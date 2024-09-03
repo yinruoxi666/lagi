@@ -19,18 +19,18 @@ import io.reactivex.Observable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@LLM(modelNames = {"gpt-3.5-turbo","gpt-4-1106-preview"})
+@LLM(modelNames = {"glm4-zhishulora"})
 public class GPTAdapter extends ModelService implements ILlmAdapter {
     private static final Logger logger = LoggerFactory.getLogger(GPTAdapter.class);
     private final Gson gson = new Gson();
-    private static final String COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
+    private static final String COMPLETIONS_URL = "http://172.17.0.1:8800/v1/chat/completions";
     private static final int HTTP_TIMEOUT = 15 * 1000;
 
 
 
     @Override
     public boolean verify() {
-        if(getApiKey() == null || getApiKey().startsWith("you")) {
+        if(getApiKey() != null && getApiKey().startsWith("you")) {
             return false;
         }
         return true;

@@ -4,7 +4,7 @@ models:
   # Landing is a MOE model provided by Beijing Landing Technologies
   - name: landing
     type: Landing
-    enable: true
+    enable: false
     drivers:
       - model: turing,qa,tree,proxy,cascade
         driver: ai.llm.adapter.impl.LandingAdapter
@@ -28,10 +28,10 @@ models:
   # ChatGPT is a state-of-the-art language model developed by OpenAI
   - name: chatgpt
     type: GPT
-    enable: false
-    model: gpt-3.5-turbo,gpt-4-1106-preview
+    enable: true
+    model: glm4-zhishulora
     driver: ai.llm.adapter.impl.GPTAdapter
-    api_key: your-api-key # https://platform.openai.com/
+    # api_key: your-api-key # https://platform.openai.com/
 
   # ChatGPT is a state-of-the-art language model developed by OpenAI
   #  - name: chatgpt-azure
@@ -169,7 +169,7 @@ stores:
       similarity_cutoff: 0.5
       parent_depth: 1
       child_depth: 1
-      url: http://localhost:8000
+      url: http://172.17.0.1:16990
 
     # Pinecone is a vector database for building large-scale machine learning applications
     # The official website is https://www.pinecone.io/
@@ -215,7 +215,7 @@ stores:
       driver: ai.bigdata.impl.ElasticsearchAdapter
       host: localhost
       port: 9200
-      enable: true
+      enable: false
 
   rag:
     vector: chroma
@@ -233,12 +233,12 @@ functions:
   embedding:
     - backend: qwen
       type: Qwen
-      api_key: you-api-key
+      api_key: sk-f4f5565da70f49228a8f3fc2d231a543
 
   chat:
     - backend: landing
       model: cascade
-      enable: true
+      enable: false
       stream: true
       priority: 350
 
@@ -249,8 +249,8 @@ functions:
       priority: 150
 
     - backend: chatgpt
-      model: gpt-3.5-turbo
-      enable: false
+      model: glm4-zhishulora
+      enable: true
       stream: true
       priority: 120
 
