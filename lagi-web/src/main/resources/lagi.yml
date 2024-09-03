@@ -34,13 +34,13 @@ models:
     api_key: your-api-key # https://platform.openai.com/
 
   # ChatGPT is a state-of-the-art language model developed by OpenAI
-  #  - name: chatgpt-azure
-  #    type: GPT
-  #    model: gpt-3.5-turbo,gpt-4-1106-preview,gpt-4o-20240513
-  #    enable: true
-  #    driver: ai.llm.adapter.impl.GPTAzureAdapter
-  #    endpoint: your-endpoint
-  #    api_key: your-api-key
+  - name: chatgpt-azure
+    type: GPT
+    model: gpt-3.5-turbo,gpt-4-1106-preview,gpt-4o-20240513
+    enable: true
+    driver: ai.llm.adapter.impl.GPTAzureAdapter
+    endpoint: https://dgman-north-central-us-gpt4.openai.azure.com/
+    api_key: 56cac597a3c1477da3b83a60f67c6507
 
   #  qwen (TongyiQianwen) is an advanced large-scale language model developed by Alibaba Cloud
   - name: qwen
@@ -103,42 +103,50 @@ models:
     api_key: your-api-key  #  url address https://platform.moonshot.cn/console/api-keys
 
   # Baichuan is a new generation of open source large language model launched by Baichuan AI
-  #  - name: baichuan
-  #    type: Baichuan
-  #    enable: false
-  #    model: Baichuan2-Turbo,Baichuan2-Turbo-192k,Baichuan2-53B
-  #    driver: ai.llm.adapter.impl.BaichuanAdapter
-  #    api_key: your-api-key # url address https://platform.baichuan-ai.com/console/apikey
+  - name: baichuan
+    type: Baichuan
+    enable: true
+    model: Baichuan2-Turbo,Baichuan2-Turbo-192k,Baichuan2-53B,Baichuan4
+    driver: ai.llm.adapter.impl.BaichuanAdapter
+    api_key: sk-c3ebfa901c895eea23d938c96f80f6d5 # url address https://platform.baichuan-ai.com/console/apikey
 
   # iFLYTEK Spark is an AI cognitive model developed by iFLYTEK, aiming to provide natural language interaction and generation capabilities
   - name: spark
     type: Spark
-    enable: false
+    enable: true
     drivers:
       - model: v1.1,v2.1,v3.1,v3.5
         driver: ai.llm.adapter.impl.SparkAdapter
       - model: tti
         driver: ai.image.adapter.impl.SparkImageAdapter
-    app_id: your-app-id
-    api_key: you-api-key  # https://console.xfyun.cn/
-    secret_key: you-secret-key   # https://console.xfyun.cn/
+    app_id: 948cf4b6
+    api_key: 54f6e81f40a31d66d976496de895a7a4  # https://console.xfyun.cn/
+    secret_key: ZDYyMjNmMTlkYTE0YWRmOWUwZTYxNjYz   # https://console.xfyun.cn/
+
+  # ChatGPT is a state-of-the-art language model developed by OpenAI
+  - name: ayena
+    type: Ayena
+    enable: true
+    model: ayenaspring-basic-001
+    driver: ai.llm.adapter.impl.AyenaAdapter
+    api_key: sk-4a78244e7fab4af9ba2a3bf8eb3cacb4ldiehkid4h6tjkx2 # https://platform.openai.com/
 
     #SenseChat(RiRiXin) is a large language model developed by Shangtang
-  #  - name: SenseChat
-  #    type: SenseChat
-  #    enable: false
-  #    model: SenseChat-Turbo,SenseChat-FunctionCall,SenseChat-5,SenseChat-128K,SenseChat-32K #SenseChat
-  #    driver: ai.llm.adapter.impl.SenseChatAdapter
-  #    api_key: your-api-key
-  #    secret_key: your-secret-key # url address https://console.sensecore.cn/iam/Security/access-key
+#  - name: SenseChat
+#    type: SenseChat
+#    enable: false
+#    model: SenseChat-Turbo,SenseChat-FunctionCall,SenseChat-5,SenseChat-128K,SenseChat-32K #SenseChat
+#    driver: ai.llm.adapter.impl.SenseChatAdapter
+#    api_key: your-api-key
+#    secret_key: your-secret-key # url address https://console.sensecore.cn/iam/Security/access-key
 
   # Gemini is a family of multimodal large language models developed by Google DeepMind.
-  #  - name: gemini
-  #    type: Gemini
-  #    enable: true
-  #    model: gemini-1.5-flash-latest,gemini-1.5-flash-latest,gemini-1.0-pro,gemini-1.5-pro-latest
-  #    driver: ai.llm.adapter.impl.GeminiAdapter
-  #    api_key: your-api-key
+#  - name: gemini
+#    type: Gemini
+#    enable: true
+#    model: gemini-1.5-flash-latest,gemini-1.5-flash-latest,gemini-1.0-pro,gemini-1.5-pro-latest
+#    driver: ai.llm.adapter.impl.GeminiAdapter
+#    api_key: your-api-key
 
   #Doubao(Doubao) is a AI tool developed by ByteDance based on the lark model
 #  - name: doubao
@@ -169,8 +177,8 @@ stores:
       similarity_cutoff: 0.5
       parent_depth: 1
       child_depth: 1
-      url: http://localhost:8000
-
+      url: http://chroma-chromadb-0.chroma-chromadb:8000
+#      url: http://test.digimeta.com.cn:16990
     # Pinecone is a vector database for building large-scale machine learning applications
     # The official website is https://www.pinecone.io/
     - name: pinecone
@@ -213,7 +221,7 @@ stores:
   bigdata:
     - name: elasticsearch
       driver: ai.bigdata.impl.ElasticsearchAdapter
-      host: localhost
+      host: 8.140.53.237
       port: 9200
       enable: true
 
@@ -233,32 +241,46 @@ functions:
   embedding:
     - backend: qwen
       type: Qwen
-      api_key: you-api-key
+      api_key: sk-f4f5565da70f49228a8f3fc2d231a543
 
   chat:
-    - backend: landing
-      model: cascade
+    - backend: ayena
+      model: ayenaspring-basic-001
       enable: true
       stream: true
-      priority: 350
+      priority: 60
 
-    - backend: kimi
-      model: moonshot-v1-8k
-      enable: false
+    - backend: spark
+      model: v3.5
+      enable: true
       stream: true
-      priority: 150
+      priority: 100
 
-    - backend: chatgpt
-      model: gpt-3.5-turbo
-      enable: false
+    - backend: chatgpt-azure
+      model: gpt-4o-20240513
+      enable: true
       stream: true
-      priority: 120
+      priority: 90
+      api_version: 2024-02-15-preview
+      deployment: gpt-4o-20240513
 
-    - backend: ernie
-      model: ERNIE-Speed-128K
-      enable: false
+    - backend: baichuan
+      model: Baichuan4
+      enable: true
       stream: true
-      priority: 10
+      priority: 80
+
+#    - backend: chatgpt
+#      model: gpt-3.5-turbo
+#      enable: false
+#      stream: false
+#      priority: 120
+#
+#    - backend: ernie
+#      model: ERNIE-Speed-128K
+#      enable: false
+#      stream: true
+#      priority: 10
 
   translate:
     - backend: ernie
