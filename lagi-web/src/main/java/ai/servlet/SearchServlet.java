@@ -4,7 +4,6 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.stream.Collectors;
 
 import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
@@ -17,7 +16,7 @@ import javax.servlet.http.Part;
 import ai.common.pojo.*;
 import ai.intent.impl.SampleIntentServiceImpl;
 import ai.intent.pojo.IntentResult;
-import ai.migrate.service.VectorDbService;
+import ai.vector.VectorDbService;
 import ai.servlet.annotation.Body;
 import ai.servlet.annotation.Post;
 import ai.utils.*;
@@ -43,7 +42,7 @@ import com.google.gson.reflect.TypeToken;
 
 import ai.common.client.AiServiceCall;
 import ai.common.client.AiServiceInfo;
-import ai.audio.service.AudioService;
+import ai.migrate.service.AudioService;
 import ai.llm.service.CompletionsService;
 import ai.learn.questionAnswer.KShingleFilter;
 import ai.migrate.service.ApiService;
@@ -109,73 +108,9 @@ public class SearchServlet extends RestfulServlet {
 
     }
 
-
-
-    @Post("uploadVoice")
-    public void uploadVoice(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        String allowedOrigin = "https://localhost";
-        response.setHeader("Access-Control-Allow-Origin", allowedOrigin);
-        response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-        response.setHeader("Access-Control-Allow-Headers", "Content-Type");
-        response.setHeader("Access-Control-Allow-Credentials", "true");
-        Part filePart = request.getPart("audioFile");
-
-        String fileName = getFileName(filePart);
-
-        String os = System.getProperty("os.name").toLowerCase();
-
-        String tempFolder;
-        if (os.contains("win")) {
-            tempFolder = "C:\\temp\\";
-        } else if (os.contains("nix") || os.contains("nux") || os.contains("mac")) {
-            tempFolder = "/tmp/";
-        } else {
-            tempFolder = "/var/tmp/";
-        }
-
-        File tempDir = new File(tempFolder);
-        if (!tempDir.exists()) {
-            tempDir.mkdirs(); // 创建临时文件夹及其父文件夹（如果不存在）
-        }
-
-        String savePath = tempFolder;
-        String resPath = savePath + fileName;
-        String result = null;
-        try (InputStream input = filePart.getInputStream();
-             OutputStream output = new FileOutputStream(savePath + fileName)) {
-            byte[] buffer = new byte[1024];
-            int bytesRead;
-            while ((bytesRead = input.read(buffer)) != -1) {
-                output.write(buffer, 0, bytesRead);
-            }
-            result = getVoiceResult(resPath);
-        } catch (IOException e) {
-            result = gson.toJson(new WhisperResponse(1, "识别失败"));
-            e.printStackTrace();
-        }
-
-        response.setHeader("Content-Type", "application/json;charset=utf-8");
-        PrintWriter out = response.getWriter();
-        out.print(result);
-        out.flush();
-        out.close();
-    }
-
-
-    // 保留接口
-    private String getVoiceResult(String resPath) throws IOException {
-        AudioRequestParam audioRequestParam = new AudioRequestParam();
-        AsrResult result = audioService.asr(resPath, audioRequestParam);
-
-        if (result.getStatus() == LagiGlobal.ASR_STATUS_SUCCESS) {
-            return gson.toJson(new WhisperResponse(0, result.getResult()));
-        }
-        return gson.toJson(new WhisperResponse(1, "识别失败"));
-    }
-
     @Post("uploadFile")
     public void uploadFile(HttpServletRequest request,
-                            HttpServletResponse response) throws ServletException, IOException {
+                           HttpServletResponse response) throws ServletException, IOException {
         String allowedOrigin = "https://localhost";
         response.setCharacterEncoding("UTF-8");
         Part filePart = request.getPart("file"); // 与前端发送的FormData中的字段名对应
@@ -273,8 +208,12 @@ public class SearchServlet extends RestfulServlet {
         ObjectMapper objectMapper = new ObjectMapper();
         String content = messages.get(messages.size() - 1).getContent().trim();
 //        String intent = intentService.detectIntent(content);
-
-        IntentResult intentResult = sampleIntentService.detectIntent(messages);
+        ChatCompletionRequest request = new ChatCompletionRequest();
+        request.setMax_tokens(0);
+        request.setModel("");
+        request.setTemperature(0);
+        request.setMessages(messages);
+        IntentResult intentResult = sampleIntentService.detectIntent(request);
         String intent = intentResult.getType();
         PrintWriter out = resp.getWriter();
 
@@ -357,10 +296,8 @@ public class SearchServlet extends RestfulServlet {
             String partResult;
             try {
                 while (!(partResult = queue.take()).equals("[CLOSED]")) {
-                    System.out.println("partResult: " + partResult);
                     out.print("data: " + partResult + "\n\n");
                     out.flush();
-//                    Thread.sleep(10);
                 }
             } catch (InterruptedException e) {
                 e.printStackTrace();
@@ -453,23 +390,18 @@ public class SearchServlet extends RestfulServlet {
 //                System.out.println("Received event: " + data);
                 if (!data.equals("[DONE]")) {
                     ChatCompletionResult chatCompletionResult = gson.fromJson(data, ChatCompletionResult.class);
+                    SensitiveWordUtil.filter(chatCompletionResult);
                     chatCompletionResult.getChoices().get(0).getDelta().getContent();
                     String chunk = chatCompletionResult.getChoices().get(0).getDelta().getContent();
                     if (chunk != null) {
                         tempChunk += chunk;
                         allContent += chunk;
                     }
-                    if (SensitiveWordUtil.containSensitiveWord(allContent)) {
-                        responseWithContext.setText("......");
+                    if (tempChunk.getBytes(StandardCharsets.UTF_8).length >= 2) {
+                        responseWithContext.setText(tempChunk);
                         queue.add(gson.toJson(responseWithContext));
-                        queue.add("[DONE]");
-                    } else {
-                        if (tempChunk.getBytes(StandardCharsets.UTF_8).length >= 2) {
-                            responseWithContext.setText(tempChunk);
-                            queue.add(gson.toJson(responseWithContext));
-                            tempChunk = "";
-                            responseWithContext.setText(tempChunk);
-                        }
+                        tempChunk = "";
+                        responseWithContext.setText(tempChunk);
                     }
                 } else {
                     if (!tempChunk.isEmpty()) {
@@ -582,7 +514,12 @@ public class SearchServlet extends RestfulServlet {
     @Post("intentDetect")
     public String intentDetect(@Body QuestionAnswerRequest qaRequest) {
         List<ChatMessage> messages = qaRequest.getMessages();
-        IntentResult intentResult = sampleIntentService.detectIntent(messages);
+        ChatCompletionRequest request = new ChatCompletionRequest();
+        request.setMessages(messages);
+        request.setMax_tokens(0);
+        request.setModel("");
+        request.setTemperature(0);
+        IntentResult intentResult = sampleIntentService.detectIntent(request);
         return intentResult.getType();
     }
 }

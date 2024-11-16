@@ -1,67 +1,120 @@
 package ai.intent.impl;
 
 
+import ai.common.pojo.IndexSearchData;
+import ai.common.utils.ThreadPoolManager;
 import ai.intent.IntentService;
 import ai.intent.enums.IntentStatusEnum;
 import ai.intent.enums.IntentTypeEnum;
 import ai.intent.pojo.IntentResult;
-import ai.openai.pojo.ChatMessage;
+import ai.medusa.utils.PromptCacheTrigger;
+import ai.openai.pojo.ChatCompletionRequest;
+import ai.utils.ContinueWordUtil;
 import ai.utils.StoppingWordUtil;
+import ai.utils.StrFilterUtil;
+import ai.utils.qa.ChatCompletionUtil;
+import ai.vector.VectorStoreService;
 import cn.hutool.core.util.StrUtil;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
+
+@Slf4j
 public class SampleIntentServiceImpl implements IntentService {
 
     private static final String punctuations = "[\\.,;!\\?，。；！？]";
 
+    private static ExecutorService executor;
 
+    static {
+        ThreadPoolManager.registerExecutor("vector_intent");
+        executor = ThreadPoolManager.getExecutor("vector_intent");
+    }
 
     private List<String> splitByPunctuation(String content) {
         String[] split = content.split(punctuations);
         return Arrays.stream(split).filter(StrUtil::isNotBlank).collect(Collectors.toList());
     }
 
+    private IntentTypeEnum detectType(ChatCompletionRequest chatCompletionRequest) {
+        String lastMessage = ChatCompletionUtil.getLastMessage(chatCompletionRequest);
+        List<String> segments = splitByPunctuation(lastMessage);
+        IntentTypeEnum[] enums = IntentTypeEnum.values();
+        for(IntentTypeEnum e : enums) {
+            if(e.matches(lastMessage ,segments)) {
+                return e;
+            }
+        }
+        return IntentTypeEnum.TEXT;
+    }
 
     @Override
-    public IntentResult detectIntent(List<ChatMessage> chatMessages) {
-        List<String> messages = chatMessages.stream().map(ChatMessage::getContent).collect(Collectors.toList());
-        if(messages.isEmpty()) {
-            return null;
-        }
-        String newMessage = messages.get(messages.size() - 1);
-        List<String> segments = splitByPunctuation(newMessage);
-        IntentTypeEnum[] enums = IntentTypeEnum.values();
+    public IntentResult detectIntent(ChatCompletionRequest chatCompletionRequest) {
+        IntentTypeEnum intentTypeEnum = detectType(chatCompletionRequest);
         IntentResult intentResult = new IntentResult();
-        for(IntentTypeEnum e : enums) {
-            if(e.matches(newMessage ,segments)) {
-                intentResult.setType(e.getName());
-            }
+        intentResult.setType(intentTypeEnum.getName());
+        if(intentTypeEnum != IntentTypeEnum.TEXT
+                || chatCompletionRequest.getMax_tokens() <= 0) {
+            return intentResult;
         }
-        if(intentResult.getType() == null) {
-            intentResult.setType(IntentTypeEnum.TEXT.getName());
+        intentResult.setStatus(IntentStatusEnum.COMPLETION.getName());
+        List<Integer> res = PromptCacheTrigger.analyzeChatBoundariesForIntent(chatCompletionRequest);
+        if(res.size() == 1) {
+            return intentResult;
         }
-        intentResult.setStatus(IntentStatusEnum.getStatusByContents(messages, punctuations).getName());
-        List<Integer> stoppingIndex = StoppingWordUtil.getStoppingIndex(chatMessages);
-        if(!stoppingIndex.isEmpty()) {
-            int lastIndex = stoppingIndex.get(stoppingIndex.size() - 1);
-            if(lastIndex != chatMessages.size() -1) {
-                intentResult.setStatus(IntentStatusEnum.CONTINUE.getName());
-                intentResult.setContinuedIndex(lastIndex);
-            } else {
-                intentResult.setStatus(IntentStatusEnum.COMPLETION.getName());
-            }
+        String lastQ = ChatCompletionUtil.getLastMessage(chatCompletionRequest);
+        boolean isStop = StoppingWordUtil.containsStoppingWorlds(lastQ);
+        if(isStop) {
+            return intentResult;
         }
+        Integer lIndex = res.get(0);
+        boolean isContinue = ContinueWordUtil.containsStoppingWorlds(lastQ);
+        if(isContinue) {
+            intentResult.setStatus(IntentStatusEnum.CONTINUE.getName());
+            intentResult.setContinuedIndex(lIndex);
+            return intentResult;
+        }
+        setIntentByVector(chatCompletionRequest, lIndex, lastQ, intentResult);
         return intentResult;
     }
 
-    public static void main(String[] args) {
-//        SampleIntentServiceImpl sampleIntentService = new SampleIntentServiceImpl();
-//        List<String> strings = sampleIntentService.splitByPunctuation("你好。画一张狗狗图");
-//        System.out.println(strings);
-//        IntentResult intentResult = sampleIntentService.detectIntent(strings);
-//        System.out.println(intentResult);
+    private static void setIntentByVector(ChatCompletionRequest chatCompletionRequest, Integer lIndex, String lastQ, IntentResult intentResult) {
+        VectorStoreService vectorStoreService = new VectorStoreService();
+        String lQ = chatCompletionRequest.getMessages().get(lIndex).getContent();
+        String complexQ = lQ + lastQ;
+        lastQ = StrFilterUtil.filterPunctuations(lastQ);
+        complexQ = StrFilterUtil.filterPunctuations(complexQ);
+        String finalLastQ = lastQ;
+        Future<List<IndexSearchData>> lastFuture = executor.submit(() -> vectorStoreService.search(finalLastQ, chatCompletionRequest.getCategory()));
+        String finalComplexQ = complexQ;
+        Future<List<IndexSearchData>> complexFuture = executor.submit(() -> vectorStoreService.search(finalComplexQ, chatCompletionRequest.getCategory()));
+        try {
+            List<IndexSearchData> l = lastFuture.get();
+            List<IndexSearchData> c = complexFuture.get();
+            boolean vectorContinue = false;
+            if(!l.isEmpty() && !c.isEmpty()) {
+                if(c.get(0).getDistance() < l.get(0).getDistance()) {
+                    vectorContinue = true;
+                }
+            } else if(!l.isEmpty()){
+                vectorContinue = true;
+            }
+            if(vectorContinue) {
+                intentResult.setStatus(IntentStatusEnum.CONTINUE.getName());
+                intentResult.setContinuedIndex(lIndex);
+                intentResult.setIndexSearchDataList(c);
+            } else {
+                intentResult.setIndexSearchDataList(l);
+            }
+        } catch (Exception e) {
+            log.error("detectIntent error", e);
+        }
     }
+
+
 }

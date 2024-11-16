@@ -6,6 +6,7 @@ import ai.vector.VectorStore;
 import ai.vector.pojo.QueryCondition;
 import ai.vector.pojo.IndexRecord;
 import ai.vector.pojo.UpsertRecord;
+import ai.vector.pojo.VectorCollection;
 import com.google.protobuf.Struct;
 import com.google.protobuf.Value;
 import io.pinecone.PineconeClient;
@@ -145,6 +146,16 @@ public class PineconeVectorStore implements VectorStore {
         return result;
     }
 
+    public List<IndexRecord> fetch(Map<String, String> where) {
+        // TODO: Implement this method
+        return null;
+    }
+
+    public List<IndexRecord> fetch(Map<String, String> where, String category) {
+        // TODO: Implement this method
+        return null;
+    }
+
     @Override
     public void delete(List<String> ids) {
         this.delete(ids, this.config.getDefaultCategory());
@@ -215,6 +226,42 @@ public class PineconeVectorStore implements VectorStore {
         return result;
     }
 
-    public void update() {
+    @Override
+    public void deleteCollection(String category) {
+        PineconeConnectionConfig connectionConfig = new PineconeConnectionConfig()
+                .withIndexName(this.config.getIndexName());
+        try (PineconeConnection connection = pineconeClient.connect(connectionConfig)) {
+            DeleteRequest deleteRequest = DeleteRequest.newBuilder()
+                    .setNamespace(category)
+                    .setDeleteAll(true)
+                    .build();
+            connection.getBlockingStub().delete(deleteRequest);
+        } catch (PineconeException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public List<VectorCollection> listCollections() {
+        List<VectorCollection> result = new ArrayList<>();
+        PineconeConnectionConfig connectionConfig = new PineconeConnectionConfig()
+                .withIndexName(this.config.getIndexName());
+        try (PineconeConnection connection = pineconeClient.connect(connectionConfig)) {
+            DescribeIndexStatsResponse describeIndexStatsResponse = connection.getBlockingStub().describeIndexStats(DescribeIndexStatsRequest.newBuilder().build());
+            for (Map.Entry<String, NamespaceSummary> entry : describeIndexStatsResponse.getNamespacesMap().entrySet()) {
+                if (entry.getKey().isEmpty()) {
+                    continue;
+                }
+                int count = entry.getValue().getVectorCount();
+                VectorCollection vectorCollection = VectorCollection.builder()
+                        .category(entry.getKey())
+                        .vectorCount(count)
+                        .build();
+                result.add(vectorCollection);
+            }
+        } catch (PineconeException e) {
+            e.printStackTrace();
+        }
+        return result;
     }
 }

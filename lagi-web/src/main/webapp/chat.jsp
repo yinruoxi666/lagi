@@ -169,6 +169,16 @@
             <!-- 上部导航条 -->
             <!-- *************************************************主要结构********************************* -->
             <main class="relative h-full w-full transition-width overflow-auto flex-1">
+              <div>
+                <div id="model-prefences" class="w-full h-16 pl-10">
+                  <div id="model-selects" class="inline-block model-selects  float-left">
+                  </div>
+                  <div class="model-btns w-20 flex-1 inline-block">
+                    <button id = "modelClearBtn" class="inline-block" onclick="clearPreference()">重置所有</button>
+                    <button id = "modelSaveBtn" class="inline-block" onclick="savePerference()">保存</button>
+                  </div>
+                </div>
+              </div>
               <div role="presentation" class="flex h-full">
                 <!-- 隐藏文本遮罩 -->
                 <div  class="w-full h-full absolute top-14 z-10 bg-white " id="textareaMask" style="display: none;">
@@ -339,7 +349,7 @@
                       &nbsp;&nbsp;&nbsp;&nbsp;
                       联系邮箱: 
                       <a href="mailto:service@landingbj.com" style="text-decoration: none;">service@landingbj.com</a>
-                      &nbsp;&nbsp;&nbsp;&nbsp;联系电话: 027-87659116 &nbsp;&nbsp;&nbsp;&nbsp;<div>一种通用人工智能的实现验证</div>
+                      &nbsp;&nbsp;&nbsp;&nbsp;联系电话: 027-87659116 &nbsp;&nbsp;&nbsp;&nbsp;<div>内容由AI生成 &nbsp 一种通用人工智能的实现验证</div>
                     </div>
                   </div>
                   <!-- *********************** 底部end******************************** -->
@@ -372,6 +382,7 @@
     <!-- mobile debug 插件 -->
     <!-- <script src="https://unpkg.com/vconsole@latest/dist/vconsole.min.js"></script> -->
     <script src="libs/jquery-3.1.1.min.js"></script>
+    <script src="js/fingerprint2.min.js"></script>
     <script src="libs/sse.js?ver=${initParam.version}"></script>
     <script src="js/common.js?ver=${initParam.version}"></script>
     <script src="js/hello.js?ver=${initParam.version}"></script>

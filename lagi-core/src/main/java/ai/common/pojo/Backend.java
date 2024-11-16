@@ -17,7 +17,10 @@ public class Backend {
     private Boolean enable;
     private Integer priority;
     private String model;
+    private String deployment;
+    private String apiVersion;
     private String driver;
+    private String endpoint;
     private String apiAddress;
     private String appId;
     private String apiKey;
@@ -25,5 +28,14 @@ public class Backend {
     private String appKey;
     private String accessKeyId;
     private String accessKeySecret;
+    private String securityKey;
     private Boolean stream;
+    private String oss;
+    private String accessToken;
+    private String others;
+    private String alias;
+    private Boolean cacheEnable;
+    private String cacheDir;
+    private String router;
+    private Boolean dependingOnTheContext;
 }

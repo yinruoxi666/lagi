@@ -391,6 +391,15 @@ function generalOutput(paras, question, robootAnswerJq) {
 }
 
 function streamOutput(paras, question, robootAnswerJq) {
+    function isJsonString(str) {
+        try {
+            JSON.parse(str);
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
     async function generateStream(paras) {
         const response = await fetch('v1/chat/completions', {
             method: "POST",
@@ -403,13 +412,32 @@ function streamOutput(paras, question, robootAnswerJq) {
             body: JSON.stringify(paras),
         });
 
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
         const reader = response.body.getReader();
+
         let fullText = '';
         let flag = true;
+        let lastChunkPart = '';
+
         while (flag) {
             const {value, done} = await reader.read();
-            let chunkStr = new TextDecoder().decode(value).replaceAll('data: ', '').trim();
+            let res =  new TextDecoder().decode(value);
+            if(res.startsWith("error:")) {
+                robootAnswerJq.html(res.replaceAll('error:', ''));
+                return;
+            }
+            let chunkStr = lastChunkPart + new TextDecoder().decode(value).replaceAll('data: ', '').trim();
             const chunkArray = chunkStr.split("\n\n");
+
+            let lastChunk = chunkArray[chunkArray.length - 1];
+            if (!isJsonString(chunkArray[chunkArray.length - 1]) && lastChunk !== "[DONE]" ) {
+                lastChunkPart = chunkArray.pop();
+            } else {
+                lastChunkPart = '';
+            }
+
             for (let i = 0; i < chunkArray.length; i++) {
                 let chunk = chunkArray[i];
                 if (chunk === "[DONE]") {
@@ -419,15 +447,36 @@ function streamOutput(paras, question, robootAnswerJq) {
                     break;
                 }
                 var json = JSON.parse(chunk);
-                if (json.choices === undefined || json.choices.length === 0) {
+                if (json.choices === undefined) {
                     queryLock = false;
                     robootAnswerJq.html("调用失败！");
                     break
                 }
+                if (json.choices.length === 0) {
+                    continue;
+                }
                 var chatMessage = json.choices[0].message;
-                var a = '<a style="color: #666;text-decoration: none;" ' +
-                    'href="uploadFile/downloadFile?filePath=' + chatMessage.filepath + '&fileName=' +
-                    chatMessage.filename + '">' + chatMessage.filename + '</a>';
+
+                if (chatMessage.filename === undefined){
+
+                }else{
+                    //var a = '<ul style="list-style:none;padding-left:5px;">';
+                    var a = '';
+                    let isFirst = true; // 标记是否是第一个文件名
+
+                    for (let i = 0; i < chatMessage.filename.length; i++) {
+                        let marginLeft = isFirst ? '0' : '50px';
+                        a += `<a class="filename" style="list-style:none;color: #666;text-decoration: none;display: inline-block; " href="uploadFile/downloadFile?filePath=${chatMessage.filepath[i]}&fileName=${chatMessage.filename[i]}">${chatMessage.filename[i]}</a>`;
+                        isFirst = false;
+                        //console.log("这里的路径是："+chatMessage.filepath[i]);
+                        //a+=`<a style="color: #666;text-decoration: none;" href="uploadFile/downloadFile?filePath=${chatMessage.filepath[i]}&fileName=${chatMessage.filename[i]}">${chatMessage.filename[i]}</a><br>`;
+                    }
+                    //a +='</ul>'
+                }
+
+                // var a = '<a style="color: #666;text-decoration: none;" ' +
+                //     'href="uploadFile/downloadFile?filePath=' + chatMessage.filepath + '&fileName=' +
+                //     chatMessage.filename + '">' + chatMessage.filename + '</a>';
 
                 if (chatMessage.content === undefined) {
                     continue;
@@ -438,7 +487,7 @@ function streamOutput(paras, question, robootAnswerJq) {
                 result = `
                         ${fullText} <br>
                         ${chatMessage.imageList !== undefined && chatMessage.imageList.length > 0 ? `<img src='${chatMessage.imageList[0]}' alt='Image'>` : ""}
-                        ${chatMessage.filename !== undefined ? `附件:${a}` : ""}<br>
+                        ${chatMessage.filename !== undefined ? `<div style="display: flex;"><div style="width:50px;flex:1">附件:</div><div style="width:600px;flex:17 padding-left:5px">${a}</div></div>` : ""}<br>
                         `
                 robootAnswerJq.html(result);
             }

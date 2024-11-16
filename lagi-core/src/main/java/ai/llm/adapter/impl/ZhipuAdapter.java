@@ -1,8 +1,10 @@
 package ai.llm.adapter.impl;
 
+import ai.annotation.LLM;
 import ai.common.ModelService;
 import ai.common.utils.MappingIterable;
 import ai.llm.adapter.ILlmAdapter;
+import ai.llm.utils.convert.ZhiPuConvert;
 import ai.openai.pojo.ChatCompletionChoice;
 import ai.openai.pojo.ChatCompletionRequest;
 import ai.openai.pojo.ChatCompletionResult;
@@ -17,13 +19,19 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+@LLM(modelNames = { "glm-3-turbo","glm-4", "glm-4v"})
 public class ZhipuAdapter extends ModelService implements ILlmAdapter {
+
 
 
     @Override
     public ChatCompletionResult completions(ChatCompletionRequest chatCompletionRequest) {
         ClientV4 client = new ClientV4.Builder(getApiKey()).build();
         ModelApiResponse invokeModelApiResp = client.invokeModelApi(convertRequest(chatCompletionRequest));
+        int code = invokeModelApiResp.getCode();
+        if(code != 200) {
+            throw ZhiPuConvert.convert2RRException(invokeModelApiResp);
+        }
         return convertResponse(invokeModelApiResp.getData());
     }
 
@@ -31,10 +39,15 @@ public class ZhipuAdapter extends ModelService implements ILlmAdapter {
     public Observable<ChatCompletionResult> streamCompletions(ChatCompletionRequest chatCompletionRequest) {
         ClientV4 client = new ClientV4.Builder(getApiKey()).build();
         ModelApiResponse sseModelApiResp = client.invokeModelApi(convertRequest(chatCompletionRequest));
+        int code = sseModelApiResp.getCode();
+        if(code != 200) {
+            throw ZhiPuConvert.convert2RRException(sseModelApiResp);
+        }
         Iterable<ModelData> resultIterable = sseModelApiResp.getFlowable().blockingIterable();
         Iterable<ChatCompletionResult> iterable = new MappingIterable<>(resultIterable, this::convertResponse);
         return Observable.fromIterable(iterable);
     }
+
 
     private com.zhipu.oapi.service.v4.model.ChatCompletionRequest convertRequest(ChatCompletionRequest request) {
         List<com.zhipu.oapi.service.v4.model.ChatMessage> messages = new ArrayList<>();
@@ -48,7 +61,7 @@ public class ZhipuAdapter extends ModelService implements ILlmAdapter {
         String model = Optional.ofNullable(request.getModel()).orElse(getModel());
 
         String invokeMethod = Constants.invokeMethod;
-        if (request.getStream()) {
+        if (stream) {
             invokeMethod = Constants.invokeMethodSse;
         }
 
@@ -70,8 +83,8 @@ public class ZhipuAdapter extends ModelService implements ILlmAdapter {
         for (int i = 0; i < modelData.getChoices().size(); i++) {
             ChatCompletionChoice choice = new ChatCompletionChoice();
             ChatMessage chatMessage = new ChatMessage();
-            if (choice.getDelta() == null) {
-                com.zhipu.oapi.service.v4.model.Delta delta = modelData.getChoices().get(i).getDelta();
+            com.zhipu.oapi.service.v4.model.Delta delta = modelData.getChoices().get(i).getDelta();
+            if (delta != null) {
                 chatMessage.setContent(delta.getContent());
                 chatMessage.setRole(delta.getRole());
             } else {
