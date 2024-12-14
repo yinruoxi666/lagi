@@ -4,6 +4,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.util.List;
+import java.util.Map;
 
 @Data
 @EqualsAndHashCode
@@ -20,4 +21,5 @@ public class IndexSearchData {
     private List<String> imageList;
     private String level;
     private String parentId;
+    private Map<String,Object> metadata;
 }
