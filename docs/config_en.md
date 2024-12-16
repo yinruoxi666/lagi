@@ -65,12 +65,18 @@ stores:
       enable: true
 
   # This part is the configuration of Elasticsearch
-  bigdata:
+  text:
     - name: elasticsearch # The name of the full-text search
-      driver: ai.bigdata.impl.ElasticsearchAdapter
+      driver: ai.bigdata.impl.ElasticSearchAdapter
       host: localhost # IP address
       port: 9200 # Port number
       enable: false # Whether it is turned on
+  database: # Relational database configuration
+    name: mysql # Database name
+    jdbcUrl: you-jdbc-url # Connection address
+    driverClassName: com.mysql.cj.jdbc.Driver # Driver class
+    username: your-username # Database username
+    password: your-password # Database password
   # This section is the configuration of the retrieval enhancement build service
   rag:
     vector: chroma # The name of the vector database used by the service
@@ -79,6 +85,7 @@ stores:
     enable: true # Enable or not
     priority: 10 # Priority for this function，When the priority is greater than the model, the prompt in default is returned if the context is not found
     default: "Please give prompt more precisely" # If the context is not found, the cue is returned
+    track: true # enable document tracking
   # This section is the configuration of Medusa's Accelerated Inference Service
   medusa:
     enable: true # Enable or not
@@ -161,6 +168,12 @@ functions:
       model: enhance
       enable: true
       priority: 10
+  # Image OCR configuration list
+  image2ocr:
+      - backend: qwen
+        model: ocr
+        enable: true
+        priority: 10
   # Text generated video configuration list
   text2video:
     - backend: landing # The name of the model configuration used by the backend
@@ -173,19 +186,30 @@ functions:
       model: vision
       enable: true
       priority: 10
-  # 视频追踪功能配置列表
+  # Video tracking configuration list
   video2track:
     - backend: landing # The name of the model configuration used by the backend
       model: video
       enable: true
       priority: 10
-  # 视屏增强功能配置列表
+  # Video enhancement configuration list
   video2enhance:
     - backend: qwen # The name of the model configuration used by the backend
       model: vision
       enable: true
       priority: 10
-
+  # document OCR configuration list
+  doc2ocr:
+      - backend: qwen
+        model: ocr
+        enable: true
+        priority: 10
+  # document instruction configuration list
+  doc2instruct:
+    - backend: landing
+      model: cascade
+      enable: true
+      priority: 10
 ```
 
 Routing policy configuration
@@ -193,11 +217,11 @@ Routing policy configuration
 ```yaml
 functions:
   policy:
-    #  handle Configuration: Currently, there are three values: parallel, failover, and polling. Parallel indicates concurrent invocation; failover indicates failover handling; polling indicates load balancing invocation. Scenario explanation：
-    # 1. When the model is not forcibly specified in the request or the specified model is invalid, the three strategies of parallel, failover, and polling take effect.
+    #  handle Configuration: Currently, there are three values: parallel, failover, and failover. Parallel indicates concurrent invocation; failover indicates failover handling; failover indicates load balancing invocation. Scenario explanation：
+    # 1. When the model is not forcibly specified in the request or the specified model is invalid, the three strategies of parallel, failover, and failover take effect.
     # 2. When the handle is set to parallel, the models configured for parallel execution will be invoked concurrently, returning the result of the fastest responding and highest-priority model call.
     # 3. When the handle is set to failover, the models configured for serial execution will be executed in sequence according to priority. If any model returns successfully during the serial execution process, subsequent models will not be executed.
-    # 4. When the handle is set to polling, the models configured for round-robin execution will be invoked based on additional information such as the request IP and browser fingerprint, distributing requests evenly among the corresponding models.
+    # 4. When the handle is set to failover, the models configured for round-robin execution will be invoked based on additional information such as the request IP and browser fingerprint, distributing requests evenly among the corresponding models.
     # 5. When all models return failures, the HTTP request status code will be set to 600-608. The body will contain specific error messages. (The error code and message actually correspond to the failure information of the last model call.)
     #  Error Codes： 
     #     600 Invalid request parameters

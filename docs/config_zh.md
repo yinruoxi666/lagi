@@ -65,12 +65,18 @@ stores:
       enable: true
 
   # 这部分是elasticsearch的配置
-  bigdata:
+  text:
     - name: elasticsearch # 全文检索名称
-      driver: ai.bigdata.impl.ElasticsearchAdapter
+      driver: ai.bigdata.impl.ElasticSearchAdapter
       host: localhost # 全文检索的elasticsearch地址
       port: 9200 # 全文检索的elasticsearch的端口号
       enable: false # 是否开启
+  database: # 关系型数据库配置
+    name: mysql # 数据库名称
+    jdbcUrl: you-jdbc-url # 连接地址
+    driverClassName: com.mysql.cj.jdbc.Driver # 驱动类
+    username: your-username # 数据库用户名
+    password: your-password # 数据库密码
   # 这部分是检索增强生成服务的配置
   rag:
       vector: chroma # 服务用到的向量数据库的名称
@@ -79,6 +85,7 @@ stores:
       enable: true # 是否开启
       priority: 10 # 优先级，当该优先级大于模型时,则匹配不到上下文就只返回default中提示语
       default: "Please give prompt more precisely" # 如未匹配到上下文，则返回该提示语
+      track: true # 开启文档跟踪
   # 这部分是美杜莎的加速推理服务的配置
   medusa:
     enable: true # 是否开启
@@ -173,6 +180,12 @@ functions:
       model: vision
       enable: true
       priority: 10
+  # 图片OCR配置列表
+  image2ocr:
+    - backend: qwen
+      model: ocr
+      enable: true
+      priority: 10
   # 视频追踪功能配置列表
   video2track:
     - backend: landing # 后端使用的模型配置的名称
@@ -185,7 +198,18 @@ functions:
       model: vision
       enable: true
       priority: 10
-
+  # 文档OCR配置列表
+  doc2ocr:
+    - backend: qwen
+      model: ocr
+      enable: true
+      priority: 10
+  # 文件指令配置表
+  doc2instruct:
+    - backend: landing
+      model: cascade
+      enable: true
+      priority: 10
 ```
 
 路由政策配置
@@ -193,11 +217,11 @@ functions:
 ```yaml
 functions:
   policy:
-    #  handle配置 目前有parallel、failover、polling 3种值， parallel表示并行调用，failover表示故障转移, polling表示负载轮询调用, 场景解释：
-    # 1. 当请求中未强制指定模型, 或指定的模型无效时 ，parallel、failover、polling 3种策略生效
+    #  handle配置 目前有parallel、failover、failover 3种值， parallel表示并行调用，failover表示故障转移, polling表示负载轮询调用, 场景解释：
+    # 1. 当请求中未强制指定模型, 或指定的模型无效时 ，parallel、failover、failover 3种策略生效
     # 2. 当指定handle为 parallel 配置的模型并行执行， 返回响应最快且优先级最高的模型调用结果
     # 3. 当指定handle为 failover 配置的模型串行执行， 模型按优先级串行执行， 串行执行过程中任意模型返回成功， 后面的模型不再执行。
-    # 4. 当指定handle为 polling 配置的模型轮询执行， 请求会根据请求的ip、浏览器指纹 等额外信息， 均衡分配请求给对应的模型执行。
+    # 4. 当指定handle为 failover 配置的模型轮询执行， 请求会根据请求的ip、浏览器指纹 等额外信息， 均衡分配请求给对应的模型执行。
     # 5. 当所有的模型都返回失败时, 会设置 http 请求的状态码为 600-608。 body里为具体的错误信息。 (错误码错误信息实际为最后一个模型调用失败的信息)
     #  错误码： 
     #     600 请求参数不合法

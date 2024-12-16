@@ -42,6 +42,10 @@ public class ModelFunctions {
     private List<Backend> speech2clone;
     @JsonProperty("image2ocr")
     private List<Backend> image2ocr;
+    @JsonProperty("doc2ocr")
+    private List<Backend> doc2orc;
+    @JsonProperty("doc2instruct")
+    private List<Backend> doc2instruct;
 
     @JsonCreator
     public ModelFunctions(
@@ -61,7 +65,7 @@ public class ModelFunctions {
             @JsonProperty("speech2clone") List<Backend> speech2clone,
             @JsonProperty("image2ocr") List<Backend> image2ocr
     ) {
-        this.policy = policy == null ? new Policy(null, null, null, null) : policy;
+        this.policy = policy == null ? new Policy(null,null, null, null, null) : policy;
         this.embedding = embedding;
         this.chat = chat;
         this.speech2text = speech2text;

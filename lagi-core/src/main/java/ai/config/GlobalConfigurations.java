@@ -5,6 +5,11 @@ import ai.config.pojo.*;
 import ai.manager.*;
 import ai.medusa.utils.PromptCacheConfig;
 import ai.ocr.OcrConfig;
+import ai.router.Routers;
+import ai.utils.PriorityWordUtil;
+import ai.utils.RetainWordUtil;
+import ai.utils.SensitiveWordUtil;
+import ai.utils.StoppingWordUtil;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
@@ -26,6 +31,8 @@ public class GlobalConfigurations extends AbstractConfiguration {
     private ModelFunctions functions;
     private List<AgentConfig> agents;
     private List<WorkerConfig> workers;
+    private List<RouterConfig> routers;
+    private FilterConfig filters;
 
     @Override
     public void init() {
@@ -36,9 +43,18 @@ public class GlobalConfigurations extends AbstractConfiguration {
         MultimodalAIManager.register(models, functions);
         PromptCacheConfig.init(stores.getVectors(), stores.getMedusa());
         OcrConfig.init(functions.getImage2ocr());
+        AgentManager.getInstance().register(agents);
+        WorkerManager.getInstance().register(workers);
+        Routers.getInstance().register(routers);
+        registerFilter();
     }
 
-
+    private void registerFilter() {
+        SensitiveWordUtil.pushWordRule(filters.getSensitive());
+        StoppingWordUtil.addWords(filters.getStopping());
+        PriorityWordUtil.addWords(filters.getPriority());
+        RetainWordUtil.addWords(filters.getRetain());
+    }
 
 
     @Override
