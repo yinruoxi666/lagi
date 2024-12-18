@@ -1,10 +1,13 @@
 package ai.servlet.api;
 
 import ai.audio.pojo.AsrResponse;
+import ai.openai.pojo.ChatCompletionRequest;
+import ai.openai.pojo.ChatCompletionResult;
 import ai.servlet.BaseServlet;
 import ai.utils.SensitiveWordUtil;
 import ai.worker.DefaultWorker;
 import ai.worker.audio.Asr4FlightsWorker;
+import ai.worker.llmIntent.LlmIntentWorker;
 import ai.worker.pojo.Asr4FlightData;
 import com.google.gson.Gson;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +26,7 @@ import java.nio.file.Paths;
 public class WorkerApiServlet extends BaseServlet {
     private final Asr4FlightsWorker asr4FlightsWorker = new Asr4FlightsWorker();
     private final DefaultWorker defaultWorker = new DefaultWorker();
+    private final LlmIntentWorker llmIntentWorker = new LlmIntentWorker();
 
 
     private static final Gson gson = new Gson();
@@ -43,7 +47,7 @@ public class WorkerApiServlet extends BaseServlet {
     public void completions(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         resp.setContentType("application/json;charset=utf-8");
         ChatCompletionRequest chatCompletionRequest = reqBodyToObj(req, ChatCompletionRequest.class);
-        ChatCompletionResult chatCompletionResult = defaultWorker.work("best", chatCompletionRequest);
+        ChatCompletionResult chatCompletionResult = llmIntentWorker.process(chatCompletionRequest, null);
         chatCompletionResult = SensitiveWordUtil.filter(chatCompletionResult);
         responsePrint(resp, gson.toJson(chatCompletionResult));
     }

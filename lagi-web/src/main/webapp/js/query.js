@@ -273,7 +273,7 @@ function getTextResult(question, robootAnswerJq, conversation) {
         ]),
         "temperature": 0.8,
         "max_tokens": 1024,
-        "stream": true
+        "stream": false
         // "stream": false
     };
 
@@ -361,7 +361,7 @@ function generalOutput(paras, question, robootAnswerJq) {
     $.ajax({
         type: "POST",
         contentType: "application/json;charset=utf-8",
-        url: "v1/chat/completions",
+        url: "v1/worker/completions",
         // url: "v1/worker/completions",
         data: JSON.stringify(paras),
         success: function (res) {
@@ -412,7 +412,7 @@ function streamOutput(paras, question, robootAnswerJq) {
     }
 
     async function generateStream(paras) {
-        const response = await fetch('v1/chat/completions', {
+        const response = await fetch('v1/worker/completions', {
             method: "POST",
             cache: "no-cache",
             keepalive: true,

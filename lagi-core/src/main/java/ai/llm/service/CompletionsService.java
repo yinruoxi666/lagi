@@ -18,6 +18,7 @@ import ai.config.ContextLoader;
 import ai.config.pojo.Policy;
 import ai.llm.adapter.ILlmAdapter;
 import ai.common.pojo.Backend;
+import ai.llm.pojo.ChatCompletionResultWithModel;
 import ai.llm.pojo.EnhanceChatCompletionRequest;
 import ai.llm.pojo.GetRagContext;
 import ai.llm.utils.CacheManager;
