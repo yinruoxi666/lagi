@@ -1,67 +1,3 @@
-# API 接口文档
-
-## 启动 Lag[i] (联基)
-
-### 1.配置yml文件
-
-修改[`src/main/resources/lagi.yml`](../lagi-web/src/main/resources/lagi.yml)配置文件，选择您喜欢的模型，将其中的大语言模型your-api-key等信息替换为您自己的密钥，并根据需要将启用的模型的`enable`字段设置为`true`。详细的配置方法可参见[配置文档](config_zh.md)。
-
-***以配置kimi为列：***
-
-填入模型信息并开启模型,修改enable设置为true。
-
-```yaml
-  - name: kimi
-    type: Moonshot
-    enable: true
-    model: moonshot-v1-8k,moonshot-v1-32k,moonshot-v1-128k
-    driver: ai.llm.adapter.impl.MoonshotAdapter
-    api_key: your-api-key  
-```
-
-根据您的需求，设置模型输出的方式stream和优先级priority，值越大优先级越高。
-
-```yaml
-  chat:
-    - backend: doubao
-      model: doubao-pro-4k
-      enable: true
-      stream: true
-      priority: 160
-
-    - backend: kimi
-      model: moonshot-v1-8k
-      enable: true
-      stream: true
-      priority: 150
-```
-
-### 2.引入依赖
-
-调用lag[i] (联基) 相关API接口需引入依赖，您可以通过maven引入或直接导入jar的方式。
-
-***以maven引入为例：***
-
-使用maven下载依赖执行命令。
-
-```shell
-mvn clean install
-```
-
-### 3.启动web服务。
-
-您可以选择使用maven命令行工具进行封包，或者通过IntelliJ IDEA等主流的集成开发环境（IDE）进行运行。请确保您的JDK版本至少满足8的要求。
-
-***以maven命令行工具封包为例：***
-
-使用maven命令进行项目封包，封包完成后将会在`target`目录下生成一个war文件。
-
-```shell
-mvn package
-```
-
-将生成的war包部署到Tomcat服务器中。启动Tomcat后，通过浏览器访问对应的端口，即可查看Lag[i] (联基) 的具体页面。
-
 ## 问答接口
 
 POST `/chat/completions`
@@ -151,6 +87,94 @@ POST `/chat/completions`
 | »» prompt_tokens       | integer  | true  | 提示中的令牌数量。                                   |
 | »» completion_tokens   | integer  | true  | 生成的令牌数量                                     |
 | »» total_tokens        | integer  | true  | 请求中使用的总令牌数量                                 |
+
+
+## 智能体调用接口
+
+POST `/chat/go`
+
+输入prompt，获取智能体的回答。
+
+### Body 请求参数
+
+```json
+{
+  "router": "pass",
+  "agentId": "weather_agent",
+  "temperature": 0.8,
+  "max_tokens": 500,
+  "messages": [
+    {
+      "role": "user",
+      "content": "今天武汉的天气如何。"
+    }
+  ]
+}
+```
+
+### 请求参数
+
+| 名称              | 位置   | 类型       | 必选 | 说明                                                                                         |
+|-----------------|------|----------|----|--------------------------------------------------------------------------------------------|
+| body            | body | object   | 否  | none                                                                                       |
+| » router         | body | string   | 是  | 路由规则,该值取于router 配置项, 具体请参考[路由配置](./config.md#路由配置) 接口会按规则调用智能体                             |                                                                            |
+| » agentId      | body | string   | 否  | 当指定路由规则为%通配时，能指定调用所有智能体, 值为智能体配置里配置的智能体名字。                                                 |
+| » temperature   | body | number   | 是  | 用来控制语言模型生成文本的创造性和多样性<br/>的参数，范围再0-1之间，调低温度会让模型<br/>生成更加确定和高概率的文本，而调高温<br/>度则会增加文本的随机性和多样性。 |
+| » max_tokens    | body | integer  | 是  | 可以生成的最大token数。                                                                             |
+| » messages      | body | [object] | 是  | 提交的消息列表                                                                                    |
+| »» role         | body | string   | 否  | user或者assistant, user表示用户提交，<br/>assistant表示智能体输出                                          |
+| »» content      | body | string   | 否  | 请求内容                                                                                       |
+
+### 返回示例
+
+> 成功
+
+```json
+{
+  "source": "weather_agent",
+  "created": 0,
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "content": "今天武汉的天气是晴天，温度为7℃，湿度为59%，风力小于等于3级，风向为北。更新时间为2024-12-16 18:01:56。"
+      }
+    }
+  ]
+}
+```
+
+### 返回结果
+
+| 状态码 | 状态码含义 | 说明 |
+|-----|-------|----|
+| 200 | OK    | 成功 |
+
+### 返回数据结构
+
+状态码 **200**
+
+| 名称                   | 类型       | 必选    | 说明                                            |
+|----------------------|----------|-------|-----------------------------------------------|
+| » id                 | string   | true  | 唯一标识符                                         |
+| » object             | string   | true  | 对象类型                                          |
+| » created            | integer  | true  | 聊天完成创建时的Unix时间戳（秒）                            | 
+| » source             | integer  | true  | 源智能体名称                                        | 
+| » imageList          | array   | true  | 图片理解列表                                        | 
+| » filepath          | array   | true  | 文件列表                                          | 
+| » created            | integer  | true  | 聊天完成创建时的Unix时间戳（秒）                            | 
+| » choices            | [object] | true  | 选择的列表                                         |
+| »» index             | integer  | false | 对象的索引                                         |
+| »» message           | object   | false | 返回的消息                                         |
+| »»» role             | string   | true  | user或assistant, user表示用户提交，<br/>assistant表示大模型输出 |
+| »»» content          | string   | true  | 大模型的输出内容                                      |
+| »»» context          | string   | false | 向量数据库查出来的上下文信息                                |
+| »» finish_reason     | string   | false | 模型停止生成的原因                                     |
+| » usage              | object   | true  | 完成请求的使用统计                                     |
+| »» prompt_tokens     | integer  | true  | 提示中的令牌数量。                                     |
+| »» completion_tokens | integer  | true  | 生成的令牌数量                                       |
+| »» total_tokens      | integer  | true  | 请求中使用的总令牌数量                                   |
+| »» total_tokens      | integer  | true  | 请求中使用的总令牌数量                                   |
 
 ## 语音识别
 
@@ -679,3 +703,136 @@ file: file://D:\Test\Datasets\Image\kppziguz230716233346.jpg
 |-----------|----------------|------|-----------|
 | » status  | string         | true | 返回的结果状态   |
 | » data    | List< string > | true | 返回识别的文字数组 |
+
+## 文本生成SQL
+
+POST `/sql/text2sql`
+
+选择一张表后输入需求，生成一个可执行的SQL语句。
+
+### Body 请求参数
+
+```json
+{
+  "demand":"帮我查一下京伦饭店的情况",
+  "tables":"ai.hotel_agreement",
+  "storage": "mysql"
+}
+```
+
+### 请求参数
+
+| 名称        | 位置  | 类型     | 必选 | 说明                                                                  |
+|-----------|------|---------|----|---------------------------------------------------------------------|
+| body      | body | object  | 否  | none                                                                |
+| » demand  | body | string  | 是  | 用户需求                                                                |
+| » tables  | body | string  | 是  | 用户选定的表,多表之间用逗号拼接(命名规则：数据库名.数据表名 例如：ai.hotel_agreement,ai.library)   |
+| » storage | body | string  | 是  | 数据库配置名称                                                             |      
+
+### 返回示例
+
+> 成功
+
+```json
+{
+  "data": {
+    "sql": "SELECT * FROM hotel_agreement WHERE hotel_name LIKE '%京伦饭店%';",
+    "demand": "帮我查一下京伦饭店的情况",
+    "tables": "ai.hotel_agreement",
+    "storage": "mysql"
+  },
+  "status": "success"
+}
+```
+
+### 返回结果
+
+| 状态码 | 状态码含义 | 说明   |
+|------|-------|------|
+| 200  | OK    | 成功   |
+
+### 返回数据结构
+
+状态码 **200**
+
+| 名称         | 类型       | 必选    | 说明                                                      |
+|------------|----------|-------|---------------------------------------------------------|
+| » status   | string   | true  | 返回的结果状态                                                 |
+| » data     | object   | true  | 返回内容                                                    |
+| »» sql     | string   | true  | 生成的SQL语句                                                |
+| »» demand  | string   | true  | 用户需求                                                    |
+| »» tables  | string   | true  | 用户选定的表,多表之间用逗号拼接(命名规则：数据库名.数据表名 例如：ai.hotel_agreement,ai.library) |
+| »» storage | string   | true  | 数据库配置名称                                                 |   
+
+## SQL生成文本
+
+POST `/sql/sql2text`
+
+传入SQL查询文本信息。
+
+### Body 请求参数
+
+```json
+{
+  "sql": " SELECT * FROM hotel_agreement WHERE hotel_name LIKE '%京伦饭店%'; ",
+  "demand": "帮我查一下京伦饭店的情况",
+  "tables": "ai.hotel_agreement",
+  "storage": "mysql"
+}
+```
+
+### 请求参数
+
+| 名称        | 位置  | 类型    | 必选 | 说明                                                                  |
+|-----------|------|---------|----|---------------------------------------------------------------------|
+| body      | body | object  | 否  | none                                                                |
+| » sql     | body | string  | 是  | 生成的SQL语句                                                            |
+| » demand  | body | string  | 是  | 用户需求                                                                |
+| » tables  | body | string  | 是  | 用户选定的表,多表之间用逗号拼接(命名规则：数据库名.数据表名 例如：ai.hotel_agreement,ai.library)   |
+| » storage | body | string  | 是  | 数据库配置名称                                                             |
+
+### 返回示例
+
+> 成功
+
+```json
+{
+  "data": "您好，关于您查询的京伦饭店的信息如下：\n\n- **城市**: 北京市\n- **协议价**: 650元/间（具体价格可能因房型和日期有所不同）\n- **距离集团**: 10.3公里\n- **酒店地址**: 北京市朝阳区建国门外大街3号\n- **联系方式**: 010-65002266转客房预定部\n- **数据来源**: 附件3：2024年中国电信集团总部及全国连锁协议酒店清单\n- **酒店名称**: 京伦饭店\n- **星级**: 四星\n- **房间类型**: 标准间\n- **备注**: 目前没有特别的备注信息\n\n如有其他问题，请随时告知。",
+  "list": [
+    {
+      "city": "北京市",
+      "unavailable_dates": "",
+      "agreement_price": "650，600",
+      "distance_from_group": "10.3",
+      "hotel_address": "北京市朝阳区建国门外大街3号",
+      "contact_info": "010-65002266转客房预定部",
+      "data_source": "附件3：2024年中国电信集团总部及全国连锁协议酒店清单",
+      "hotel_name": "京伦饭店",
+      "tier": "档位一：600元以内/天标准-1人入住推荐（含单早）",
+      "province": "北京",
+      "applicable_brand": "",
+      "star_rating": "四星",
+      "id": 10,
+      "remarks": "",
+      "room_type": "标准间"
+    }
+  ],
+  "status": "success"
+}
+```
+
+### 返回结果
+
+| 状态码 | 状态码含义 | 说明   |
+|------|-------|------|
+| 200  | OK    | 成功   |
+
+### 返回数据结构
+
+状态码 **200**
+
+| 名称       | 类型      | 必选   | 说明       |
+|----------|---------|------|----------|
+| » status | string  | true | 返回的结果状态  |
+| » data   | string  | true | 返回内容     |
+| » list   | object  | true | 数据表中询的内容 |

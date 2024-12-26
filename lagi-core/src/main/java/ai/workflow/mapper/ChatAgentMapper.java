@@ -11,6 +11,7 @@ import ai.openai.pojo.ChatCompletionResult;
 import ai.qa.AiGlobalQA;
 import ai.utils.WorkPriorityWordUtil;
 import ai.utils.qa.ChatCompletionUtil;
+import ai.worker.SkillMap;
 import ai.worker.WorkerGlobal;
 import cn.hutool.core.bean.BeanUtil;
 import lombok.Setter;
@@ -27,11 +28,11 @@ public class ChatAgentMapper extends BaseMapper implements IMapper {
 
 
     public String getAgentName() {
-        return agent.getAgentName();
+        return agent.getAgentConfig().getName();
     }
 
     public String getBadCase() {
-        return agent.getBadCase();
+        return agent.getAgentConfig().getWrongCase() == null ? "抱歉" : agent.getAgentConfig().getWrongCase();
     }
 
     public double getSimilarity(ChatCompletionRequest chatCompletionRequest, ChatCompletionResult chatCompletionResult) {
@@ -87,6 +88,12 @@ public class ChatAgentMapper extends BaseMapper implements IMapper {
             BeanUtil.copyProperties(chatCompletionResult, chatCompletionResultWithSource);
             chatCompletionResult = chatCompletionResultWithSource;
             calPriority = calculatePriority(chatCompletionRequest, chatCompletionResult);
+            try {
+                SkillMap skillMap = new SkillMap();
+                skillMap.saveAgentScore(agent.getAgentConfig(), ChatCompletionUtil.getLastMessage(chatCompletionRequest), ChatCompletionUtil.getFirstAnswer(chatCompletionResult));
+            } catch (Exception e) {
+                log.error("saveAgentScore error", e);
+            }
         }
         result.add(AiGlobalQA.M_LIST_RESULT_TEXT, chatCompletionResult);
         result.add(AiGlobalQA.M_LIST_RESULT_PRIORITY, calPriority);
