@@ -127,6 +127,16 @@ models:
     api_key: 54f6e81f40a31d66d976496de895a7a4  # https://console.xfyun.cn/
     secret_key: ZDYyMjNmMTlkYTE0YWRmOWUwZTYxNjYz   # https://console.xfyun.cn/
 
+  - name: arvryuyi
+    type: Caacsri
+    enable: true
+    model: arvryuyi-model
+    driver: ai.llm.adapter.impl.ArvryuyiAdapter
+    api_address: https://arvryuyi.caacsri.com/tech/yuyi/data # https://platform.openai.com/
+    app_id: 46733500-9c63-4a30-b15f-01d965184adf
+    secret_key: 9cd518e4-4ca4-4fe3-8f63-51626ae39e16
+    api_key: 1
+
   # SenseChat(RiRiXin) is a large language model developed by SenseTime
   #  - name: SenseChat
   #    type: SenseTime
@@ -280,6 +290,12 @@ functions:
       priority: 90
       api_version: 2024-02-15-preview
       deployment: gpt-4o-20240513
+
+    - backend: arvryuyi
+      model: arvryuyi-model
+      enable: true
+      stream: true
+      priority: 120
 
     - backend: ernie
       model: ERNIE-Speed-128K
