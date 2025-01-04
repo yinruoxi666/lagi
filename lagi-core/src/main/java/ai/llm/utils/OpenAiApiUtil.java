@@ -105,16 +105,25 @@ public class OpenAiApiUtil {
                                                    ChatCompletionRequest req,
                                                    Function<String, ChatCompletionResult> convertResponseFunc,
                                                    Function<Response, Integer> convertErrorFunc, Map<String, String> headers) {
+        return streamCompletions(apikey, apiUrl, timeout, JSONUtil.toJsonStr(req), convertResponseFunc, convertErrorFunc, headers);
+    }
+
+    public static LlmApiResponse streamCompletions(String apikey, String apiUrl,
+                                                   Integer timeout,
+                                                   String json,
+                                                   Function<String, ChatCompletionResult> convertResponseFunc,
+                                                   Function<Response, Integer> convertErrorFunc, Map<String, String> headers) {
         OkHttpClient client = new OkHttpClient.Builder()
                 .connectTimeout(timeout, TimeUnit.SECONDS)
                 .connectionPool(CONNECTION_POOL)
                 .build();
         MediaType mediaType = MediaType.get("application/json");
-        String json = JSONUtil.toJsonStr(req);
+//        String json = JSONUtil.toJsonStr(req);
         RequestBody body = RequestBody.create(json, mediaType);
         Request.Builder requestBuilder = new Request.Builder()
                 .url(apiUrl)
                 .header("Accept", "text/event-stream")
+                .header("timestamp", String.valueOf(System.currentTimeMillis()))
                 .post(body);
         if (headers != null) {
             for (Map.Entry<String, String> header : headers.entrySet()) {
