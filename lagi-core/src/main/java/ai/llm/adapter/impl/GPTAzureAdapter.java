@@ -4,11 +4,14 @@ import ai.annotation.LLM;
 import ai.common.ModelService;
 import ai.common.exception.RRException;
 import ai.llm.adapter.ILlmAdapter;
+import ai.llm.pojo.EnhanceChatCompletionRequest;
 import ai.llm.pojo.LlmApiResponse;
 import ai.llm.utils.OpenAiApiUtil;;
 import ai.llm.utils.convert.GptAzureConvert;
 import ai.openai.pojo.ChatCompletionRequest;
 import ai.openai.pojo.ChatCompletionResult;
+import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.json.JSONUtil;
 import com.google.gson.Gson;
 import io.reactivex.Observable;
 import org.slf4j.Logger;
@@ -57,6 +60,9 @@ public class GPTAzureAdapter extends ModelService implements ILlmAdapter {
         String apiKey = getApiKey();
         Map<String, String> headers = new HashMap<>();
         headers.put("api-key", apiKey);
+        EnhanceChatCompletionRequest enhanceChatCompletionRequest = new EnhanceChatCompletionRequest();
+        BeanUtil.copyProperties(chatCompletionRequest, enhanceChatCompletionRequest);
+        enhanceChatCompletionRequest.setIp(null);
         LlmApiResponse llmApiResponse = OpenAiApiUtil.streamCompletions(apiKey, apiUrl, HTTP_TIMEOUT, chatCompletionRequest,
                 GptAzureConvert::convertStreamLine2ChatCompletionResult, GptAzureConvert::convertByResponse, headers);
         Integer code = llmApiResponse.getCode();

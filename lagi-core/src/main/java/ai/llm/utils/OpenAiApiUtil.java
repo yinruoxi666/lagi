@@ -123,6 +123,7 @@ public class OpenAiApiUtil {
         Request.Builder requestBuilder = new Request.Builder()
                 .url(apiUrl)
                 .header("Accept", "text/event-stream")
+                .header("timestamp", String.valueOf(System.currentTimeMillis()))
                 .post(body);
         if (headers != null) {
             for (Map.Entry<String, String> header : headers.entrySet()) {
