@@ -31,7 +31,7 @@ public class OpenAiApiUtil {
 
     private static final ConnectionPool CONNECTION_POOL = new ConnectionPool(
             10, // 最大空闲连接数
-            15, // 保持连接的时间
+            60, // 保持连接的时间
             TimeUnit.MINUTES
     );
 
@@ -66,6 +66,8 @@ public class OpenAiApiUtil {
                                              Map<String, String> headers) {
         OkHttpClient client = new OkHttpClient.Builder()
                 .connectTimeout(timeout, TimeUnit.SECONDS)
+                .readTimeout(timeout, TimeUnit.SECONDS)
+                .writeTimeout(timeout, TimeUnit.SECONDS)
                 .connectionPool(CONNECTION_POOL)
                 .build();
         MediaType mediaType = MediaType.get("application/json");
@@ -81,9 +83,9 @@ public class OpenAiApiUtil {
         }
         Request request = requestBuilder.build();
         LlmApiResponse result = LlmApiResponse.builder().build();
-        try (Response response = client.newCall(request).execute();){
+        try (Response response = client.newCall(request).execute();) {
             String bodyStr = response.body().string();
-            if(response.code() != 200) {
+            if (response.code() != 200) {
                 Integer code = convertErrorFunc.apply(response);
                 result.setCode(code);
                 result.setMsg(bodyStr);
@@ -98,7 +100,6 @@ public class OpenAiApiUtil {
         }
         return result;
     }
-
 
     public static LlmApiResponse streamCompletions(String apikey, String apiUrl,
                                                    Integer timeout,
@@ -118,7 +119,6 @@ public class OpenAiApiUtil {
                 .connectionPool(CONNECTION_POOL)
                 .build();
         MediaType mediaType = MediaType.get("application/json");
-//        String json = JSONUtil.toJsonStr(req);
         RequestBody body = RequestBody.create(json, mediaType);
         Request.Builder requestBuilder = new Request.Builder()
                 .url(apiUrl)

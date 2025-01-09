@@ -1,6 +1,7 @@
 package ai.servlet.dto;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class VectorQueryRequest {
@@ -8,6 +9,8 @@ public class VectorQueryRequest {
     private Integer n;
     private Map<String, String> where = new HashMap<>();
     private String category;
+
+    private List<String> ids;
 
     public String getText() {
         return text;
@@ -39,6 +42,13 @@ public class VectorQueryRequest {
 
     public void setCategory(String category) {
         this.category = category;
+    }
+
+    public List<String> getIds() {
+        return ids;
+    }
+    public void setIds(List<String> ids) {
+        this.ids = ids;
     }
 
     @Override

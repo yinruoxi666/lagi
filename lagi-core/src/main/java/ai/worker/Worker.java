@@ -1,10 +1,11 @@
 package ai.worker;
 
-public abstract class Worker {
-    public abstract void work();
 
-    public abstract void start();
+public abstract class Worker<T, R> {
+    public abstract R work(T data);
 
-    public abstract void stop();
+    public abstract R call(T data);
+
+    public abstract void notify(T data);
 
 }

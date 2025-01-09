@@ -18,12 +18,14 @@ import ai.config.ContextLoader;
 import ai.config.pojo.Policy;
 import ai.llm.adapter.ILlmAdapter;
 import ai.common.pojo.Backend;
+import ai.llm.pojo.ChatCompletionResultWithModel;
 import ai.llm.pojo.EnhanceChatCompletionRequest;
 import ai.llm.pojo.GetRagContext;
 import ai.llm.utils.CacheManager;
 import ai.llm.utils.LLMErrorConstants;
 import ai.llm.utils.PolicyConstants;
 import ai.llm.utils.PollingScheduler;
+import ai.manager.AIManager;
 import ai.manager.LlmManager;
 import ai.mr.IMapper;
 import ai.mr.IRContainer;
@@ -47,6 +49,7 @@ public class CompletionsService implements ChatCompletion{
     private static TulingThread tulingProcessor = null;
     private static final double DEFAULT_TEMPERATURE = 0.8;
     private static final int DEFAULT_MAX_TOKENS = 1024;
+    private final AIManager<ILlmAdapter> llmAdapterAIManager;
 
     static {
         if (tulingProcessor == null) {
@@ -56,7 +59,15 @@ public class CompletionsService implements ChatCompletion{
         }
     }
 
-    private Policy getPolicy() {
+    public CompletionsService(){
+        this.llmAdapterAIManager = LlmManager.getInstance();
+    }
+
+    public CompletionsService(AIManager<ILlmAdapter> llmAdapterAIManager){
+        this.llmAdapterAIManager = llmAdapterAIManager;
+    }
+
+    public static Policy getPolicy() {
         return ContextLoader.configuration.getFunctions().getPolicy();
     }
 
@@ -64,7 +75,7 @@ public class CompletionsService implements ChatCompletion{
         // The execution model is specified
         RRException r = new RRException(LLMErrorConstants.OTHER_ERROR,"{\"error\":\"backend is not enabled.\"}");
         if (chatCompletionRequest.getModel() != null) {
-            ILlmAdapter appointAdapter = LlmManager.getInstance().getAdapter(chatCompletionRequest.getModel());
+            ILlmAdapter appointAdapter = llmAdapterAIManager.getAdapter(chatCompletionRequest.getModel());
             if(appointAdapter != null && notFreezingAdapter(appointAdapter)) {
                 try {
                     ChatCompletionResult result = SensitiveWordUtil.filter(appointAdapter.completions(chatCompletionRequest));
@@ -181,7 +192,7 @@ public class CompletionsService implements ChatCompletion{
             }).collect(Collectors.toList());
             while (!models.isEmpty()) {
                 String model = PollingScheduler.schedule(models);
-                ILlmAdapter appointAdapter = LlmManager.getInstance().getAdapter(model);
+                ILlmAdapter appointAdapter = llmAdapterAIManager.getAdapter(model);
                 if(appointAdapter != null && notFreezingAdapter(appointAdapter)) {
                     ChatCompletionRequest copy = new ChatCompletionRequest();
                     BeanUtil.copyProperties(chatCompletionRequest, copy);
@@ -232,7 +243,7 @@ public class CompletionsService implements ChatCompletion{
     public Observable<ChatCompletionResult> streamCompletions(ChatCompletionRequest chatCompletionRequest, List<IndexSearchData> indexSearchDataList) {
         RRException r = new RRException(LLMErrorConstants.NO_AVAILABLE_MODEL,"{\"error\":\"Stream backend is not enabled.\"}");
         if (chatCompletionRequest.getModel() != null) {
-            ILlmAdapter adapter = LlmManager.getInstance().getAdapter(chatCompletionRequest.getModel());
+            ILlmAdapter adapter = llmAdapterAIManager.getAdapter(chatCompletionRequest.getModel());
             if(adapter != null && notFreezingAdapter(adapter)) {
                 try {
                     Observable<ChatCompletionResult> result = adapter.streamCompletions(chatCompletionRequest);
@@ -301,7 +312,7 @@ public class CompletionsService implements ChatCompletion{
             }).collect(Collectors.toList());
             while (!models.isEmpty()) {
                 String model = PollingScheduler.schedule(models);
-                ILlmAdapter appointAdapter = LlmManager.getInstance().getAdapter(model);
+                ILlmAdapter appointAdapter = llmAdapterAIManager.getAdapter(model);
                 if(appointAdapter != null && notFreezingAdapter(appointAdapter)) {
                     ChatCompletionRequest copy = new ChatCompletionRequest();
                     BeanUtil.copyProperties(chatCompletionRequest, copy);
@@ -321,13 +332,13 @@ public class CompletionsService implements ChatCompletion{
         throw  r;
     }
 
-    private List<ILlmAdapter> getLlmAdapters(List<IndexSearchData> indexSearchDataList) {
+    public List<ILlmAdapter> getLlmAdapters(List<IndexSearchData> indexSearchDataList) {
         // no effect backend
         List<ILlmAdapter> adapters;
         if(indexSearchDataList != null && !indexSearchDataList.isEmpty()) {
-            adapters = LlmRouterDispatcher.getRagAdapter(indexSearchDataList.get(0).getText());
+            adapters = LlmRouterDispatcher.getRagAdapter(llmAdapterAIManager,indexSearchDataList.get(0).getText());
         } else {
-            adapters = LlmManager.getInstance().getAdapters();
+            adapters = llmAdapterAIManager.getAdapters();
         }
         List<ILlmAdapter> notFreezingAdapters =
                 adapters.stream().filter(adapter -> adapter != null && notFreezingAdapter(adapter)).collect(Collectors.toList());
@@ -349,7 +360,7 @@ public class CompletionsService implements ChatCompletion{
         throw new RuntimeException("Stream backend is not enabled.");
     }
 
-    public boolean notFreezingAdapter(ILlmAdapter adapter) {
+    public static boolean notFreezingAdapter(ILlmAdapter adapter) {
         ModelService modelService = (ModelService) adapter;
         Integer freezingCount = CacheManager.getInstance().getCount(modelService.getModel());
         if(freezingCount >= getPolicy().getMaxGen()) {
@@ -401,10 +412,12 @@ public class CompletionsService implements ChatCompletion{
         }
         List<String> filePaths = new ArrayList<>();
         List<String> filenames = new ArrayList<>();
+        List<String> chunkIds = new ArrayList<>();
         String context = indexSearchDataList.get(0).getText();
         if(indexSearchDataList.get(0).getFilepath() != null && indexSearchDataList.get(0).getFilename() != null) {
             filePaths.addAll(indexSearchDataList.get(0).getFilepath());
             filenames.addAll(indexSearchDataList.get(0).getFilename());
+            chunkIds.add(indexSearchDataList.get(0).getId());
         }
         double firstDistance = indexSearchDataList.get(0).getDistance();
         double lastDistance = firstDistance;
@@ -418,6 +431,7 @@ public class CompletionsService implements ChatCompletion{
                     if(data.getFilepath() != null && data.getFilename() != null) {
                         filePaths.addAll(data.getFilepath());
                         filenames.addAll(data.getFilename());
+                        chunkIds.add(data.getId());
                     }
                     context += "\n" + data.getText();
                     lastDistance = data.getDistance();
@@ -432,6 +446,7 @@ public class CompletionsService implements ChatCompletion{
                     if(data.getFilepath() != null && data.getFilename() != null) {
                         filePaths.addAll(data.getFilepath());
                         filenames.addAll(data.getFilename());
+                        chunkIds.add(data.getId());
                     }
                     context += "\n" + data.getText();
                     lastDistance = data.getDistance();
@@ -450,6 +465,7 @@ public class CompletionsService implements ChatCompletion{
                     if(data.getFilepath() != null && data.getFilename() != null) {
                         filePaths.addAll(data.getFilepath());
                         filenames.addAll(data.getFilename());
+                        chunkIds.add(data.getId());
                     }
                 } else {
                     break;
@@ -460,6 +476,7 @@ public class CompletionsService implements ChatCompletion{
                 .filenames(filenames)
                 .filePaths(filePaths)
                 .context(context)
+                .chunkIds(chunkIds)
                 .build();
     }
 

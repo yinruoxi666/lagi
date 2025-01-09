@@ -41,7 +41,7 @@ public class VectorApiServlet extends BaseServlet {
             this.upsert(req, resp);
         } else if (method.equals("search")) {
             this.search(req, resp);
-        } else if (method.equals("deleteById")) {
+        }else if (method.equals("deleteById")) {
             this.deleteById(req, resp);
         } else if (method.equals("deleteByMetadata")) {
             this.deleteByMetadata(req, resp);
@@ -82,7 +82,9 @@ public class VectorApiServlet extends BaseServlet {
         queryCondition.setN(vectorQueryRequest.getN());
         queryCondition.setText(vectorQueryRequest.getText());
         queryCondition.setWhere(vectorQueryRequest.getWhere());
+        queryCondition.setIds(vectorQueryRequest.getIds());
         List<IndexRecord> recordList;
+
         if (vectorQueryRequest.getCategory() == null) {
             recordList = vectorStoreService.query(queryCondition);
         } else {
@@ -107,6 +109,7 @@ public class VectorApiServlet extends BaseServlet {
         vectorStoreService.upsertCustomVectors(upsertRecords, category, isContextLinked);
         Map<String, Object> result = new HashMap<>();
         result.put("status", "success");
+        result.put("data", upsertRecords);
         responsePrint(resp, toJson(result));
     }
 

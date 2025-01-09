@@ -7,6 +7,7 @@ import ai.vector.pojo.IndexRecord;
 import ai.vector.pojo.UpsertRecord;
 import ai.vector.pojo.VectorCollection;
 import com.google.gson.internal.LinkedTreeMap;
+import org.apache.commons.collections4.CollectionUtils;
 import tech.amikos.chromadb.Client;
 import tech.amikos.chromadb.Collection;
 import tech.amikos.chromadb.EmbeddingFunction;
@@ -87,10 +88,18 @@ public class ChromaVectorStore extends BaseVectorStore {
         Collection collection = getCollection(category);
         Collection.GetResult gr;
         if (queryCondition.getText() == null) {
-            try {
-                gr = collection.get(null, queryCondition.getWhere(), null);
-            } catch (ApiException e) {
-                throw new RuntimeException(e);
+            if (CollectionUtils.isNotEmpty(queryCondition.getIds())) {
+                try {
+                    gr = collection.get(queryCondition.getIds(), null, null);
+                } catch (ApiException e) {
+                    throw new RuntimeException(e);
+                }
+            } else {
+                try {
+                    gr = collection.get(null, queryCondition.getWhere(), null);
+                } catch (ApiException e) {
+                    throw new RuntimeException(e);
+                }
             }
             return getIndexRecords(result, gr);
         }

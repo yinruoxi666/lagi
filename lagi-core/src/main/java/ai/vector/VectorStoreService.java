@@ -210,6 +210,25 @@ public class VectorStoreService {
         this.vectorStore.deleteCollection(category);
     }
 
+    public List<IndexSearchData> searchByIds(List<String> ids, String category) {
+        List<IndexRecord> fetch = fetch(ids, category);
+        if(fetch == null) {
+            return Collections.emptyList();
+        }
+        List<IndexSearchData> indexSearchDataList = fetch.stream().map(this::toIndexSearchData).collect(Collectors.toList());
+        List<Future<IndexSearchData>> futureResultList = indexSearchDataList.stream()
+                .map(indexSearchData -> executor.submit(() -> extendIndexSearchData(indexSearchData, category)))
+                .collect(Collectors.toList());
+        return futureResultList.stream().map(indexSearchDataFuture -> {
+            try {
+                return indexSearchDataFuture.get();
+            }catch (Exception e) {
+                log.error("indexData get error", e);
+            }
+            return null;
+        }).filter(Objects::nonNull).collect(Collectors.toList());
+    }
+
     public List<IndexSearchData> search(ChatCompletionRequest request) {
         String lastMessage = ChatCompletionUtil.getLastMessage(request);
         List<IndexSearchData> indexSearchDataList = search(lastMessage, request.getCategory());
@@ -317,6 +336,7 @@ public class VectorStoreService {
         indexSearchData.setCategory((String) indexRecord.getMetadata().get("category"));
         indexSearchData.setLevel((String) indexRecord.getMetadata().get("level"));
         indexSearchData.setFileId((String) indexRecord.getMetadata().get("file_id"));
+        indexSearchData.setMetadata(indexRecord.getMetadata());
         String filename = (String) indexRecord.getMetadata().get("filename");
         Long seq = indexRecord.getMetadata().get("seq") == null ? 0L : Long.parseLong((String) indexRecord.getMetadata().get("seq"));
         indexSearchData.setSeq(seq);
@@ -372,7 +392,7 @@ public class VectorStoreService {
 
     public IndexSearchData extendText(int parentDepth, int childDepth, IndexSearchData data, String category) {
         String text = data.getText().trim();
-        String splitChar = "";
+        String splitChar = "$$$";
         if (data.getFilename() != null && data.getFilename().size() == 1
                 && data.getFilename().get(0).isEmpty()) {
             splitChar = "\n";

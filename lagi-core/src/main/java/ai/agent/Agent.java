@@ -1,8 +1,14 @@
 package ai.agent;
 
-import ai.agent.pojo.AgentData;
 
-public abstract class Agent {
+import ai.config.pojo.AgentConfig;
+import lombok.Getter;
+
+@Getter
+public abstract class Agent<T, R>{
+
+    protected AgentConfig agentConfig;
+
     public abstract void connect();
 
     public abstract void terminate();
@@ -11,7 +17,9 @@ public abstract class Agent {
 
     public abstract void stop();
 
-    public abstract void send(AgentData request);
+    public abstract void send(T request);
 
-    public abstract AgentData receive();
+    public abstract R receive();
+
+    public abstract R communicate(T data);
 }

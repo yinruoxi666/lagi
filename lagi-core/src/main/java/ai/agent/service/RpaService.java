@@ -10,9 +10,13 @@ import ai.openai.pojo.ChatCompletionResult;
 import ai.openai.pojo.ChatMessage;
 import ai.utils.LagiGlobal;
 import ai.utils.OkHttpUtil;
+import ai.worker.DefaultWorker;
 import ai.worker.Worker;
+import ai.worker.pojo.WorkData;
 import ai.worker.social.RobotWorker;
 import com.google.gson.Gson;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.text.SimpleDateFormat;
@@ -25,6 +29,8 @@ public class RpaService {
     private static final Gson gson = new Gson();
     private static final String patternString = "\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}";
     private static final Pattern pattern = Pattern.compile(patternString);
+    private static final Logger log = LoggerFactory.getLogger(RpaService.class);
+//    private DefaultWorker defaultWorker = new DefaultWorker();
 
     private final CompletionsService completionsService = new CompletionsService();
 
@@ -253,14 +259,14 @@ public class RpaService {
         @Override
         public void run() {
             SocialAgent agent = AgentFactory.getSocialAgent(param);
-            Worker worker = new RobotWorker(agent);
-            worker.start();
+            Worker<Boolean, Boolean> worker = new RobotWorker(agent);
+            worker.notify(true);
             try {
                 Thread.sleep(sleepTime);
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                log.error("rpaService sleep error", e);
             }
-            worker.stop();
+            worker.notify(false);
         }
     }
 }

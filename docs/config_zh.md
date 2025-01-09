@@ -1,7 +1,9 @@
-系统首页展示名称，这个设置指定了将在系统首页显示的名称，这里是“Lagi”。
+# 配置参考指南
+
+系统首页展示名称，这个设置指定了将在系统首页显示的名称，这里是“ Lag[i]”。
 
 ```yaml
-system_title: Lagi
+system_title: Lag[i]
 ```
 
 模型配置
@@ -65,12 +67,18 @@ stores:
       enable: true
 
   # 这部分是elasticsearch的配置
-  bigdata:
+  text:
     - name: elasticsearch # 全文检索名称
-      driver: ai.bigdata.impl.ElasticsearchAdapter
+      driver: ai.bigdata.impl.ElasticSearchAdapter
       host: localhost # 全文检索的elasticsearch地址
       port: 9200 # 全文检索的elasticsearch的端口号
       enable: false # 是否开启
+  database: # 关系型数据库配置
+    name: mysql # 数据库名称
+    jdbcUrl: you-jdbc-url # 连接地址
+    driverClassName: com.mysql.cj.jdbc.Driver # 驱动类
+    username: your-username # 数据库用户名
+    password: your-password # 数据库密码
   # 这部分是检索增强生成服务的配置
   rag:
       vector: chroma # 服务用到的向量数据库的名称
@@ -79,6 +87,7 @@ stores:
       enable: true # 是否开启
       priority: 10 # 优先级，当该优先级大于模型时,则匹配不到上下文就只返回default中提示语
       default: "Please give prompt more precisely" # 如未匹配到上下文，则返回该提示语
+      track: true # 开启文档跟踪
   # 这部分是美杜莎的加速推理服务的配置
   medusa:
     enable: true # 是否开启
@@ -173,6 +182,12 @@ functions:
       model: vision
       enable: true
       priority: 10
+  # 图片OCR配置列表
+  image2ocr:
+    - backend: qwen
+      model: ocr
+      enable: true
+      priority: 10
   # 视频追踪功能配置列表
   video2track:
     - backend: landing # 后端使用的模型配置的名称
@@ -185,7 +200,24 @@ functions:
       model: vision
       enable: true
       priority: 10
-
+  # 文档OCR配置列表
+  doc2ocr:
+    - backend: qwen
+      model: ocr
+      enable: true
+      priority: 10
+  # 文件指令配置列表
+  doc2instruct:
+    - backend: landing
+      model: cascade
+      enable: true
+      priority: 10
+  # sql指令配置表
+  text2sql:
+    - backend: landing
+      model: qwen-turbo # 模型名称
+      enable: true # 是否启用
+      priority: 10
 ```
 
 路由政策配置
@@ -193,12 +225,12 @@ functions:
 ```yaml
 functions:
   policy:
-    #  handle配置 目前有parallel、failover、polling 3种值， parallel表示并行调用，failover表示故障转移, polling表示负载轮询调用, 场景解释：
-    # 1. 当请求中未强制指定模型, 或指定的模型无效时 ，parallel、failover、polling 3种策略生效
-    # 2. 当指定handle为 parallel 配置的模型并行执行， 返回响应最快且优先级最高的模型调用结果
-    # 3. 当指定handle为 failover 配置的模型串行执行， 模型按优先级串行执行， 串行执行过程中任意模型返回成功， 后面的模型不再执行。
-    # 4. 当指定handle为 polling 配置的模型轮询执行， 请求会根据请求的ip、浏览器指纹 等额外信息， 均衡分配请求给对应的模型执行。
-    # 5. 当所有的模型都返回失败时, 会设置 http 请求的状态码为 600-608。 body里为具体的错误信息。 (错误码错误信息实际为最后一个模型调用失败的信息)
+    #  handle配置 目前有parallel、failover、failover 3种值， parallel表示并行调用，failover表示故障转移, polling表示负载轮询调用, 场景解释：
+    #  1. 当请求中未强制指定模型, 或指定的模型无效时 ，parallel、failover、failover 3种策略生效
+    #  2. 当指定handle为 parallel 配置的模型并行执行， 返回响应最快且优先级最高的模型调用结果
+    #  3. 当指定handle为 failover 配置的模型串行执行， 模型按优先级串行执行， 串行执行过程中任意模型返回成功， 后面的模型不再执行。
+    #  4. 当指定handle为 failover 配置的模型轮询执行， 请求会根据请求的ip、浏览器指纹 等额外信息， 均衡分配请求给对应的模型执行。
+    #  5. 当所有的模型都返回失败时, 会设置 http 请求的状态码为 600-608。 body里为具体的错误信息。 (错误码错误信息实际为最后一个模型调用失败的信息)
     #  错误码： 
     #     600 请求参数不合法
     #     601 授权错误
@@ -209,15 +241,14 @@ functions:
     #     606 其他错误
     #     607 超时
     #     608 没有可用的模型
-      handle: failover
-      grace_time: 20 # 故障后重试间隔时间
-      maxgen: 3 # 故障后最大重试次数 默认为 Integer.MAX_VALUE
+    handle: failover
+    grace_time: 20 # 故障后重试间隔时间
+    maxgen: 3 # 故障后最大重试次数 默认为 Integer.MAX_VALUE
 ```
 
 智能体配置
 
 ```yaml
-
 # 这部分表示模型支持的智能体配置
 agents:
   - name: qq # 智能体的名称
@@ -231,7 +262,51 @@ agents:
   - name: ding
     api_key: your-api-key
     driver: ai.agent.social.DingAgent
+    
+  - name: weather_agent
+    driver: ai.agent.customer.WeatherAgent
+    token: your-token
+    app_id: weather_agent
 
+  - name: oil_price_agent
+    driver: ai.agent.customer.OilPriceAgent
+    token: your-token
+    app_id: oil_price_agent
+
+  - name: bmi_agent
+    driver: ai.agent.customer.BmiAgent
+    token: your-token
+    app_id: bmi_agent
+
+  - name: food_calorie_agent
+    driver: ai.agent.customer.FoodCalorieAgent
+    token: your-token
+    app_id: food_calorie_agent
+
+  - name: dishonest_person_search_agent
+    driver: ai.agent.customer.DishonestPersonSearchAgent
+    token: your-token
+    app_id: dishonest_person_search_agent
+
+  - name: high_speed_ticket_agent
+    driver: ai.agent.customer.HighSpeedTicketAgent
+    app_id: high_speed_ticket_agent
+
+  - name: history_in_today_agent
+    driver: ai.agent.customer.HistoryInToDayAgent
+    app_id: history_in_today_agent
+
+  - name: youdao_agent
+    driver: ai.agent.customer.YouDaoAgent
+    app_id: your-app-id
+    token: your-token
+
+  - name: image_gen_agent
+    driver: ai.agent.customer.ImageGenAgent
+    app_id: your-app-id
+    endpoint: http://127.0.0.1:8080
+    token: image_gen_agent
+    
 # 这部分表示智能体实际作业的配置
 workers:
   - name: qq-robot # 作业名称
@@ -246,6 +321,20 @@ workers:
     agent: ding
     worker: ai.worker.social.RobotWorker
 
+# 路由配置
+routers:
+  - name: best
+    # rule: (weather_agent&food_calorie_agent)  # A|B ->轮询，A或B，表示在A和B之间随机轮询；
+    # A,B ->故障转移，首先A，如果A失败，然后B；
+    # A&B ->并行，同时调用A和B，选择合适的结果只有一个
+    # 该规则可以组合为((A&B&C),(E|F))，这意味着首先同时调用ABC，如果失败，则随机调用E或F
+    rule: (weather_agent&food_calorie_agent)  # A|B ->轮询，A或B，表示在A和B内随机轮询；
+
+    # %是表示的通配符。
+    # 如果指定，则调用该代理
+    # 如果只给出%，则%将由调用时的参数决定。
+  - name: pass
+    rule: '%'
 ```
 
 
