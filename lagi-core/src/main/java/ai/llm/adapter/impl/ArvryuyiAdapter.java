@@ -4,6 +4,7 @@ import ai.annotation.LLM;
 import ai.common.ModelService;
 import ai.common.utils.ObservableList;
 import ai.llm.adapter.ILlmAdapter;
+import ai.llm.pojo.ArvryuyiChatCompletionRequest;
 import ai.llm.pojo.LlmApiResponse;
 import ai.llm.utils.OpenAiApiUtil;
 import ai.llm.utils.convert.ArvryuyiConvert;
@@ -13,6 +14,7 @@ import ai.openai.pojo.ChatCompletionRequest;
 import ai.openai.pojo.ChatCompletionResult;
 import ai.openai.pojo.ChatMessage;
 import ai.utils.qa.HttpUtil;
+import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import com.alibaba.fastjson.JSONObject;
 import com.google.gson.Gson;
@@ -33,6 +35,7 @@ public class ArvryuyiAdapter implements ILlmAdapter {
     @Override
     public ChatCompletionResult completions(ChatCompletionRequest request) {
 //        setDefaultModel(request);
+        ArvryuyiChatCompletionRequest arvryuyiChatCompletionRequest = (ArvryuyiChatCompletionRequest) request;
         Map<String, String> headers = new HashMap<>();
         headers.put("Content-Type", "application/json");
         headers.put("timestamp", String.valueOf(System.currentTimeMillis()));
@@ -42,14 +45,35 @@ public class ArvryuyiAdapter implements ILlmAdapter {
         requestJson.put("appkey", "46733500-9c63-4a30-b15f-01d965184adf");
         requestJson.put("secret", "9cd518e4-4ca4-4fe3-8f63-51626ae39e16");
         requestJson.put("mac", "");
-        requestJson.put("sn", "b3775d32-2250-4fe2-9a69-9c8254448655");
+        String sn = StrUtil.isNotBlank(arvryuyiChatCompletionRequest.getSn()) ? arvryuyiChatCompletionRequest.getSn() : "b3775d32-2250-4fe2-9a69-9c8254448655";
+        requestJson.put("sn", sn);
         requestJson.put("robotid", "cda998f6-6f9b-4466-b052-3e726bb5cd13");
         requestJson.put("text", request.getMessages().get(request.getMessages().size() - 1).getContent());
-        jsonResult = HttpUtil.httpPost(getApiAddress(), headers, requestJson.toJSONString(), HTTP_TIMEOUT);
+        requestJson.put("appmsg", "");
+        jsonResult = HttpUtil.httpPost("https://arvryuyi.caacsri.com/tech/yuyi/data", headers, requestJson.toJSONString(), HTTP_TIMEOUT);
         if (jsonResult == null) {
             return null;
         }
-        ChatCompletionResult response = gson.fromJson(jsonResult, ChatCompletionResult.class);
+
+        JSONObject resultJson = JSONObject.parseObject(jsonResult);
+        JSONObject responseJson = resultJson.getJSONObject("data").getJSONObject("curdata");
+        if (responseJson == null) {
+            return null;
+        }
+        ChatCompletionResult response = new ChatCompletionResult();
+        Integer code = resultJson.getInteger("code");
+        if (code != 0) {
+            return null;
+        }
+        response.setChoices(new ArrayList<>());
+        ChatCompletionChoice choice= new ChatCompletionChoice();
+        ChatMessage message = new ChatMessage();
+        message.setRole("assistant");
+        message.setContent(responseJson.getString("answer"));
+        choice.setMessage(message);
+        choice.setFinish_reason("stop");
+        response.getChoices().add(choice);
+
         if (response == null || response.getChoices().isEmpty()) {
             return null;
         }

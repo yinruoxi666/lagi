@@ -63,7 +63,7 @@ public class GPTAzureAdapter extends ModelService implements ILlmAdapter {
         EnhanceChatCompletionRequest enhanceChatCompletionRequest = new EnhanceChatCompletionRequest();
         BeanUtil.copyProperties(chatCompletionRequest, enhanceChatCompletionRequest);
         enhanceChatCompletionRequest.setIp(null);
-        LlmApiResponse llmApiResponse = OpenAiApiUtil.streamCompletions(apiKey, apiUrl, HTTP_TIMEOUT, chatCompletionRequest,
+        LlmApiResponse llmApiResponse = OpenAiApiUtil.streamCompletions(apiKey, apiUrl, HTTP_TIMEOUT, JSONUtil.toJsonStr(enhanceChatCompletionRequest),
                 GptAzureConvert::convertStreamLine2ChatCompletionResult, GptAzureConvert::convertByResponse, headers);
         Integer code = llmApiResponse.getCode();
         if(code != 200) {

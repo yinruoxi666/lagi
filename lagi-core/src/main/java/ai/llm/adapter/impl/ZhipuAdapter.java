@@ -5,10 +5,7 @@ import ai.common.ModelService;
 import ai.common.utils.MappingIterable;
 import ai.llm.adapter.ILlmAdapter;
 import ai.llm.utils.convert.ZhiPuConvert;
-import ai.openai.pojo.ChatCompletionChoice;
-import ai.openai.pojo.ChatCompletionRequest;
-import ai.openai.pojo.ChatCompletionResult;
-import ai.openai.pojo.ChatMessage;
+import ai.openai.pojo.*;
 import cn.hutool.core.bean.BeanUtil;
 import com.zhipu.oapi.ClientV4;
 import com.zhipu.oapi.Constants;
@@ -101,6 +98,18 @@ public class ZhipuAdapter extends ModelService implements ILlmAdapter {
             if (delta != null) {
                 chatMessage.setContent(delta.getContent());
                 chatMessage.setRole(delta.getRole());
+                List<ToolCall> toolCalls = new ArrayList<>();
+                if (delta.getTool_calls() != null) {
+                    for (com.zhipu.oapi.service.v4.model.ToolCalls toolCall : delta.getTool_calls()) {
+                        ToolCall toolCall1 = new ToolCall();
+                        BeanUtil.copyProperties(toolCall, toolCall1);
+                        toolCall1.getFunction().setArguments(
+                                // 去除toolCall1.getFunction().getArguments()中两端的双引号
+                                toolCall1.getFunction().getArguments().replaceAll("^\"|\"$", ""));
+                        toolCalls.add(toolCall1);
+                    }
+                    chatMessage.setTool_calls(toolCalls);
+                }
             } else {
                 com.zhipu.oapi.service.v4.model.ChatMessage message = modelData.getChoices().get(i).getMessage();
                 chatMessage.setContent(message.getContent().toString());

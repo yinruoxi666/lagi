@@ -1,6 +1,7 @@
 package ai.servlet.api;
 
 import ai.audio.pojo.AsrResponse;
+import ai.llm.pojo.ArvryuyiChatCompletionRequest;
 import ai.openai.pojo.ChatCompletionRequest;
 import ai.openai.pojo.ChatCompletionResult;
 import ai.common.pojo.IndexSearchData;
@@ -74,10 +75,15 @@ public class WorkerApiServlet extends BaseServlet {
     public void arvryuyiCompletions(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         PrintWriter out = resp.getWriter();
         resp.setContentType("application/json;charset=utf-8");
-        ChatCompletionRequest chatCompletionRequest = reqBodyToObj(req, ChatCompletionRequest.class);
-        Observable<ChatCompletionResult> result = arvryuyiWorker.work("arvryuyi", chatCompletionRequest);
-        resp.setHeader("Content-Type", "text/event-stream;charset=utf-8");
-        streamOutPrint(result, null, null, out);
+        ArvryuyiChatCompletionRequest chatCompletionRequest = reqBodyToObj(req, ArvryuyiChatCompletionRequest.class);
+        if (chatCompletionRequest.getStream()) {
+            Observable<ChatCompletionResult> result = arvryuyiWorker.work("arvryuyi", chatCompletionRequest);
+            resp.setHeader("Content-Type", "text/event-stream;charset=utf-8");
+            streamOutPrint(result, null, null, out);
+        } else {
+            ChatCompletionResult chatCompletionResult = arvryuyiWorker.completions(chatCompletionRequest);
+            responsePrint(resp, gson.toJson(chatCompletionResult));
+        }
     }
     public void asr4flights(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         Part filePart = request.getPart("audioFile");
