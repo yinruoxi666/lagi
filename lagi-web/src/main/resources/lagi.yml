@@ -81,14 +81,6 @@ models:
     driver: ai.llm.adapter.impl.ZhipuAdapter
     api_key: 35b7042a1699fc7c9d9d22c078f39423.mRQcEhtKzmYyCPqJ #  url address https://open.bigmodel.cn/usercenter/apikeys
 
-  - name: chatgpt-azure
-    type: Microsoft
-    model: gpt-3.5-turbo,gpt-4-1106-preview,gpt-4o-20240513
-    enable: true
-    driver: ai.llm.adapter.impl.GPTAzureAdapter
-    endpoint: https://dgman-north-central-us-gpt4.openai.azure.com/
-    api_key: 56cac597a3c1477da3b83a60f67c6507
-
   # Kimi is an intelligent assistant product developed by Moonshot AI.
   - name: kimi
     type: Moonshot
