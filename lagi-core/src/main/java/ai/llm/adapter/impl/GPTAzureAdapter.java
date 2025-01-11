@@ -11,6 +11,7 @@ import ai.llm.utils.convert.GptAzureConvert;
 import ai.openai.pojo.ChatCompletionRequest;
 import ai.openai.pojo.ChatCompletionResult;
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.google.gson.Gson;
 import io.reactivex.Observable;
@@ -63,7 +64,8 @@ public class GPTAzureAdapter extends ModelService implements ILlmAdapter {
         EnhanceChatCompletionRequest enhanceChatCompletionRequest = new EnhanceChatCompletionRequest();
         BeanUtil.copyProperties(chatCompletionRequest, enhanceChatCompletionRequest);
         enhanceChatCompletionRequest.setIp(null);
-        LlmApiResponse llmApiResponse = OpenAiApiUtil.streamCompletions(apiKey, apiUrl, HTTP_TIMEOUT, JSONUtil.toJsonStr(enhanceChatCompletionRequest),
+        JSONObject middleJson= JSONUtil.parseObj(enhanceChatCompletionRequest);
+        LlmApiResponse llmApiResponse = OpenAiApiUtil.streamCompletions(apiKey, apiUrl, HTTP_TIMEOUT, chatCompletionRequest,
                 GptAzureConvert::convertStreamLine2ChatCompletionResult, GptAzureConvert::convertByResponse, headers);
         Integer code = llmApiResponse.getCode();
         if(code != 200) {
