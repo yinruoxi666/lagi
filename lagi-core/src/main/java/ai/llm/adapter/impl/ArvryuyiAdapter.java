@@ -82,6 +82,7 @@ public class ArvryuyiAdapter implements ILlmAdapter {
 
     @Override
     public Observable<ChatCompletionResult> streamCompletions(ChatCompletionRequest request) {
+        ArvryuyiChatCompletionRequest arvryuyiChatCompletionRequest = (ArvryuyiChatCompletionRequest) request;
 //        setDefaultModel(request);
         Map<String, String> headers = new HashMap<>();
         headers.put("Content-Type", "application/json");
@@ -94,7 +95,8 @@ public class ArvryuyiAdapter implements ILlmAdapter {
         requestJson.put("secret", "9cd518e4-4ca4-4fe3-8f63-51626ae39e16");
         requestJson.put("mac", "");
         requestJson.put("appmsg", "");
-        requestJson.put("sn", "b3775d32-2250-4fe2-9a69-9c8254448655");
+        String sn = StrUtil.isNotBlank(arvryuyiChatCompletionRequest.getSn()) ? arvryuyiChatCompletionRequest.getSn() : "b3775d32-2250-4fe2-9a69-9c8254448655";
+        requestJson.put("sn", sn);
         requestJson.put("robotid", "cda998f6-6f9b-4466-b052-3e726bb5cd13");
         requestJson.put("text", request.getMessages().get(request.getMessages().size() - 1).getContent());
         System.out.println(requestJson.toJSONString());
