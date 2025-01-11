@@ -32,7 +32,7 @@ Supports but is not limited to the following models:
         <img src="docs/images/logo/model/img_9.jpeg" width="20" style="margin: 10px;" height="20">
         <span style="font-size: 12px;width: 70px; text-align:   left;">Baichuan&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
         <img src="docs/images/logo/model/img_10.jpeg"width="20" style="margin: 10px;" height="20">
-        <span style="font-size: 12px;width: 70px; text-align: left;">iFLYTEK&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+        <span style="font-size: 12px;width: 70px; text-align: left;">IFLYTEK&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
         <img src="docs/images/logo/model/img_11.png" width="20" style="margin: 10px;" height="20">
         <span style="font-size: 12px;width: 70px; text-align: left;">SenseChat&nbsp;&nbsp;&nbsp;</span>
     </div>
@@ -41,9 +41,9 @@ Supports but is not limited to the following models:
         <img src="docs/images/logo/model/img_13.png" width="20" style="margin: 10px;" height="20">
         <span style="font-size: 12px;width: 70px; text-align: left;">Doubao&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</span>
         <img src="docs/images/logo/model/img_14.jpeg" width="20" style="margin: 10px;" height="20">
-        <span style="font-size: 12px;width: 70px; text-align: left;">deepseek&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+        <span style="font-size: 12px;width: 70px; text-align: left;">Deepseek&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
         <img src="docs/images/logo/model/img_15.webp" width="20" style="margin: 10px;" height="20">
-        <span style="font-size: 12px;width: 70px; text-align: left;">claude&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+        <span style="font-size: 12px;width: 70px; text-align: left;">Claude&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
     </div>
 	</br>
 </div>
@@ -173,11 +173,12 @@ Example：Set priority keywords and stop keywords:
 
 Thank you for your support of Lag[i] ! To help you get started quickly and easily, we have provided a pre-packaged Lag[i] application that is ready for immediate use.
 
-1. **Jar File**
-    - File Name: lagi-core-1.0.2-jar-with-dependencies.jar
-    
-    - File Size: 250.5MB
+- **Jar File**: The core dependency library of Lag[i].
+  - File Name: lagi-core-1.0.2-jar-with-dependencies.jar
+  - File Size: 250.5 MB
+  - Download Link: [Click here to download](https://downloads.saasai.top/lagi/lagi-core-1.0.2-jar-with-dependencies.jar)
 
-    - Download Link: [Download Jar File](https://downloads.saasai.top/lagi/lagi-core-1.0.2-jar-with-dependencies.jar)
-    
-      
+- **War File**: The Web application of Lag[i], which can be directly deployed to a web container.
+  - File Name: lagi-web.war
+  - File Size: 279 MB
+  - Download Link: [Click here to download](https://downloads.saasai.top/lagi/lagi-web.war)
