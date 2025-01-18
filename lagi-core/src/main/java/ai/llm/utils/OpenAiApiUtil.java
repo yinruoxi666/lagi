@@ -17,6 +17,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.Proxy;
 import java.net.SocketTimeoutException;
 import java.util.HashMap;
 import java.util.Map;
@@ -62,11 +63,26 @@ public class OpenAiApiUtil {
                                              Function<String, ChatCompletionResult> convertResponseFunc,
                                              Function<Response, Integer> convertErrorFunc,
                                              Map<String, String> headers) {
+        return completions(apikey, apiUrl, timeout, req, convertResponseFunc, convertErrorFunc, headers, null);
+    }
+    public static LlmApiResponse completions(String apikey, String apiUrl,
+                                             Integer timeout,
+                                             ChatCompletionRequest req,
+                                             Function<String, ChatCompletionResult> convertResponseFunc,
+                                             Function<Response, Integer> convertErrorFunc,
+                                             Map<String, String> headers, Proxy proxy) {
+        java.net.Authenticator.setDefault(new java.net.Authenticator() {
+            @Override
+            protected java.net.PasswordAuthentication getPasswordAuthentication() {
+                return new java.net.PasswordAuthentication("socks5", "digimeta".toCharArray());
+            }
+        });
         OkHttpClient client = new OkHttpClient.Builder()
                 .connectTimeout(timeout, TimeUnit.SECONDS)
                 .readTimeout(timeout, TimeUnit.SECONDS)
                 .writeTimeout(timeout, TimeUnit.SECONDS)
                 .connectionPool(CONNECTION_POOL)
+                .proxy(proxy)
                 .build();
         MediaType mediaType = MediaType.get("application/json");
         String json = gson.toJson(req);
@@ -104,17 +120,32 @@ public class OpenAiApiUtil {
                                                    ChatCompletionRequest req,
                                                    Function<String, ChatCompletionResult> convertResponseFunc,
                                                    Function<Response, Integer> convertErrorFunc, Map<String, String> headers) {
-        return streamCompletions(apikey, apiUrl, timeout, gson.toJson(req), convertResponseFunc, convertErrorFunc, headers);
+        return streamCompletions(apikey, apiUrl, timeout, gson.toJson(req), convertResponseFunc, convertErrorFunc, headers, null);
     }
-
     public static LlmApiResponse streamCompletions(String apikey, String apiUrl,
                                                    Integer timeout,
                                                    String json,
                                                    Function<String, ChatCompletionResult> convertResponseFunc,
                                                    Function<Response, Integer> convertErrorFunc, Map<String, String> headers) {
+        return streamCompletions(apikey, apiUrl, timeout, json, convertResponseFunc, convertErrorFunc, headers, null);
+    }
+    public static LlmApiResponse streamCompletions(String apikey, String apiUrl,
+                                                   Integer timeout,
+                                                   String json,
+                                                   Function<String, ChatCompletionResult> convertResponseFunc,
+                                                   Function<Response, Integer> convertErrorFunc, Map<String, String> headers,
+                                                   Proxy proxy) {
+        java.net.Authenticator.setDefault(new java.net.Authenticator() {
+            @Override
+            protected java.net.PasswordAuthentication getPasswordAuthentication() {
+                return new java.net.PasswordAuthentication("socks5", "digimeta".toCharArray());
+            }
+        });
         OkHttpClient client = new OkHttpClient.Builder()
                 .connectTimeout(timeout, TimeUnit.SECONDS)
                 .connectionPool(CONNECTION_POOL)
+                .proxy(proxy)
+//                .proxyAuthenticator(proxyAuthenticator)
                 .build();
         MediaType mediaType = MediaType.get("application/json");
         RequestBody body = RequestBody.create(json, mediaType);

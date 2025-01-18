@@ -170,6 +170,7 @@ stores:
       child_depth: 1
       #      url: http://localhost:8000
       url: http://test.digimeta.com.cn:16990
+#      url: http://10.122.159.11:16990
 
 
     # Pinecone is a vector database for building large-scale machine learning applications
@@ -234,6 +235,7 @@ stores:
     priority: 10
     default: "Please give prompt more precisely"
     track: true
+    use_rag: true
 
   medusa: # Medusa is a caching tool designed to accelerate the response of large models.
     enable: false
@@ -248,25 +250,25 @@ functions:
   chat:
     - backend: landing
       model: cascade
-      enable: true
+      enable: false
       stream: true
       priority: 350
 
     - backend: spark
       model: v3.5
-      enable: true
+      enable: false
       stream: true
       priority: 100
 
     - backend: kimi
       model: moonshot-v1-128k
-      enable: true
+      enable: false
       stream: true
       priority: 150
 
     - backend: chatglm
       model: glm-4-alltools
-      enable: true
+      enable: false
       stream: true
       priority: 80
 
@@ -372,6 +374,9 @@ functions:
       model: cascade
       enable: true
       priority: 10
+  policy:
+    context_length: 9192
+
 
 # The following is the configuration of agents, name is the name of the agent,
 # type is the type of the agent, class is the implement class of the agent.

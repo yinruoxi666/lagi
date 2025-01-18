@@ -1,13 +1,17 @@
 package ai.llm.utils.convert;
 
 import ai.common.exception.RRException;
+import ai.llm.pojo.AzureChatCompletionChoice;
 import ai.llm.utils.LLMErrorConstants;
 import ai.openai.pojo.ChatCompletionResult;
 import com.google.gson.Gson;
 import okhttp3.Response;
 
-public class GptAzureConvert {
+import java.net.InetSocketAddress;
 
+public class GptAzureConvert {
+    private static final String PROXY_URL = "proxy.digimeta.com.cn";
+    private static final Integer PROXY_PORT = 18888;
     private static final Gson gson = new Gson();
     public static int convert(Object object) {
         if(object instanceof  Integer) {
@@ -112,6 +116,10 @@ public class GptAzureConvert {
             choice.setDelta(null);
         });
         return result;
+    }
+
+    public static InetSocketAddress convertProxyUrl2InetSocketAddress() {
+        return new InetSocketAddress(PROXY_URL, PROXY_PORT);
     }
 
     public static int convertByResponse(Response response) {

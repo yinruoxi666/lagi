@@ -310,10 +310,12 @@ public class VectorStoreService {
 
 
     public List<IndexSearchData> search(String question, String category) {
+        return search(question, new HashMap<>(), category);
+    }
+    public List<IndexSearchData> search(String question,Map<String,String> where, String category) {
 
         int similarity_top_k = vectorStore.getConfig().getSimilarityTopK();
         double similarity_cutoff = vectorStore.getConfig().getSimilarityCutoff();
-        Map<String, String> where = new HashMap<>();
         category = ObjectUtils.defaultIfNull(category, vectorStore.getConfig().getDefaultCategory());
         List<IndexSearchData> indexSearchDataList = search(question, similarity_top_k, similarity_cutoff, where, category);
         Set<String> esIds = bigdataService.getIds(question, category);
@@ -337,7 +339,6 @@ public class VectorStoreService {
             return null;
         }).filter(Objects::nonNull).collect(Collectors.toList());
     }
-
     private IndexSearchData extendIndexSearchData(IndexSearchData indexSearchData, String category) {
         IndexSearchData extendedIndexSearchData = vectorCache.getFromVectorLinkCache(indexSearchData.getId());
         if (extendedIndexSearchData == null) {
@@ -484,5 +485,12 @@ public class VectorStoreService {
 
     public List<VectorCollection> listCollections() {
         return this.vectorStore.listCollections();
+    }
+
+    public static void main(String[] args) {
+        String splitChar = "\\$\\$\\$";
+        String text = "aaa$$$bbb";
+        String[] split = text.split(splitChar);
+        System.out.println(split[0]);
     }
 }

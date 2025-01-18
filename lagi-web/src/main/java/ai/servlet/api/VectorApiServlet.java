@@ -5,6 +5,7 @@ import ai.common.pojo.IndexSearchData;
 import ai.migrate.service.UploadFileService;
 import ai.openai.pojo.ChatCompletionRequest;
 import ai.servlet.BaseServlet;
+import ai.servlet.dto.VectorSearchRequest;
 import ai.servlet.dto.VectorDeleteRequest;
 import ai.servlet.dto.VectorQueryRequest;
 import ai.servlet.dto.VectorUpsertRequest;
@@ -41,6 +42,8 @@ public class VectorApiServlet extends BaseServlet {
             this.upsert(req, resp);
         } else if (method.equals("search")) {
             this.search(req, resp);
+        }else if (method.equals("searchByMetadata")) {
+                this.searchByMetadata(req, resp);
         }else if (method.equals("deleteById")) {
             this.deleteById(req, resp);
         } else if (method.equals("deleteByMetadata")) {
@@ -65,6 +68,23 @@ public class VectorApiServlet extends BaseServlet {
         resp.setContentType("application/json;charset=utf-8");
         ChatCompletionRequest request = reqBodyToObj(req, ChatCompletionRequest.class);
         List<IndexSearchData> indexSearchData = vectorDbService.searchByContext(request);
+        Map<String, Object> result = new HashMap<>();
+        if (indexSearchData == null || indexSearchData.isEmpty()) {
+            result.put("status", "failed");
+        } else {
+            result.put("status", "success");
+            result.put("data", indexSearchData);
+        }
+        responsePrint(resp, toJson(result));
+    }
+    private void searchByMetadata(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        resp.setContentType("application/json;charset=utf-8");
+        VectorSearchRequest request = reqBodyToObj(req, VectorSearchRequest.class);
+        String text = request.getText();
+        String category = request.getCategory();
+        Map<String, String> where = request.getWhere();
+        vectorStoreService.search(text, where, category);
+        List<IndexSearchData> indexSearchData = vectorStoreService.search(text, where, category);
         Map<String, Object> result = new HashMap<>();
         if (indexSearchData == null || indexSearchData.isEmpty()) {
             result.put("status", "failed");

@@ -18,6 +18,7 @@ import io.reactivex.Observable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.Proxy;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -26,6 +27,7 @@ public class GPTAzureAdapter extends ModelService implements ILlmAdapter {
     private static final Logger logger = LoggerFactory.getLogger(GPTAzureAdapter.class);
     private final Gson gson = new Gson();
     private static final String ENTERPOINT = "https://api.openai.com/v1/chat/completions";
+
     private static final int HTTP_TIMEOUT = 30 * 1000;
 
 
@@ -42,10 +44,10 @@ public class GPTAzureAdapter extends ModelService implements ILlmAdapter {
         Map<String, String> headers = new HashMap<>();
         headers.put("Content-Type", "application/json");
         headers.put("api-key", getApiKey());
-
+        Proxy proxy = new Proxy(Proxy.Type.SOCKS, GptAzureConvert.convertProxyUrl2InetSocketAddress());
         LlmApiResponse completions = OpenAiApiUtil.completions(getApiKey(), getApiAddress(), HTTP_TIMEOUT, chatCompletionRequest,
                 GptAzureConvert::convert2ChatCompletionResult, GptAzureConvert::convertByResponse,
-                headers);
+                headers,proxy);
         if(completions.getCode() != 200) {
             logger.error("open ai  api error {}", completions.getMsg());
             throw new RRException(completions.getCode(), completions.getMsg());
@@ -64,9 +66,10 @@ public class GPTAzureAdapter extends ModelService implements ILlmAdapter {
         EnhanceChatCompletionRequest enhanceChatCompletionRequest = new EnhanceChatCompletionRequest();
         BeanUtil.copyProperties(chatCompletionRequest, enhanceChatCompletionRequest);
         enhanceChatCompletionRequest.setIp(null);
+        Proxy proxy = new Proxy(Proxy.Type.SOCKS, GptAzureConvert.convertProxyUrl2InetSocketAddress());
         JSONObject middleJson= JSONUtil.parseObj(enhanceChatCompletionRequest);
-        LlmApiResponse llmApiResponse = OpenAiApiUtil.streamCompletions(apiKey, apiUrl, HTTP_TIMEOUT, chatCompletionRequest,
-                GptAzureConvert::convertStreamLine2ChatCompletionResult, GptAzureConvert::convertByResponse, headers);
+        LlmApiResponse llmApiResponse = OpenAiApiUtil.streamCompletions(apiKey, apiUrl, HTTP_TIMEOUT, gson.toJson(enhanceChatCompletionRequest),
+                GptAzureConvert::convertStreamLine2ChatCompletionResult, GptAzureConvert::convertByResponse, headers, proxy);
         Integer code = llmApiResponse.getCode();
         if(code != 200) {
             logger.error("open ai stream api error {}", llmApiResponse.getMsg());
