@@ -26,11 +26,6 @@
 
 
 <body class="antialiased">
-<div id="pdfMask" class="pdf-mask" >
-  <div class="pdf-box">
-    <img src="" style="width: 100%; height: auto"/>
-  </div>
-</div>
 <div id="__next">
   <script>!function () { try { var d = document.documentElement, c = d.classList; c.remove('light', 'dark'); var e = localStorage.getItem('theme'); if ('system' === e || (!e && true)) { var t = '(prefers-color-scheme: dark)', m = window.matchMedia(t); if (m.media !== t || m.matches) { d.style.colorScheme = 'dark'; c.add('dark') } else { d.style.colorScheme = 'light'; c.add('light') } } else if (e) { c.add(e || '') } if (e === 'light' || e === 'dark') d.style.colorScheme = e } catch (e) { } }()</script>
   <div class="overflow-hidden w-full h-full relative flex z-0">
@@ -173,7 +168,7 @@
         </div>
         <!-- 上部导航条 -->
         <!-- *************************************************主要结构********************************* -->
-        <main class="relative h-full w-full transition-width overflow-hidden flex-1">
+        <main class="relative h-full w-full transition-width overflow-auto flex-1">
           <div>
             <div id="model-prefences" class="w-full h-16 pl-10">
               <div id="model-selects" class="inline-block model-selects  float-left">
@@ -181,7 +176,6 @@
               <div class="model-btns w-20 flex-1 inline-block">
                 <button id = "modelClearBtn" class="inline-block" onclick="clearPreference()">重置所有</button>
                 <button id = "modelSaveBtn" class="inline-block" onclick="savePerference()">保存</button>
-                <%--                    <button id = "test" class="inline-block" onclick="matchingAgents()">匹配智能体</button>--%>
               </div>
             </div>
           </div>
@@ -194,11 +188,12 @@
               <textarea class="w-full h-full"  id = "textareaCopy"></textarea>
             </div>
 
-            <div id="hello-page" class="flex-1 overflow-hidden" >
+            <div id="hello-page" class="flex-1 overflow-hidden">
               <div class="react-scroll-to-bottom--css-dlyqs-79elbk h-full dark:bg-gray-800">
                 <div class="react-scroll-to-bottom--css-dlyqs-1n7m0yu">
                   <div class="flex flex-col text-sm dark:bg-gray-800 h-full">
                     <div class="flex h-full flex-col items-center justify-between pb-64">
+                      <!-- ***********************************头部  slide**************************************-->
                       <div id="modelChoices" class="px-2 w-full flex flex-col py-2 md:py-6 sticky top-0">
                         <div class="relative flex flex-col items-stretch justify-center gap-2 sm:items-center">
                           <div class="relative flex rounded-xl bg-gray-100 p-1 text-gray-900 dark:bg-gray-900">
@@ -207,31 +202,24 @@
                           </div>
                         </div>
                       </div>
+                      <!-- ************************************************中部 标题**************************** -->
+                      <div id="topTitle"
+                           class="align-center flex h-full w-full flex-col justify-center self-center px-2 pb-2 md:pb-[8vh]">
+                        <div class="absolute right-2 top-2 text-gray-600 text-sm  sm:none">
+                          仅限邀请内测
+                        </div>
+                        <h1
+                                class="text-6xl font-semibold text-center t ml-auto mr-auto mb-10 sm:mb-16 flex gap-2 items-center justify-center flex-grow"
+                                style="color: #838383;"
+                        >
+                          <!-- style="color: #51B4EF;" -->
+                          <span></span>
+                        </h1>
+                      </div>
+                      <!-- ************************************************中部 标题end**************************** -->
+                      <div id="item-content" class="flex h-full w-full flex-col  px-2 pb-32 md:pb-[8vh]"
+                           style="overflow: auto;">
 
-                      <div id="item-content" class="w-full" style="overflow: auto;" >
-                        <div id="topTitle" class="align-center flex w-full flex-col justify-center self-center px-2 pb-2 md:pb-[4vh]" style="height: calc(8vh);">
-                          <div class="absolute right-2 top-2 text-gray-600 text-sm sm:none">
-                            仅限邀请内测
-                          </div>
-                          <h1
-                                  class="text-6xl font-semibold text-center t ml-auto mr-auto mb-10 sm:mb-16 flex gap-2 items-center justify-center flex-grow"
-                                  style="color: #838383;">
-                            <span></span>
-                          </h1>
-                        </div>
-                        <div id="ball-div">
-                        </div>
-                        <!-- ***********************输入框前form******************************** -->
-                        <div id="introduces">
-                          <div class="h-full flex ml-1 md:w-full md:m-auto md:mb-4 gap-0 md:gap-2 justify-center">
-                            <div class="grow">
-                              <div class="absolute  left-0 mb-4 flex w-full grow gap-2 px-1 pb-1 sm:px-2 sm:pb-0 md:static md:mb-0 md:max-w-none">
-                                <div class="grid w-full grid-flow-row grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-3"></div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        <!-- ***********************输入框前form end******************************** -->
                       </div>
                     </div>
                   </div>
@@ -239,12 +227,43 @@
               </div>
             </div>
             <div
-                    class="absolute bottom-0 left-0  border-t md:border-t-0 dark:border-white/20 md:border-transparent md:dark:border-transparent md:bg-vert-light-gradient bg-white dark:bg-gray-800 md:!bg-transparent dark:md:bg-vert-dark-gradient pt-2 md:pl-2 md:w-[calc(100%-.5rem)]">
+                    class="absolute bottom-0 left-0 w-full border-t md:border-t-0 dark:border-white/20 md:border-transparent md:dark:border-transparent md:bg-vert-light-gradient bg-white dark:bg-gray-800 md:!bg-transparent dark:md:bg-vert-dark-gradient pt-2 md:pl-2 md:w-[calc(100%-.5rem)]">
               <form
                       class="stretch mx-2 flex flex-row gap-3 last:mb-2 md:mx-4 md:last:mb-6 lg:mx-auto lg:max-w-2xl xl:max-w-3xl">
                 <div class="relative flex h-full flex-1 items-stretch md:flex-col">
+                  <!-- ***********************输入框前form******************************** -->
+                  <div id="introduces">
+                    <div class="h-full flex ml-1 md:w-full md:m-auto md:mb-4 gap-0 md:gap-2 justify-center">
+                      <div class="grow">
+                        <div
+                                class="absolute bottom-full left-0 mb-4 flex w-full grow gap-2 px-1 pb-1 sm:px-2 sm:pb-0 md:static md:mb-0 md:max-w-none">
+                          <div
+                                  class="grid w-full grid-flow-row grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-3">
+
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="flex w-full " id="queryOption">
+
+                  </div>
+                  <!-- ***********************输入框前form end******************************** -->
+
+
+
                   <!-- ***********************输入框******************************** -->
+
                   <div class="flex w-full " id="queryBox">
+
+                    <div id = "category-container" class="absolute flex w-full flex-1 items-stretch md:flex-col hidden">
+                      <div id="categoryList" class="absolute right-1 z-50 agent-pannel w-32 "  >
+                        <div id = "category-head" class="agent-head  pt-2 pb-1 text-center"></div>
+                        <ul id = "category-tools" class="pb-2">
+                        </ul>
+                      </div>
+                    </div>
+
                     <div id = "agent-container" class="absolute flex w-full flex-1 items-stretch md:flex-col hidden">
                       <div id="agentList" class="absolute right-1 z-50 agent-pannel w-32 "  >
                         <div id = "agent-head" class="agent-head  pt-2 pb-1 text-center"></div>
@@ -283,7 +302,7 @@
 
                     <div
                             class="flex flex-col w-full py-2 flex-grow md:py-3 md:pl-4 relative border border-black/10 bg-white dark:border-gray-900/50 dark:text-white dark:bg-gray-700 rounded-md shadow-[0_0_10px_rgba(0,0,0,0.10)] dark:shadow-[0_0_15px_rgba(0,0,0,0.10)]">
-                          <textarea id="queryContent" data-agent="" tabindex="0" data-id="root" rows="1" placeholder="请输入文字..."
+                          <textarea id="queryContent" tabindex="0" data-id="root" rows="1" placeholder="请输入文字..."
                                     class=" m-0 w-full resize-none border-0 bg-transparent p-0 pl-2 pr-7 focus:ring-0 focus-visible:ring-0 dark:bg-transparent md:pl-0"
                                     style="max-height: 200px; height: 24px;  width: 98%;float: left;"></textarea>
 
@@ -297,18 +316,37 @@
                       <!-- ******************发送按钮关闭***************************** -->
                     </div>
 
+                    <!-- 定义一个按钮，用于选择category -->
+                    <div id="categoryButton" class=" flex-col-reverse m-2 flex-bottom">
+                      <img style="width: 28px;height: 28px; float: left;right: 100px; object-fit: contain; margin-bottom: 1px;" t="1694871462493" class=" icon"
+                           alt="category"
+                           src="images/category.png"
+                      />
+
+                    </div>
+
                     <div id="agentButton" class=" flex-col-reverse m-2 flex-bottom">
-                      <img style="width: 28px;height: 28px; float: left;right: 100px; object-fit: contain; margin-bottom: 0px;" t="1694871462493" class=" icon"
+                      <img style="width: 28px;height: 28px; float: left;right: 100px; object-fit: contain; margin-bottom: 1px;" t="1694871462493" class=" icon"
                            alt="agent"
                            src="images/agent.png"
                       />
                     </div>
 
-                    <div id="addButton" class=" flex-col-reverse m-2 flex-bottom">
-                      <img style="width: 28px;height: 28px; float: left;right: 100px; object-fit: contain; margin-bottom: 0px;" t="1694871462493" class=" icon"
-                           alt="agent"
-                           src="images/wjsc.png"
-                      />
+                    <div id="addButton" class=" flex-col-reverse m-2 flex-bottom"><svg id="addSvg"
+                                                                                       style="width: 26px;height: 26px; float: left;right: 100px; margin-bottom: 0px;" t="1694871462493" class=" icon"
+                                                                                       viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="6730"
+                                                                                       width="200" height="200">
+                      <path
+                              d="M888.640638 178.095187 344.424912 178.095187c0 0-37.257555-65.74333-75.9109-65.74333L93.247242 112.351857c-15.407921 0-27.907607 15.117302-27.907607 33.675984l0 50.736545c0 18.508539 12.499685 33.624818 27.907607 33.624818l796.417725 0c15.408945 0 26.220175-7.514137 26.220175-26.022677l0.067538 0.38374C915.95268 186.241728 904.049582 178.095187 888.640638 178.095187z"
+                              fill="#2DAAD2" p-id="6731"></path>
+                      <path
+                              d="M958.413747 833.260841c0 18.508539-12.500709 33.624818-27.90863 33.624818L93.247242 866.88566c-15.407921 0-27.907607-15.116279-27.907607-33.624818L65.339636 294.90559c0-18.508539 12.499685-33.625842 27.907607-33.625842l837.257875 0c15.408945 0 27.90863 15.117302 27.90863 33.625842L958.413747 833.260841z"
+                              fill="#3399CC" p-id="6732"></path>
+                      <path d="M351.692433 523.843746l320.318376 0 0 80.529081-320.318376 0 0-80.529081Z"
+                            fill="#FFFFFF" p-id="6733"></path>
+                      <path d="M471.659735 403.923516l80.479963 0 0 320.319399-80.479963 0 0-320.319399Z"
+                            fill="#FFFFFF" p-id="6734"></path>
+                    </svg>
                     </div>
                   </div>
                   <!-- ***********************输入框end******************************** -->
@@ -331,7 +369,7 @@
                   &nbsp;&nbsp;&nbsp;&nbsp;
                   联系邮箱:
                   <a href="mailto:service@landingbj.com" style="text-decoration: none;">service@landingbj.com</a>
-                  &nbsp;&nbsp;&nbsp;&nbsp;联系电话: 027-87659116 &nbsp;&nbsp;&nbsp;&nbsp;<div>内容由AI生成 &nbsp 一种通用人工智能的实现验证</div>
+                  &nbsp;&nbsp;&nbsp;&nbsp;联系电话: 027-87659116 &nbsp;&nbsp;&nbsp;&nbsp;<div>一种通用人工智能的实现验证</div>
                 </div>
               </div>
               <!-- *********************** 底部end******************************** -->
@@ -374,6 +412,5 @@
 <script src="js/index.js?ver=${initParam.version}"></script>
 <script src="js/self.js?ver=${initParam.version}"></script>
 <script src="js/query.js?ver=${initParam.version}"></script>
-<script src="js/ball.js"></script>
 </body>
 </html>
