@@ -3,6 +3,7 @@ package ai.llm.utils;
 import ai.common.ModelService;
 import ai.common.exception.RRException;
 import ai.common.utils.ObservableList;
+import ai.llm.interceptor.CustomInterceptor;
 import ai.openai.pojo.ChatCompletionResult;
 import okhttp3.*;
 import okhttp3.sse.EventSource;
@@ -38,6 +39,7 @@ public class ServerSentEventUtil {
 //                .proxy(new Proxy(Proxy.Type.HTTP, new InetSocketAddress("localhost", 7890)))
                 .connectTimeout(10, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
+                .addInterceptor(new CustomInterceptor())
                 .build();
 
         Request.Builder requestBuilder = new Request.Builder();
@@ -48,7 +50,7 @@ public class ServerSentEventUtil {
             requestBuilder.header(entry.getKey(), entry.getValue());
         }
         Request request = requestBuilder.url(apiUrl)
-                .header("Accept", "text/event-stream")
+//                .header("Accept", "text/event-stream")
                 .post(RequestBody.create(json, MediaType.parse("application/json")))
                 .build();
 

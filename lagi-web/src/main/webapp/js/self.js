@@ -645,7 +645,14 @@ var Recoder = {
     }
 }
 
-
+const modelButton = document.getElementById("categoryButton");
+modelButton.addEventListener("click", function (e) {
+    $('#category-container').toggle();
+    $(document).one("click", function () {
+        $("#category-container").hide();
+    });
+    event.stopPropagation();
+});
 
 const agentButton = document.getElementById("agentButton");
 agentButton.addEventListener("click", function (e) {

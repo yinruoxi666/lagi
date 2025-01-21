@@ -10,6 +10,8 @@ let introTable = [
     [{title:"测试1", content:"内容1"},{title:"测试2", content:"内容2"},],
     [{title:"测试3", content:"内容3"},{title:"测试4", content:"内容4"},],
 ]
+let category_title = '分类';
+let category_tools = [];
 
 let agent_title = 'AI智能体';
 let agent_tools = [
@@ -20,10 +22,37 @@ let agent_tools = [
     {name:'工控线', bind_func: 'notifyAvailable', available:false},
 ]
 
+// 获取category 列表，调用接口GET:/v1/vector/listCollections
+function loadCategories() {
+    $.ajax({
+        type: "GET",
+        url: "v1/vector/listCollections",
+        success: function (res) {
+            if (res.status === 'success') {
+                var categories = res.data;
+                for (let i = 0; i < categories.length; i++) {
+                    const category = categories[i].category;
+                    const category_item = {name:category, bind_func: "changeCategory('"+category+"')", available:true};
+                    category_tools.push(category_item);
+                    let html = `<li class=" pl-5  ${category_item.available ? '' : 'not-available'}" onclick="${category_item.bind_func}()" >> ${category_item.name}</li>`;
+                    $('#category-tools').append(html);
+                }
+            }
+        }
+    });
+}
+// 切换category
+function changeCategory(category) {
+    setCookie("category", category, 180);
+    window.category = category;
+    $('#category').text(category);
+}
+
 function initHelloPage() {
     initTopTile();
     initModelSlide();
     initIntroduces();
+    initCategoryTool();
     initAgentTool();
     $('#model-prefences').hide();
 }
@@ -203,6 +232,11 @@ function initTopTile() {
 	});
 }
 
+function initCategoryTool() {
+    $('#category-head').html(category_title);
+    $('#category-tools').empty();
+    loadCategories();
+}
 
 function initAgentTool() {
     $('#agent-head').html(agent_title);
