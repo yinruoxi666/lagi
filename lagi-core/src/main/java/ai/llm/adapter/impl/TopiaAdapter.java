@@ -79,8 +79,8 @@ public class TopiaAdapter extends ModelService implements ILlmAdapter {
             });
             return result;
         };
-        ObservableList<ChatCompletionResult> result =
-                ServerSentEventUtil.streamCompletions(json, COMPLETIONS_URL, apiKey, convertFunc, this);
+        ObservableList<ChatCompletionResult> result = null;
+//                ServerSentEventUtil.streamCompletions(json, COMPLETIONS_URL, apiKey, convertFunc, this);
         Iterable<ChatCompletionResult> iterable = result.getObservable().blockingIterable();
         return Observable.fromIterable(iterable);
     }

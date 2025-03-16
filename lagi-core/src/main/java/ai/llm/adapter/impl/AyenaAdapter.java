@@ -2,8 +2,11 @@ package ai.llm.adapter.impl;
 
 import ai.annotation.LLM;
 import ai.common.ModelService;
+import ai.common.exception.RRException;
 import ai.common.utils.ObservableList;
 import ai.llm.adapter.ILlmAdapter;
+import ai.llm.pojo.LlmApiResponse;
+import ai.llm.utils.OpenAiApiUtil;
 import ai.llm.utils.ServerSentEventUtil;
 import ai.openai.pojo.ChatCompletionRequest;
 import ai.openai.pojo.ChatCompletionResult;
@@ -12,6 +15,7 @@ import ai.utils.qa.HttpUtil;
 import cn.hutool.core.util.StrUtil;
 import com.google.gson.Gson;
 import io.reactivex.Observable;
+import okhttp3.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,7 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
 
-@LLM(modelNames = {"ayenaspring-basic-001"})
+@LLM(modelNames = {"ayenaspring-advanced-001"})
 public class AyenaAdapter extends ModelService implements ILlmAdapter {
     private static final Logger logger = LoggerFactory.getLogger(AyenaAdapter.class);
     private final Gson gson = new Gson();
@@ -84,8 +88,9 @@ public class AyenaAdapter extends ModelService implements ILlmAdapter {
 //            }
             return result;
         };
+        Function<Response, RRException> convertErrorFunc = response -> new RRException();
         ObservableList<ChatCompletionResult> result =
-                ServerSentEventUtil.streamCompletions(json, COMPLETIONS_URL, apiKey, convertFunc, this);
+                ServerSentEventUtil.streamCompletions(json, COMPLETIONS_URL, apiKey, convertFunc, this, convertErrorFunc);
         Iterable<ChatCompletionResult> iterable = result.getObservable().blockingIterable();
         return Observable.fromIterable(iterable);
     }

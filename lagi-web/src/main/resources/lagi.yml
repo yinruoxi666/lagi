@@ -17,10 +17,11 @@ models:
   # FastChat is an open platform designed for training, deploying, and evaluating chatbots based on large language models.
   - name: fastchat
     type: Vicuna
-    enable: false
-    model: vicuna-13b,vicuna-7b,vicuna-7b-16k,vicuna-13B-16k,vicuna-33B
+    enable: true
+    model: /data/models/DeepSeek-R1-Distill-Llama-70B-w8a8, vicuna-13b,vicuna-7b,vicuna-7b-16k,vicuna-13B-16k,vicuna-33B
     driver: ai.llm.adapter.impl.VicunaAdapter
-    api_address: http://localhost:8090/v1/chat/completions
+    api_address: http://117.157.184.24:58080/v1/chat/completions
+    api_key: sk-112121
 
   # ChatGPT is a state-of-the-art language model developed by OpenAI
   - name: chatgpt
@@ -110,6 +111,14 @@ models:
     api_key: 54f6e81f40a31d66d976496de895a7a4  # https://console.xfyun.cn/
     secret_key: ZDYyMjNmMTlkYTE0YWRmOWUwZTYxNjYz   # https://console.xfyun.cn/
 
+  # ChatGPT is a state-of-the-art language model developed by OpenAI
+  - name: ayenaspring
+    type: Ayena
+    enable: true
+    model: ayenaspring-advanced-001
+    driver: ai.llm.adapter.impl.AyenaAdapter
+    api_key: sk-4a78244e7fab4af9ba2a3bf8eb3cacb4ldiehkid4h6tjkx2 # https://platform.openai.com/
+
   # SenseChat(RiRiXin) is a large language model developed by SenseTime
   - name: SenseChat
     type: SenseTime
@@ -147,7 +156,7 @@ models:
     enable: true
     model: deepseek-chat
     driver: ai.llm.adapter.impl.DeepSeekAdapter
-    api_key: your-api-key # url address https://platform.deepseek.com/api_keys
+    api_key: sk-8f41405229de4c8b8269fd4d18dcb29e # url address https://platform.deepseek.com/api_keys
 
   # Claude is a next generation AI assistant built by Anthropic and trained to be safe, accurate, and secure to help you do your best work.
   - name: claude
@@ -235,7 +244,7 @@ stores:
     priority: 10
     default: "Please give prompt more precisely"
     track: true
-    use_rag: true
+    use_rag: false
 
   medusa: # Medusa is a caching tool designed to accelerate the response of large models.
     enable: false
@@ -260,6 +269,12 @@ functions:
       stream: true
       priority: 100
 
+    - backend: ayenaspring
+      model: ayenaspring-advanced-001
+      enable: true
+      stream: true
+      priority: 100
+
     - backend: kimi
       model: moonshot-v1-128k
       enable: false
@@ -269,6 +284,18 @@ functions:
     - backend: chatglm
       model: glm-4-alltools
       enable: false
+      stream: true
+      priority: 80
+
+    - backend: deepseek
+      model: deepseek-chat
+      enable: true
+      stream: true
+      priority: 80
+
+    - backend: fastchat
+      model: /data/models/DeepSeek-R1-Distill-Llama-70B-w8a8
+      enable: true
       stream: true
       priority: 80
 
@@ -375,7 +402,7 @@ functions:
       enable: true
       priority: 10
   policy:
-    context_length: 9192
+    context_length: 32768
 
 
 # The following is the configuration of agents, name is the name of the agent,

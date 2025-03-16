@@ -44,8 +44,11 @@ public class GPTAzureAdapter extends ModelService implements ILlmAdapter {
         Map<String, String> headers = new HashMap<>();
         headers.put("Content-Type", "application/json");
         headers.put("api-key", getApiKey());
+        EnhanceChatCompletionRequest enhanceChatCompletionRequest = new EnhanceChatCompletionRequest();
+        BeanUtil.copyProperties(chatCompletionRequest, enhanceChatCompletionRequest);
+        enhanceChatCompletionRequest.setIp(null);
         Proxy proxy = new Proxy(Proxy.Type.SOCKS, GptAzureConvert.convertProxyUrl2InetSocketAddress());
-        LlmApiResponse completions = OpenAiApiUtil.completions(getApiKey(), getApiAddress(), HTTP_TIMEOUT, chatCompletionRequest,
+        LlmApiResponse completions = OpenAiApiUtil.completions(getApiKey(), getApiAddress(), HTTP_TIMEOUT, enhanceChatCompletionRequest,
                 GptAzureConvert::convert2ChatCompletionResult, GptAzureConvert::convertByResponse,
                 headers,proxy);
         if(completions.getCode() != 200) {
