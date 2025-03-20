@@ -4,9 +4,11 @@ import ai.annotation.LLM;
 import ai.common.ModelService;
 import ai.common.exception.RRException;
 import ai.llm.adapter.ILlmAdapter;
+import ai.llm.pojo.EnhanceChatCompletionRequest;
 import ai.llm.pojo.LlmApiResponse;
 import ai.llm.utils.OpenAiApiUtil;
 import ai.llm.utils.convert.GptConvert;
+import ai.llm.utils.convert.LandingConvert;
 import ai.openai.pojo.ChatCompletionRequest;
 import ai.openai.pojo.ChatCompletionResult;
 import com.google.gson.Gson;
@@ -24,6 +26,9 @@ public class LandingAdapter extends ModelService implements ILlmAdapter {
 
     @Override
     public boolean verify() {
+        if (getEndpoint() != null && !getEndpoint().contains("lagi.saasai.top")) {
+            return true;
+        }
         if (getApiKey() == null || getApiKey().startsWith("you")) {
             return false;
         }
@@ -32,17 +37,23 @@ public class LandingAdapter extends ModelService implements ILlmAdapter {
 
     @Override
     public ChatCompletionResult completions(ChatCompletionRequest chatCompletionRequest) {
+        setDefaultField(chatCompletionRequest);
         String model = chatCompletionRequest.getModel();
         String url = API_ADDRESS;
         if (model.equals("cascade")) {
             chatCompletionRequest.setModel(null);
             chatCompletionRequest.setCategory(null);
-            url = "https://lagi.saasai.top/v1/chat/completions";
+            if (getEndpoint() == null) {
+                url = "https://lagi.saasai.top/v1/chat/completions";
+            } else {
+                url = getEndpoint();
+            }
         }
+        System.out.println(new Gson().toJson(chatCompletionRequest));
         LlmApiResponse completions = OpenAiApiUtil.completions(getApiKey(), url, HTTP_TIMEOUT, chatCompletionRequest,
                 GptConvert::convert2ChatCompletionResult,
                 GptConvert::convertByResponse);
-        if(completions.getCode() != 200) {
+        if (completions.getCode() != 200) {
             logger.error("landing api error {}", completions.getMsg());
             throw new RRException(completions.getCode(), completions.getMsg());
         }
@@ -51,20 +62,34 @@ public class LandingAdapter extends ModelService implements ILlmAdapter {
 
     @Override
     public Observable<ChatCompletionResult> streamCompletions(ChatCompletionRequest chatCompletionRequest) {
+        setDefaultField(chatCompletionRequest);
         String url = API_ADDRESS;
         if (model.equals("cascade")) {
             chatCompletionRequest.setModel(null);
             chatCompletionRequest.setCategory(null);
-            url = "https://lagi.saasai.top/v1/chat/completions";
+            if (getEndpoint() == null) {
+                url = "https://lagi.saasai.top/v1/chat/completions";
+            } else {
+                url = getEndpoint();
+            }
         }
         LlmApiResponse completions = OpenAiApiUtil.streamCompletions(getApiKey(), url, HTTP_TIMEOUT, chatCompletionRequest,
-                GptConvert::convertSteamLine2ChatCompletionResult,
-                GptConvert::convertByResponse);
-        if(completions.getCode() != 200) {
+                LandingConvert::convertSteamLine2ChatCompletionResult,
+                LandingConvert::convertByResponse);
+        if (completions.getCode() != 200) {
             logger.error("landing stream api error {}", completions.getMsg());
             throw new RRException(completions.getCode(), completions.getMsg());
         }
         return completions.getStreamData();
     }
 
+    private void setDefaultField(ChatCompletionRequest request) {
+        if (request.getModel() == null) {
+            request.setModel(getModel());
+        }
+        if (request instanceof EnhanceChatCompletionRequest) {
+            ((EnhanceChatCompletionRequest) request).setIp(null);
+            ((EnhanceChatCompletionRequest) request).setBrowserIp(null);
+        }
+    }
 }
