@@ -86,5 +86,9 @@ public class GPTAzureAdapter extends ModelService implements ILlmAdapter {
         if (request.getModel() == null) {
             request.setModel(getModel());
         }
+        if (request instanceof EnhanceChatCompletionRequest) {
+            ((EnhanceChatCompletionRequest) request).setIp(null);
+            ((EnhanceChatCompletionRequest) request).setBrowserIp(null);
+        }
     }
 }

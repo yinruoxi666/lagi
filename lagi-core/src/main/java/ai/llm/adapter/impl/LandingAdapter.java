@@ -20,7 +20,6 @@ import org.slf4j.LoggerFactory;
 @LLM(modelNames = "qa")
 public class LandingAdapter extends ModelService implements ILlmAdapter {
     private static final Logger logger = LoggerFactory.getLogger(LandingAdapter.class);
-    private final Gson gson = new Gson();
     private static final int HTTP_TIMEOUT = 15 * 1000;
     private static final String API_ADDRESS = "http://ai.landingbj.com/v1/chat/completions";
 

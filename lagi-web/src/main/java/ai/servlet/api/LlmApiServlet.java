@@ -67,7 +67,7 @@ public class LlmApiServlet extends BaseServlet {
     private final MedusaService medusaService = new MedusaService();
     private final RAGFunction RAG_CONFIG = ContextLoader.configuration.getStores().getRag();
     private final Medusa MEDUSA_CONFIG = ContextLoader.configuration.getStores().getMedusa();
-    private final Boolean enableQueueHandle = ContextLoader.configuration.getFunctions().getPolicy().getEnableQueueHandle();
+    private final Boolean enableQueueHandle = ContextLoader.configuration.getFunctions().getChat().getEnableQueueHandle();
     private final QueueSchedule queueSchedule = enableQueueHandle ? new QueueSchedule() : null;
     private final DefaultWorker defaultWorker = new DefaultWorker();
     private static ExecutorService executorService;
@@ -76,6 +76,12 @@ public class LlmApiServlet extends BaseServlet {
         ThreadPoolManager.registerExecutor("dynamic-stream");
         executorService = ThreadPoolManager.getExecutor("dynamic-stream");
         VectorCacheLoader.load();
+    }
+
+    @Override
+    public void init() throws ServletException {
+        medusaService.init();
+        super.init();
     }
 
     @Override
@@ -348,9 +354,11 @@ public class LlmApiServlet extends BaseServlet {
                         for (int i = 0; i < lastResult[1].getChoices().size(); i++) {
                             ChatCompletionChoice choice = lastResult[1].getChoices().get(i);
                             ChatCompletionChoice chunkChoice = data.getChoices().get(i);
-                            String chunkContent = chunkChoice.getMessage().getContent();
-                            String content = choice.getMessage().getContent();
-                            choice.getMessage().setContent(content + chunkContent);
+                            if(chunkChoice.getMessage() != null) {
+                                String chunkContent = chunkChoice.getMessage().getContent();
+                                String content = choice.getMessage().getContent();
+                                choice.getMessage().setContent(content + chunkContent);
+                            }
                         }
                     }
                 },

@@ -7,11 +7,12 @@ import okhttp3.Response;
 
 public class LandingConvert {
     private static final Gson gson = new Gson();
+
     public static int convert(Object object) {
-        if(object instanceof  Integer) {
+        if (object instanceof Integer) {
             return convertByInt((int) object);
         }
-        if(object instanceof Response) {
+        if (object instanceof Response) {
             return convertByResponse((Response) object);
         }
         return LLMErrorConstants.OTHER_ERROR;

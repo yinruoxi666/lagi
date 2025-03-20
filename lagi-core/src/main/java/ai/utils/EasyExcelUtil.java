@@ -1,6 +1,7 @@
 package ai.utils;
 
 import ai.common.pojo.FileChunkResponse;
+import ai.vector.pojo.ExcelPage;
 import cn.hutool.json.JSONObject;
 import cn.hutool.poi.excel.ExcelReader;
 import cn.hutool.poi.excel.ExcelUtil;
@@ -14,7 +15,6 @@ import org.junit.Test;
 import java.io.*;
 import java.nio.charset.Charset;
 import java.util.*;
-import java.util.concurrent.ExecutionException;
 
 /**
  * @Author tsg
@@ -221,21 +221,18 @@ public class EasyExcelUtil {
             for (int j = 0; j < dataRow.size(); j++) {
                 JSONObject cell = dataRow.get(j);
                 String cellValue = cell.getStr("cellValue");
-
-                // 如果是合并单元格，则处理合并的值
-                if (cell.containsKey("isMerge") && cell.getBool("isMerge")) {
-                    // 获取合并单元格的起始和结束行列
-                    int firstRow = cell.getInt("firstRow");
-                    int firstCol = cell.getInt("firstColumn");
-                    // 这里只在合并单元格的起始位置才输出值
-                    if (firstRow == i && firstCol == j) {
-                        rowData.add(cellValue);
-                    } else {
-                        rowData.add("");
-                    }
-                } else {
-                    rowData.add(cellValue);
-                }
+                rowData.add(cellValue);
+//                if (cell.containsKey("isMerge") && cell.getBool("isMerge")) {
+//                    int firstRow = cell.getInt("firstRow");
+//                    int firstCol = cell.getInt("firstColumn");
+//                    if (firstRow == i && firstCol == j) {
+//                        rowData.add(cellValue);
+//                    } else {
+//                        rowData.add("");
+//                    }
+//                } else {
+//                    rowData.add(cellValue);
+//                }
             }
             text+="| " + String.join(" | ", rowData) + " |</br>";
             msgList.add(text);
@@ -325,7 +322,7 @@ public class EasyExcelUtil {
     public static <T>  List<FileChunkResponse.Document> mergePages1(List<Page<T>> pages, String sheet,String header) {
         List<FileChunkResponse.Document> result = new ArrayList<>();
         for (Page<T> page : pages) {
-            String text = "sheet工作表名："+sheet+"/n";
+            String text = "sheet工作表名："+sheet+"</br></br>";
             text +=header;
             for (T item : page.getItems()) {
                 text+=item;
@@ -342,9 +339,9 @@ public class EasyExcelUtil {
         for (Page<T> page : pages) {
             String text = "";
             List<Object> header1 = (List<Object>) header.get(0);
-            text = "表头: /n " + header1.get(0)+"/n";
+            text = "表头: </br> " + header1.get(0)+"</br>";
             for (T item : page.getItems()) {
-                text+=item+"/n";
+                text+=item+"</br>";
             }
             FileChunkResponse.Document doc = new FileChunkResponse.Document();
             doc.setText(text);
@@ -375,13 +372,85 @@ public class EasyExcelUtil {
      * @return
      * @throws IOException
      */
-   public static List<FileChunkResponse.Document> getChunkDocumentExcel(File file,Integer pageSize) throws IOException {
+    public static List<FileChunkResponse.Document> getChunkDocumentExcel(File file,Integer pageSize) throws IOException {
        List<FileChunkResponse.Document> resultDocument = new ArrayList<>();
         try {
             ExcelReader reader = ExcelUtil.getReader(file);
             List<String> sheetNames = reader.getSheetNames();
             for (int i = 0; i < sheetNames.size(); i++) {
-                List<List<JSONObject>> result =readMergeExcel(file.getPath(),i,0,0);
+                ExcelPage excelPage =readMergeExcel(file.getPath(),i,0,0);
+                List<Integer> headerIndex = excelPage.getHeaderIndex();
+                List<List<JSONObject>> result = excelPage.getData();
+
+                if (result.size() <= 0){
+                    break;
+                }
+                if (headerIndex.size() >= 2){
+                   //表中表
+                    if (headerIndex.get(0) > 1) {
+                        List<JSONObject> headerRow = result.get(headerIndex.get(0));
+                        StringBuilder separator = new StringBuilder();
+                        String title = headerRow.get(0).getStr("cellValue");
+                        separator.append(title+"</br>");
+                        List<String> headers = new ArrayList<>();
+                        for (JSONObject cell : result.get(headerIndex.get(0)+1)) {
+                            headers.add(cell.getStr("cellValue"));
+                        }
+                        separator.append("| " + String.join(" | ", headers) + " |</br>");
+                        for (int j = 0; j < headers.size(); j++) {
+                            separator.append("| --- ");
+                        }
+                        separator.append("|</br>");
+                        List<List<JSONObject>> lastSubList = result.subList(1, headerIndex.get(0)-1);
+                        List<Page<List<Object>>> pages = paginate1(lastSubList, pageSize);
+                        resultDocument.addAll(mergePages1(pages, sheetNames.get(i), separator.toString()));
+                    }
+                    for (int msgindex = 0; msgindex < headerIndex.size()-1; msgindex++) {
+                        Integer start = headerIndex.get(msgindex);
+                        Integer end = headerIndex.get(msgindex+1);
+                        StringBuilder separator = new StringBuilder();
+                        List<JSONObject> headerRow = result.get(headerIndex.get(msgindex));
+                        String title = headerRow.get(0).getStr("cellValue");
+                        separator.append(title+"</br>");
+                        List<String> headers = new ArrayList<>();
+                        for (JSONObject cell : result.get(headerIndex.get(msgindex)+1)) {
+                            headers.add(cell.getStr("cellValue"));
+                        }
+                        separator.append("| " + String.join(" | ", headers) + " |</br>");
+                        for (int j = 0; j < headers.size(); j++) {
+                            separator.append("| --- ");
+                        }
+                        separator.append("|</br>");
+                        List<List<JSONObject>> lastSubList = result.subList(start+1, end-1);
+                        List<Page<List<Object>>> pages = paginate1(lastSubList, pageSize);
+                        resultDocument.addAll(mergePages1(pages, sheetNames.get(i), separator.toString()));
+                    }
+                    if (headerIndex.get(headerIndex.size() - 1)+1 < result.size()) {
+                        StringBuilder separator = new StringBuilder();
+                        List<JSONObject> headerRow = result.get(headerIndex.get(headerIndex.size() - 1));
+                        String title = headerRow.get(0).getStr("cellValue");
+                        separator.append(title+"</br>");
+                        List<String> headers = new ArrayList<>();
+                        for (JSONObject cell : result.get(headerIndex.get(headerIndex.size() - 1)+1)) {
+                            headers.add(cell.getStr("cellValue"));
+                        }
+                        separator.append("| " + String.join(" | ", headers) + " |</br>");
+                        for (int j = 0; j < headers.size(); j++) {
+                            separator.append("| --- ");
+                        }
+                        separator.append("|</br>");
+
+                        List<List<JSONObject>> lastSubList = result.subList(headerIndex.get(headerIndex.size() - 1)+1, result.size()-1);
+                        List<Page<List<Object>>> pages = paginate1(lastSubList, pageSize);
+                        resultDocument.addAll(mergePages1(pages, sheetNames.get(i), separator.toString()));
+                    }else if (headerIndex.get(headerIndex.size() - 1)+1 == result.size()){
+                        StringBuilder separator = new StringBuilder();
+                        List<List<JSONObject>> lastSubList = result.subList(headerIndex.get(headerIndex.size() - 1), result.size());
+                        List<Page<List<Object>>> pages = paginate1(lastSubList, pageSize);
+                        resultDocument.addAll(mergePages1(pages, sheetNames.get(i), separator.toString()));
+                    }
+
+                } else {
                 StringBuilder separator = new StringBuilder();
                 // 获取表头
                 List<JSONObject> headerRow = result.get(0);
@@ -396,6 +465,7 @@ public class EasyExcelUtil {
                 separator.append("|</br>");
                 List<Page<List<Object>>> pages = paginate1(result, pageSize);
                 resultDocument.addAll(mergePages1(pages, sheetNames.get(i), separator.toString()));
+                }
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -403,15 +473,13 @@ public class EasyExcelUtil {
         return resultDocument;
     }
 
-    public static List<FileChunkResponse.Document> getChunkDocumentCsv(File file) throws IOException {
+    public static List<FileChunkResponse.Document> getChunkDocumentCsv(File file, Integer pageSize) throws IOException {
         Map<String, List<List<Object>>> result = readCsv(file.getPath());
         List<Object> header = Collections.singletonList(result.get("header"));
         List<List<Object>> rowData = result.get("data");
-        int pageSize = 512;
         List<Page<List<Object>>> pages = paginate(rowData, pageSize);
         return mergePages(pages, header);
     }
-
     public static String getExcelContent(File file) throws IOException {
         StringBuilder result = new StringBuilder();
         FileInputStream fileInputStream = new FileInputStream(file);
@@ -443,12 +511,15 @@ public class EasyExcelUtil {
      * @param startReadLine 开始读取的行:从0开始
      * @param tailLine      去除最后读取的行
      */
-    public static List<List<JSONObject>> readMergeExcel(String path, int sheetIndex, int startReadLine, int tailLine) {
+    public static ExcelPage readMergeExcel(String path, int sheetIndex, int startReadLine, int tailLine) {
         List<List<JSONObject>> results = new ArrayList<>();
         Workbook wb = null;
+        List<Integer> headerIndex = new ArrayList<>();
         try {
             wb = WorkbookFactory.create(new File(path));
+            FormulaEvaluator formulaEvaluator = wb.getCreationHelper().createFormulaEvaluator();
             Sheet sheet = wb.getSheetAt(sheetIndex);
+            headerIndex = getHeaderIndex(sheet);
             Row row = null;
             for (int i = startReadLine; i < sheet.getLastRowNum() - tailLine + 1; i++) {
                 row = sheet.getRow(i);
@@ -464,7 +535,7 @@ public class EasyExcelUtil {
                         JSONObject rs = getMergedRegionJsonValue(sheet, row.getRowNum(), c.getColumnIndex());
                         values.putAll(rs);
                     } else {
-                        values.put("cellValue",getCellValue(c));
+                        values.put("cellValue",getCellValue(c,formulaEvaluator));
                     }
                     result.add(values);
                 }
@@ -473,7 +544,58 @@ public class EasyExcelUtil {
         } catch (Exception e) {
             e.printStackTrace();
         }
-        return results;
+        ExcelPage excelPage = new ExcelPage();
+        excelPage.setData(results);
+        excelPage.setHeaderIndex(headerIndex);
+        return excelPage;
+    }
+    private static List<Integer> getHeaderIndex(Sheet sheet) {
+        List<Integer> headerIndex = new ArrayList<>();
+        for (int rowIndex = 0; rowIndex < sheet.getPhysicalNumberOfRows(); rowIndex++) {
+            Row row = sheet.getRow(rowIndex);
+            if (row != null) {
+                if (isHeader(sheet, rowIndex, row)) {
+                    headerIndex.add(rowIndex);
+                }
+            }
+        }
+        return headerIndex;
+    }
+    /**
+     * 检查指定行是否为表头
+     *
+     * @param sheet    工作表
+     * @param rowIndex 行索引
+     * @param row      行对象
+     * @return 如果指定行为表头，返回true
+     */
+    private static boolean isHeader(Sheet sheet, int rowIndex, Row row) {
+        int mergedCount = 0;
+        boolean isMergedCellWithData = false;
+        int dataCellCount = 0;
+        int totalCellCount = 0;
+
+        for (int i = 0; i < sheet.getNumMergedRegions(); i++) {
+            CellRangeAddress mergedRegion = sheet.getMergedRegion(i);
+
+            if (mergedRegion.getFirstRow() <= rowIndex && rowIndex <= mergedRegion.getLastRow()) {
+                mergedCount++;
+                if (mergedRegion.getFirstRow() == rowIndex) {
+                    Cell cell = row.getCell(mergedRegion.getFirstColumn());
+                    if (cell != null && !cell.toString().isEmpty()) {
+                        isMergedCellWithData = true;
+                        dataCellCount++;
+                    }
+                }
+            }
+        }
+        for (int i = 0; i <= row.getLastCellNum(); i++) {
+            Cell cell = row.getCell(i);
+            if (cell != null && !cell.toString().isEmpty()) {
+                totalCellCount++;
+            }
+        }
+        return mergedCount == 1 && isMergedCellWithData && dataCellCount == 1 && totalCellCount == 1;
     }
 
     public static JSONObject getMergedRegionJsonValue(Sheet sheet, int row, int column) {
@@ -504,7 +626,7 @@ public class EasyExcelUtil {
     /**
      * 获取单元格的值
      */
-    public static String getCellValue(Cell cell) {
+    private static String getCellValue(Cell cell) {
         if (cell == null) {return "";}
         if (cell.getCellType() == CellType.STRING) {
             return cell.getStringCellValue();
@@ -519,6 +641,29 @@ public class EasyExcelUtil {
             return String.valueOf(cell.getNumericCellValue());
         }
         return "";
+    }
+    private static String getCellValue(Cell cell, FormulaEvaluator formulaEvaluator) {
+        switch (cell.getCellType()) {
+            case STRING:
+                return cell.getStringCellValue();
+            case NUMERIC:
+                return String.valueOf(cell.getNumericCellValue());
+            case BOOLEAN:
+                return String.valueOf(cell.getBooleanCellValue());
+            case FORMULA:
+                switch (formulaEvaluator.evaluateInCell(cell).getCellType()) {
+                    case NUMERIC:
+                        return String.valueOf(cell.getNumericCellValue());
+                    case STRING:
+                        return cell.getStringCellValue();
+                    case BOOLEAN:
+                        return String.valueOf(cell.getBooleanCellValue());
+                    default:
+                        return "";
+                }
+            default:
+                return "";
+        }
     }
 
     /**
@@ -558,23 +703,18 @@ public class EasyExcelUtil {
             return result.toString();
         }
     }
-@Test
-    public void t() throws IOException {
-    String f = getExcelContent(new File("C:\\Users\\ruiqing.luo\\Desktop\\当前适配智能体表列表.xls"));
-    System.out.println(f);
-    }
 
-
+    /**
+     * 方案1
+     * @param args
+     */
     public static void main1(String[] args) {
         try {
-//            String filePath = "C:\\Users\\25129\\Desktop\\公司会议纪要1202.csv";
-//            Map<String, List<List<Object>>> result = readCsv(filePath);
-//            String filePath = "C:\\Users\\ruiqing.luo\\Desktop\\所有表格\\poc计划表1.0v.xlsx";
-//            String filePath = "C:\\Users\\25129\\Desktop\\公司会议纪要1202.xlsx";
-              String filePath = "C:\\Users\\ruiqing.luo\\Desktop\\rag调优\\风力发电机组故障处理手册.xlsx";
+            String filePath = "C:\\Users\\ruiqing.luo\\Desktop\\rag调优\\节点分类-测试用.csv";
 
             File file = new File(filePath);
             Map<String, List<List<Object>>> result = readExcel(file);
+//            Map<String, List<List<Object>>> result = readCsv(filePath);
             List<Object> header = Collections.singletonList(result.get("header"));
             List<List<Object>> rowData = result.get("data");
             int pageSize = 512;
@@ -588,6 +728,11 @@ public class EasyExcelUtil {
             e.printStackTrace();
         }
     }
+
+    /**
+     * 方案2
+     * @param args
+     */
     public static void main(String[] args) {
         try {
 //            String filePath = "C:\\Users\\ruiqing.luo\\Desktop\\所有表格\\poc计划表1.0v.xlsx";
@@ -597,7 +742,8 @@ public class EasyExcelUtil {
             List<String> sheetNames = reader.getSheetNames();
             for (int i = 0; i < sheetNames.size(); i++) {
 //                System.out.println(sheetNames.get(i));
-                List<List<JSONObject>> result =readMergeExcel(filePath,i,0,0);
+                ExcelPage excelPage = readMergeExcel(filePath,i,0,0);
+                List<List<JSONObject>> result = excelPage.getData();
 
                 StringBuilder separator = new StringBuilder();
                 // 获取表头
@@ -624,4 +770,18 @@ public class EasyExcelUtil {
             e.printStackTrace();
         }
     }
+
+    @Test
+    public void vv() throws IOException {
+        String filePath = "C:\\Users\\ruiqing.luo\\Desktop\\rag调优\\政务数据\\各厅布局（A3版）2023.xlsx";
+
+        File file = new File(filePath);
+        Integer pageSize = 1024;
+        List<FileChunkResponse.Document> chunkDocumentExcel = getChunkDocumentExcel(file, pageSize);
+        for (FileChunkResponse.Document document : chunkDocumentExcel) {
+            System.out.println(document);
+        }
+
+    }
+
 }

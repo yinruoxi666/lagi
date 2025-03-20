@@ -3,6 +3,7 @@ package ai.medusa.utils;
 import ai.common.pojo.IndexSearchData;
 import ai.common.pojo.QaPair;
 import ai.common.utils.ThreadPoolManager;
+import ai.llm.pojo.GetRagContext;
 import ai.llm.service.CompletionsService;
 import ai.llm.utils.CompletionUtil;
 import ai.medusa.impl.CompletionCache;
@@ -13,6 +14,7 @@ import ai.openai.pojo.ChatCompletionResult;
 import ai.openai.pojo.ChatMessage;
 import ai.utils.*;
 import ai.utils.qa.ChatCompletionUtil;
+import ai.vector.VectorDbService;
 import ai.vector.VectorStoreService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,7 +30,7 @@ public class PromptCacheTrigger {
     private static final double LCS_RATIO_QUESTION = PromptCacheConfig.LCS_RATIO_QUESTION;
     private final CompletionCache completionCache;
     private static final ExecutorService executorService;
-    private final VectorStoreService vectorStoreService = new VectorStoreService();
+    private final VectorDbService vectorStoreService = new VectorDbService();
     private final LRUCache<PromptInput, List<ChatCompletionResult>> promptCache;
     private final QaCache qaCache;
 
@@ -44,6 +46,12 @@ public class PromptCacheTrigger {
         this.completionCache = completionCache;
         this.promptCache = completionCache.getPromptCache();
         this.qaCache = completionCache.getQaCache();
+    }
+
+    public PromptCacheTrigger() {
+        completionCache = null;
+        promptCache = null;
+        qaCache = null;
     }
 
     public void triggerWriteCache(PromptInput promptInput, ChatCompletionResult chatCompletionResult) {
@@ -106,7 +114,15 @@ public class PromptCacheTrigger {
 
     private synchronized void putCache(String newestPrompt, PromptInput promptInputWithBoundaries, ChatCompletionResult chatCompletionResult) {
         List<PromptInput> promptInputList = qaCache.get(newestPrompt);
-        List<ChatCompletionResult> completionResults = promptCache.get(promptInputWithBoundaries);
+
+        PromptInput lastPromptInput = PromptInputUtil.getLastPromptInput(promptInputWithBoundaries);
+        List<ChatCompletionResult> completionResults = promptCache.get(lastPromptInput);
+        if (promptInputWithBoundaries.getPromptList().size() == 1 && completionResults == null) {
+           completionResults = promptCache.get(promptInputWithBoundaries);
+        } else {
+            putCache(promptInputWithBoundaries, lastPromptInput, chatCompletionResult, newestPrompt);
+            return;
+        }
 
         if (promptInputList == null || promptInputList.isEmpty()) {
             promptInputList = new ArrayList<>();
@@ -261,6 +277,7 @@ public class PromptCacheTrigger {
             }
             if(curDialog.isEmpty()) {
                 curDialog.add(qaPair);
+                qaCore = LCS.findLongestCommonSubstrings(qaPair.getQ(), qaPair.getA(), PromptCacheConfig.START_CORE_THRESHOLD);
                 continue;
             }
             String lastQ = curDialog.get(0).getQ();
@@ -320,10 +337,14 @@ public class PromptCacheTrigger {
             text  = firstPrompt + "," +text;
         }
 //        String text = String.join(";", promptInput.getPromptList());
-        List<IndexSearchData> indexSearchDataList = vectorStoreService.search(text, promptInput.getParameter().getCategory());
-        String context = completionsService.getRagContext(indexSearchDataList).getContext();
         ChatCompletionRequest request = completionsService.getCompletionsRequest(
                 promptInput.getParameter().getSystemPrompt(), lastPrompt, promptInput.getParameter().getCategory());
+        List<IndexSearchData> indexSearchDataList = vectorStoreService.searchByContext(request);
+        GetRagContext ragContext = completionsService.getRagContext(indexSearchDataList);
+        String context = null;
+        if(ragContext != null) {
+            context = ragContext.getContext();
+        }
         if (context != null) {
             completionsService.addVectorDBContext(request, context);
         }
