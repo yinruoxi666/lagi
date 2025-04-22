@@ -4,6 +4,7 @@ import ai.annotation.LLM;
 import ai.common.ModelService;
 import ai.common.exception.RRException;
 import ai.llm.adapter.ILlmAdapter;
+import ai.llm.pojo.EnhanceChatCompletionRequest;
 import ai.llm.pojo.LlmApiResponse;
 import ai.llm.utils.OpenAiApiUtil;
 import ai.llm.utils.convert.SparkConvert;
@@ -38,6 +39,10 @@ public class SparkAdapter extends ModelService implements ILlmAdapter {
     @Override
     public Observable<ChatCompletionResult> streamCompletions(ChatCompletionRequest chatCompletionRequest) {
         setDefaultModel(chatCompletionRequest);
+        if (chatCompletionRequest instanceof EnhanceChatCompletionRequest) {
+            ((EnhanceChatCompletionRequest) chatCompletionRequest).setIp(null);
+            ((EnhanceChatCompletionRequest) chatCompletionRequest).setBrowserIp(null);
+        }
         LlmApiResponse llmApiResponse = llmCompletions(chatCompletionRequest);
         if (llmApiResponse.getCode() != 200) {
             logger.error("SparkAdapter stream  api code:{}  error:{} ", llmApiResponse.getCode(), llmApiResponse.getMsg());

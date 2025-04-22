@@ -27,13 +27,11 @@ import java.util.function.Function;
 public class OpenAiApiUtil {
 
     private static final Gson gson = new Gson();
-
     private static final ConnectionPool CONNECTION_POOL = new ConnectionPool(
             10, // 最大空闲连接数
             60, // 保持连接的时间
             TimeUnit.MINUTES
     );
-
     private static final Logger log = LoggerFactory.getLogger(OpenAiApiUtil.class);
 
     public static LlmApiResponse completions(String apikey, String apiUrl,
@@ -166,6 +164,7 @@ public class OpenAiApiUtil {
         factory.newEventSource(request, new EventSourceListener() {
             @Override
             public void onOpen(@NotNull EventSource eventSource, @NotNull Response response) {
+                log.info("ServerSentEventUtil streamCompletions onOpen: response = {}", response);
                 int code = response.code();
                 try {
                     String bodyStr = response.body().string();

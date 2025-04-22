@@ -63,7 +63,7 @@ public class WeatherSearchTool extends AbstractTool {
     }
 
     public static void main(String[] args) {
-        String token = "xxxx";
+        String token = "Bearer 608e9106a83367945955c772dd5217fe";
         WeatherSearchTool weatherSearchTool = new WeatherSearchTool(token);
         String result = weatherSearchTool.search("北京");
         System.out.println(result);

@@ -1,15 +1,11 @@
 package ai.worker.llmIntent;
 
-import ai.llm.adapter.ILlmAdapter;
 import ai.llm.adapter.impl.GPTAzureAdapter;
-import ai.llm.adapter.impl.MoonshotAdapter;
-import ai.llm.pojo.ChatgptChatCompletionRequest;
-import ai.llm.pojo.ResponseFormat;
-import ai.llm.service.CompletionsService;
 import ai.manager.LlmManager;
 import ai.openai.pojo.ChatCompletionRequest;
 import ai.openai.pojo.ChatCompletionResult;
 import ai.openai.pojo.ChatMessage;
+import ai.openai.pojo.ResponseFormat;
 import cn.hutool.core.bean.BeanUtil;
 import com.alibaba.fastjson.JSONObject;
 import lombok.extern.slf4j.Slf4j;
@@ -38,23 +34,20 @@ public class LlmIntentWorker {
                 "1. 识别到的结果以json格式返回。\n" +
                 "2. 请不要假设或猜测传入函数的参数值。如果用户的描述不明确，请要求用户提供必要信息。\n" +
                 "3. json格式如下：\n```json\n{\n  \"primary\": \"airport_related\",\n \"secondary\": \"flight_status\"\n}\n```";
-        ChatgptChatCompletionRequest chatgptChatCompletionRequest = new ChatgptChatCompletionRequest();
-        BeanUtil.copyProperties(chatCompletionRequest, chatgptChatCompletionRequest);
         ResponseFormat responseFormat = new ResponseFormat();
         responseFormat.setType("json_object");
-        chatgptChatCompletionRequest.setResponse_format(responseFormat);
+        chatCompletionRequest.setResponse_format(responseFormat);
         ChatMessage message = new ChatMessage();
         message.setRole("system");
         message.setContent(system_prompt);
         List<ChatMessage> messages = new ArrayList<>();
         messages.add(message);
-        messages.addAll(chatgptChatCompletionRequest.getMessages());
-        chatgptChatCompletionRequest.setMessages(messages);
-        chatgptChatCompletionRequest.setModel("gpt-4o-20240513");
-//        MoonshotAdapter moonshotAdapter = (MoonshotAdapter)LlmManager.getInstance().getAdapter("gpt-4o-20240513");
-//        chatCompletionResult = moonshotAdapter.intentCompletions(chatCompletionRequest);
+        messages.addAll(chatCompletionRequest.getMessages());
+        chatCompletionRequest.setMessages(messages);
+        chatCompletionRequest.setModel("gpt-4o-20240513");
+
         GPTAzureAdapter gptAzureAdapter = (GPTAzureAdapter)LlmManager.getInstance().getAdapter("gpt-4o-20240513");
-        chatCompletionResult = gptAzureAdapter.completions(chatgptChatCompletionRequest);
+        chatCompletionResult = gptAzureAdapter.completions(chatCompletionRequest);
         // 将返回结果json转成文字对应
         JSONObject jsonObject = JSONObject.parseObject(chatCompletionResult.getChoices().get(0).getMessage().getContent());
         String primary = jsonObject.getString("primary");
