@@ -12,7 +12,8 @@ models:
             video
     # Options for default, llm, image, voice and vision, line by line above.
     driver: ai.wrapper.impl.LandingAdapter
-    api_key: your-api-key # http://saas.landingbj.com/
+    api_key: sk-112121 # http://saas.landingbj.com/
+    endpoint: http://117.157.184.24:58080/v1/chat/completions
 
   # FastChat is an open platform designed for training, deploying, and evaluating chatbots based on large language models.
   - name: fastchat
@@ -36,8 +37,16 @@ models:
     model: gpt-3.5-turbo,gpt-4-1106-preview,gpt-4o-20240513
     enable: true
     driver: ai.llm.adapter.impl.GPTAzureAdapter
-    endpoint: your-endpoint
-    api_key: your-api-key
+    endpoint: https://dgman-north-central-us-gpt4.openai.azure.com/
+    api_key: 56cac597a3c1477da3b83a60f67c6507
+
+  - name: chatgpt-azure-admin-m231f9dc-eastus2
+    type: Microsoft
+    model: gpt-4.1-nano
+    enable: true
+    driver: ai.llm.adapter.impl.GPTAzureAdapter
+    endpoint: https://admin-m231f9dc-eastus2.openai.azure.com/
+    api_key: d71aad316d69427e91b659dd19b95edc
 
   # qwen (TongyiQianwen) is an advanced large-scale language model developed by Alibaba Cloud
   - name: qwen
@@ -77,9 +86,9 @@ models:
   - name: chatglm
     type: Zhipu
     enable: true
-    model: glm-3-turbo,glm-4, glm-4v
+    model: glm-3-turbo,glm-4, glm-4v, glm-4-alltools
     driver: ai.llm.adapter.impl.ZhipuAdapter
-    api_key: your-api-key #  url address https://open.bigmodel.cn/usercenter/apikeys
+    api_key: 35b7042a1699fc7c9d9d22c078f39423.mRQcEhtKzmYyCPqJ #  url address https://open.bigmodel.cn/usercenter/apikeys
 
   # Kimi is an intelligent assistant product developed by Moonshot AI.
   - name: kimi
@@ -87,7 +96,7 @@ models:
     enable: true
     model: moonshot-v1-8k,moonshot-v1-32k,moonshot-v1-128k
     driver: ai.llm.adapter.impl.MoonshotAdapter
-    api_key: your-api-key  #  url address https://platform.moonshot.cn/console/api-keys
+    api_key: sk-8awyNSqv7us7Rg3o5Z567aS2iyw7q2Es66J6xGGaG8hgUAwJ  #  url address https://platform.moonshot.cn/console/api-keys
 
   # Baichuan is a new generation of open source large language model launched by Baichuan AI
   - name: baichuan
@@ -101,14 +110,23 @@ models:
   - name: spark
     type: iFLYTEK
     enable: true
-    model:  v4.0,
-            v1.1,v2.1,v3.1,v3.5,
+    model:  4.0Ultra,
+            lite,generalv3,pro-128k,generalv3.5,max-32k,
             tti
     # Options for default, llm and image, line by line above.
     driver: ai.wrapper.impl.FlytekAdapter
-    app_id: your-app-id
-    api_key: you-api-key  # https://console.xfyun.cn/
-    secret_key: you-secret-key   # https://console.xfyun.cn/
+    app_id: 948cf4b6
+#    api_key: 54f6e81f40a31d66d976496de895a7a4  # https://console.xfyun.cn/
+    api_key: cvUdhNJQEFXOOHfDFtPx:wDeBmrxvJfwdyjFsIzQz  # https://console.xfyun.cn/
+    secret_key: ZDYyMjNmMTlkYTE0YWRmOWUwZTYxNjYz   # https://console.xfyun.cn/
+
+  # ChatGPT is a state-of-the-art language model developed by OpenAI
+  - name: ayenaspring
+    type: Ayena
+    enable: true
+    model: ayenaspring-advanced-001
+    driver: ai.llm.adapter.impl.AyenaAdapter
+    api_key: sk-4a78244e7fab4af9ba2a3bf8eb3cacb4ldiehkid4h6tjkx2 # https://platform.openai.com/
 
   # SenseChat(RiRiXin) is a large language model developed by SenseTime
   - name: SenseChat
@@ -152,7 +170,7 @@ models:
                # https://dashscope.aliyuncs.com/compatible-mode/v1
                # https://qianfan.baidubce.com/v2/chat/completions
                # https://api.lkeap.cloud.tencent.com/v1
-    api_key: your-api-key # url address https://platform.deepseek.com/api_keys
+    api_key: sk-8f41405229de4c8b8269fd4d18dcb29e # url address https://platform.deepseek.com/api_keys
 
   # Claude is a next generation AI assistant built by Anthropic and trained to be safe, accurate, and secure to help you do your best work.
   - name: claude
@@ -173,7 +191,7 @@ stores:
       similarity_cutoff: 0.5
       parent_depth: 1
       child_depth: 1
-      url: http://localhost:8000
+      url: http://test.digimeta.com.cn:16990
 
     # Pinecone is a vector database for building large-scale machine learning applications
     # The official website is https://www.pinecone.io/
@@ -233,10 +251,11 @@ stores:
     vector: chroma
     term: elastic
     graph: landing
-    enable: false
+    enable: true
     priority: 10
     track: true
     default: "Please give prompt more precisely"
+    use_rag: false
 
   medusa: # Medusa is a caching tool designed to accelerate the response of large models.
     enable: false
@@ -258,10 +277,10 @@ functions:
   embedding:
     - backend: qwen
       type: Qwen
-      api_key: you-api-key
+      api_key: sk-f4f5565da70f49228a8f3fc2d231a543
 
   chat:
-    route: best((landing&chatgpt),(kimi|ernie))
+#    route: best((chatgpt-azure,chatglm))
     filter: sensitive,priority,stopping,continue
     backends:
       - backend: landing
@@ -271,16 +290,44 @@ functions:
         priority: 350
 
       - backend: kimi
-        model: moonshot-v1-8k
-        enable: false
+        model: moonshot-v1-128k
+        enable: true
         stream: true
         priority: 150
 
-      - backend: chatgpt
-        model: gpt-3.5-turbo
-        enable: false
+      - backend: spark
+        model: 4.0Ultra
+        enable: true
         stream: true
-        priority: 120
+        priority: 100
+
+      - backend: chatglm
+        model: glm-4-alltools
+        enable: true
+        stream: true
+        priority: 80
+
+      - backend: deepseek
+        model: deepseek-chat
+        enable: true
+        stream: true
+        priority: 80
+
+      - backend: chatgpt-azure
+        model: gpt-4o-20240513
+        enable: true
+        stream: true
+        priority: 90
+        api_version: 2024-02-15-preview
+        deployment: gpt-4o-20240513
+
+      - backend: chatgpt-azure-admin-m231f9dc-eastus2
+        model: gpt-4.1-nano
+        enable: true
+        stream: true
+        priority: 90
+        api_version: 2025-01-01-preview
+        deployment: gpt-4.1-nano
 
       - backend: ernie
         model: ERNIE-Speed-128K
@@ -389,6 +436,7 @@ functions:
       enable: true
       priority: 10
 
+
 # The following is the configuration of agents, name is the name of the agent,
 # type is the type of the agent, class is the implement class of the agent.
 agents:
@@ -434,7 +482,7 @@ agents:
 
   # Agent for weather queries, helping users obtain real-time weather information and forecasts.
   - name: weather
-    token: your-token
+    token: 608e9106a83367945955c772dd5217fe
     driver: ai.agent.customer.WeatherAgent
 
   # Agent for querying dishonest persons, helping users access information about people listed as untrustworthy.
