@@ -61,11 +61,12 @@ public class OpenAiApiUtil {
                                              Function<String, ChatCompletionResult> convertResponseFunc,
                                              Function<Response, Integer> convertErrorFunc,
                                              Map<String, String> headers) {
-        return completions(apikey, apiUrl, timeout, req, convertResponseFunc, convertErrorFunc, headers, null);
+        return completions(apikey, apiUrl, timeout, gson.toJson(req), convertResponseFunc, convertErrorFunc, headers);
     }
+
     public static LlmApiResponse completions(String apikey, String apiUrl,
                                              Integer timeout,
-                                             ChatCompletionRequest req,
+                                             String json,
                                              Function<String, ChatCompletionResult> convertResponseFunc,
                                              Function<Response, Integer> convertErrorFunc,
                                              Map<String, String> headers, Proxy proxy) {
@@ -83,7 +84,6 @@ public class OpenAiApiUtil {
                 .proxy(proxy)
                 .build();
         MediaType mediaType = MediaType.get("application/json");
-        String json = gson.toJson(req);
         RequestBody body = RequestBody.create(json, mediaType);
         Request.Builder requestBuilder = new Request.Builder()
                 .url(apiUrl)
@@ -120,6 +120,7 @@ public class OpenAiApiUtil {
                                                    Function<Response, Integer> convertErrorFunc, Map<String, String> headers) {
         return streamCompletions(apikey, apiUrl, timeout, gson.toJson(req), convertResponseFunc, convertErrorFunc, headers, null);
     }
+
     public static LlmApiResponse streamCompletions(String apikey, String apiUrl,
                                                    Integer timeout,
                                                    String json,
