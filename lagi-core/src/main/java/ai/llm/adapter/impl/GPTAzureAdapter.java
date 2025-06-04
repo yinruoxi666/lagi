@@ -10,6 +10,7 @@ import ai.llm.utils.convert.GptAzureConvert;
 import ai.openai.pojo.ChatCompletionRequest;
 import ai.openai.pojo.ChatCompletionResult;
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.map.MapUtil;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -71,6 +72,9 @@ public class GPTAzureAdapter extends ModelService implements ILlmAdapter {
         String apiKey = getApiKey();
         Map<String, String> headers = new HashMap<>();
         headers.put("api-key", apiKey);
+        Map incloudUsage = new HashMap<>();
+        incloudUsage.put("include_usage", true);
+        chatCompletionRequest.setStream_options(incloudUsage);
         Proxy proxy = new Proxy(Proxy.Type.SOCKS, GptAzureConvert.convertProxyUrl2InetSocketAddress());
         String json;
         try {
@@ -78,11 +82,8 @@ public class GPTAzureAdapter extends ModelService implements ILlmAdapter {
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }
-        JSONObject stream_options = new JSONObject();
-        stream_options.putIfAbsent("include_usage", true);
-        middleJson.putIfAbsent("stream_options", stream_options);
         LlmApiResponse llmApiResponse = OpenAiApiUtil.streamCompletions(apiKey, apiUrl, HTTP_TIMEOUT, json,
-                GptAzureConvert::convertStreamLine2ChatCompletionResult, GptAzureConvert::convertByResponse, headers);
+                GptAzureConvert::convertStreamLine2ChatCompletionResult, GptAzureConvert::convertByResponse, headers, proxy);
         Integer code = llmApiResponse.getCode();
         if(code != 200) {
             logger.error("open ai stream api error {}", llmApiResponse.getMsg());

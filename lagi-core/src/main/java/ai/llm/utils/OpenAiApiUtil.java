@@ -61,7 +61,7 @@ public class OpenAiApiUtil {
                                              Function<String, ChatCompletionResult> convertResponseFunc,
                                              Function<Response, Integer> convertErrorFunc,
                                              Map<String, String> headers) {
-        return completions(apikey, apiUrl, timeout, gson.toJson(req), convertResponseFunc, convertErrorFunc, headers);
+        return completions(apikey, apiUrl, timeout, gson.toJson(req), convertResponseFunc, convertErrorFunc, headers, null);
     }
 
     public static LlmApiResponse completions(String apikey, String apiUrl,
