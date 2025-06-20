@@ -2,6 +2,7 @@ package ai.vector;
 
 import java.awt.image.BufferedImage;
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
@@ -30,10 +31,25 @@ public class FileService {
     private final Gson gson = new Gson();
 
     public static void main(String[] args) {
-        FileService fileService = new FileService();
-        File file = new File("D:\\Test\\Datasets\\Document\\知识图谱.PDF");
-        Response response = fileService.toMarkdown(file);
-        System.out.println(response);
+        // 请将下面这行替换成你本机 PDF 的真实绝对路径
+        String pdfPath = "/Users/ruoxiyin/Documents/缔智元/02.项目/机场项目/docs/test/"
+                + "KN.pdf";
+        // 展示当前文件夹路径
+
+        // 1. 使用 FileInputStream 读取本地 PDF
+        try (InputStream inputStream = new FileInputStream(new File(pdfPath))) {
+
+            // 2. 调用 PdfUtil.webPdfParse(InputStream) 解析文本
+            String contents = PdfUtil.webPdfParse(inputStream);
+            // 3. 打印解析结果
+            System.out.println("====== 解析结果开始 ======");
+            System.out.println(contents);
+            System.out.println("====== 解析结果结束 ======");
+
+        } catch (Exception e) {
+            System.err.println("解析本地 PDF 失败！请检查文件路径是否正确。");
+            e.printStackTrace();
+        }
     }
 
     public FileChunkResponse extractContent(File file) {
@@ -228,6 +244,7 @@ public class FileService {
                 content = getString(file.getPath());
                 break;
             case ".pdf":
+//                dumpStream(in,"web-flex");
                 content = PdfUtil.webPdfParse(in);
                 if (content==null||content.trim().isEmpty()){
                     System.out.println("扫描件");
@@ -326,5 +343,29 @@ public class FileService {
             e.printStackTrace();
         }
         return content.toString();
+    }
+
+    public static byte[] dumpStream(InputStream in, String tag) throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        byte[] buffer = new byte[8 * 1024];
+
+        int n;
+        while ((n = in.read(buffer)) != -1) {
+            baos.write(buffer, 0, n);
+        }
+        byte[] data = baos.toByteArray();
+
+        // --- 打印信息 ---
+        System.out.println("[" + tag + "] bytes length : " + data.length);
+        if (data.length >= 12) {
+            String header = new String(Arrays.copyOfRange(data, 0, 12), StandardCharsets.ISO_8859_1);
+            System.out.println("[" + tag + "] first 12 bytes: " + header.replaceAll("\\p{Cntrl}", "."));
+            // 期望输出以  %PDF- 开头
+        } else {
+            System.out.println("[" + tag + "] stream too short to show header.");
+        }
+        System.out.println("------------------------------------------------");
+
+        return data;   // 让调用方决定是否继续用
     }
 }

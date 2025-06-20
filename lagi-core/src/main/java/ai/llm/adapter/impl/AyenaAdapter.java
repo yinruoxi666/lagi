@@ -51,7 +51,7 @@ public class AyenaAdapter extends ModelService implements ILlmAdapter {
         chatCompletionRequest.setCategory(null);
         chatCompletionRequest.setStream(true);
         try {
-            jsonResult = HttpUtil.httpPost(COMPLETIONS_URL, headers, chatCompletionRequest, HTTP_TIMEOUT);
+            jsonResult = HttpUtil.httpPost(getApiAddress(), headers, chatCompletionRequest, HTTP_TIMEOUT);
         } catch (IOException e) {
             logger.error("", e);
         }
@@ -90,7 +90,7 @@ public class AyenaAdapter extends ModelService implements ILlmAdapter {
         };
         Function<Response, RRException> convertErrorFunc = response -> new RRException();
         ObservableList<ChatCompletionResult> result =
-                ServerSentEventUtil.streamCompletions(json, COMPLETIONS_URL, apiKey, convertFunc, this, convertErrorFunc);
+                ServerSentEventUtil.streamCompletions(json, getApiAddress(), apiKey, convertFunc, this, convertErrorFunc);
         Iterable<ChatCompletionResult> iterable = result.getObservable().blockingIterable();
         return Observable.fromIterable(iterable);
     }

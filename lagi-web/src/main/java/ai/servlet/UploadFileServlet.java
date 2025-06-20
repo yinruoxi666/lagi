@@ -24,6 +24,7 @@ import ai.utils.ExcelSqlUtil;
 import ai.vector.VectorCacheLoader;
 import ai.vector.VectorStoreService;
 import ai.vector.pojo.UpsertRecord;
+import cn.hutool.core.util.StrUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.JsonArray;
 import com.google.gson.reflect.TypeToken;
@@ -130,9 +131,15 @@ public class UploadFileServlet extends HttpServlet {
     private void deleteFile(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         req.setCharacterEncoding("utf-8");
         resp.setContentType("application/json;charset=utf-8");
+        String category = req.getParameter("category");
+
         List<String> idList = gson.fromJson(requestToJson(req), new TypeToken<List<String>>() {
         }.getType());
-        vectorDbService.deleteDoc(idList);
+        if(StrUtil.isBlank(category)) {
+            vectorDbService.deleteDoc(idList);
+        } else {
+            vectorDbService.deleteDoc(idList, category);
+        }
         uploadFileService.deleteUploadFile(idList);
         if (ExcelSqlUtil.isConnect()||ExcelSqlUtil.isSqlietConnect()){
             ExcelSqlUtil.deleteListSql(idList);
@@ -350,8 +357,9 @@ public class UploadFileServlet extends HttpServlet {
             ex.printStackTrace();
         }
         List<Future<?>> futures = new ArrayList<>();
+        JsonArray fileList = new JsonArray();
         if (!files.isEmpty()) {
-            JsonArray fileList = new JsonArray();
+
             for (File file : files) {
                 if (file.exists() && file.isFile()) {
                     String filename = realNameMap.get(file.getName());
@@ -363,13 +371,13 @@ public class UploadFileServlet extends HttpServlet {
                     fileList.add(jsonObject);
                 }
             }
-            jsonResult.addProperty("data", fileList.toString());
         }
         String status ="success";
         // 等待所有任务完成
-            for (Future<?> future : futures) {
+            for (int i = 0; i< futures.size(); i++ ) {
                 try {
-                    future.get();
+                    String fileId = (String)futures.get(i).get();
+                    fileList.get(i).getAsJsonObject().addProperty("fileId", fileId);
                 } catch (InterruptedException e) {
                     //任务终断
                     status = "failed";
@@ -380,6 +388,7 @@ public class UploadFileServlet extends HttpServlet {
                     e.printStackTrace();
                 }
             }
+            jsonResult.addProperty("data", fileList.toString());
             if (!jsonResult.has("msg")) {
                 jsonResult.addProperty("status", status);
             }
@@ -391,7 +400,7 @@ public class UploadFileServlet extends HttpServlet {
     }
 
 
-    public class AddDocIndex extends Thread {
+    public class AddDocIndex implements Callable<String> {
         private final VectorDbService vectorDbService = new VectorDbService(config);
         private final File file;
         private final String category;
@@ -405,15 +414,16 @@ public class UploadFileServlet extends HttpServlet {
             this.level = level;
         }
 
-        public void run() {
-            if (vectorDbService.vectorStoreEnabled()) {
-                addDocIndexes();
-            }
+        @Override
+        public String call() throws Exception {
+            // 1) 先生成 fileId，后面直接返回
+            String fileId = UUID.randomUUID().toString().replace("-", "");
+            addDocIndexes(fileId);
+            return fileId;            // 2) 把结果抛给上层
         }
 
-        private void addDocIndexes() {
+        private void addDocIndexes(String fileId) {
             Map<String, Object> metadatas = new HashMap<>();
-            String fileId = UUID.randomUUID().toString().replace("-", "");
             String filepath = file.getName();
 
             metadatas.put("filename", filename);
