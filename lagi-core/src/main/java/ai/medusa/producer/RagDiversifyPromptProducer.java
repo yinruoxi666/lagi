@@ -28,13 +28,15 @@ public class RagDiversifyPromptProducer extends DiversifyPromptProducer {
 
     @Override
     public Collection<PooledPrompt> produce(PooledPrompt item) throws FailedDiversifyPromptException {
-        if (item.getPromptInput().getReasoningContent() != null) {
+        if (item.getPromptInput().getMedusaMetadata().getReasoningContent() != null) {
             return Collections.emptyList();
         }
         try {
             return diversify(item);
         } catch (Exception e) {
-            throw new FailedDiversifyPromptException(item, e);
+//            throw new FailedDiversifyPromptException(item, e);
+            log.error("Failed to diversify prompt: {}", item, e);
+            return Collections.emptyList();
         }
     }
 

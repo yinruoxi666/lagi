@@ -2,7 +2,7 @@
 
 ## **项目简介**
 
-LinkMind(联智) 是由北京联动北方科技有限公司精心打造的一款针对于大模型开源社区的强大力量和企业应用部署之间存在的显著差距而设计的解决方案。它是一款企业级的复合多模态大模型中间件，旨在桥接这一鸿沟，通过提供一个既安全又专业的平台，使得企业能够以低成本、高效率地方式定制并部署大模型。
+LinkMind（联智）是由北京联动北方科技有限公司精心打造的一款，旨在解决开源大模型技术飞速发展与企业实际应用之间存在显著差距的解决方案。它是一款企业级的复合多模态大模型中间件，旨在桥接这一鸿沟，通过提供一个既安全又专业的平台，使得企业能够以低成本、高效率的方式定制并部署大模型。
 
 支持但不限于以下大模型：
 
@@ -44,9 +44,12 @@ LinkMind(联智) 是由北京联动北方科技有限公司精心打造的一款
         <span style="font-size: 12px;width: 70px; text-align: left;">DeepSeek&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
         <img src="docs/images/logo/model/img_15.webp" width="20" style="margin: 10px;" height="20">
         <span style="font-size: 12px;width: 70px; text-align: left;">Claude&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+        <img src="docs/images/logo/model/img_16.jpg" width="20" style="margin: 10px;" height="20">
+        <span style="font-size: 12px;width: 70px; text-align: left;">MiniMax&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
     </div>
 	</br>
 </div>
+
 
 支持但不限于以下智能体平台：
 
@@ -63,13 +66,62 @@ LinkMind(联智) 是由北京联动北方科技有限公司精心打造的一款
     </div>
 </div>
 
+  </br>
+支持但不限于以下数据库类型：
+  </br>
+<div style="display: flex; flex-wrap: wrap; justify-content: flex-start;">
+    <div style="display: flex; align-items: center; margin: 10px;">
+        <img src="docs/images/logo/img_4.png" width="20" style="margin: 10px;" height="20">
+        <span style="font-size: 12px;">Chroma&nbsp;&nbsp;&nbsp;</span>
+        <img src="docs/images/logo/img_5.png" width="20" style="margin: 10px;" height="20">
+        <span style="font-size: 12px;">elastic&nbsp;&nbsp;&nbsp;</span>
+        <img src="docs/images/logo/img_6.png" width="20" style="margin: 10px;" height="20">
+        <span style="font-size: 12px;">mysql&nbsp;&nbsp;&nbsp;</span>
+    </div>
+</div>
+
+## 产品特性
+本产品通过一系列先进技术和优化设计，提供高效、稳定且易用的功能，以满足多样化的用户需求。以下为主要特性：
+
+**更精准的检索增强（RAG）**
+
+通过精细化的数据管理和优化算法，确保模型输出具有高准确性。
+支持模型持续学习，逐步提升整体性能和响应精度。
+
+**更快速的预读缓存（Medusa）**
+
+引入 Medusa 技术，通过预读缓存机制有效减少用户等待时间。
+优化数据处理流程，进一步提升模型运行效率。
+
+**更高效的模型性能提升**
+
+采用先进的性能优化策略，显著提高模型的计算效率和响应速度。
+在多种应用场景中保持高性能表现，满足复杂任务需求。
+
+**更稳定的自动切换大模型**
+
+支持多链路备份机制，确保系统在故障发生时能够无缝切换至备用模型。
+提供稳定的运行环境，降低因技术故障导致的服务中断风险。
+
+**更强大的意图探查（Graph）**
+
+利用知识图谱技术，精准识别用户意图并提供针对性的响应。
+快速分析用户输入，确保响应准确、稳定且易于使用。
+
+
+**更便捷的一次编写多模型通用**
+
+支持一次编写即可适配多个模型，显著减少开发中的重复工作。
+降低开发和维护难度，提升整体开发效率。
+
+
 ## 在线Demo
 
 为了让用户能够直观感受到LinkMind(联智) 的强大功能和便捷性，我们提供了一个在线Demo。您可以通过以下链接访问并体验：[https://lagi.landingbj.com](https://lagi.landingbj.com/)。
 
 ## 快速开始
 
-对于开发者而言，我们提供了简便的方法来编译和运行LinkMind(联智) 应用。您可以选择使用maven工具进行封包，或者通过IntelliJ IDEA等主流的集成开发环境（IDE）运行。请确保您的JDK版本至少满足不小于8的要求。
+对于开发者而言，我们提供了简便的方法来编译和运行LinkMind(联智) 应用。您可以选择使用maven工具进行封包，或者通过IntelliJ IDEA等主流的集成开发环境（IDE）运行。请确保您使用的 JDK 版本为 8 或以上。
 
 ### 方法一：使用maven
 
@@ -105,12 +157,12 @@ mvn package
 
 ### 方法三：Docker 
 
-- 镜像名称：`yinruoxi666/landingbj/lagi`
+- 镜像名称：`landingbj/lagi`
 
 - 拉取命令：
 
   ```bash
-  docker pull yinruoxi666/landingbj/lagi
+  docker pull landingbj/lagi
   ```
 
 - 启动容器：
@@ -145,7 +197,7 @@ LinkMind(联智) 项目还提供了多个RESTful API接口，方便用户将AI�
 
 示例：
 
-设置敏感词过滤, level有3个值，1:当匹配到敏感词时删除整句 2:替换为遮罩 3：擦除(默认值)。 mask：遮罩字符串(默认值:...)。 rules：代表的敏感规则列表， 其中每个列表元素的rule代表敏感词匹配的正则表达式,mask和level如不指明会使用全局的 :   
+设置敏感词过滤, level有3个值，1:当匹配到敏感词时删除整句 2:替换为遮罩 3：擦除(默认值)。 mask：遮罩字符串(默认值:...)。 rules：代表的敏感规则列表， 其中每个列表元素的rule代表敏感词匹配的正则表达式,若某条规则未指定 mask 或 level，将使用全局设置中的对应默认值。
 
 如匹配到`OPENAI`字样时，擦除`OPENAI`字样，如匹配到`hello`字样时，用`***`替换.如匹配到`people`字样时，用`...`替换。
 
@@ -174,13 +226,10 @@ LinkMind(联智) 项目还提供了多个RESTful API接口，方便用户将AI�
 我们为用户提供了预打包的应用程序，方便直接下载和使用：
 
 - **Jar 文件**：LinkMind(联智)的核心依赖库。
-  - 文件名：`lagi-core-1.0.4-jar-with-dependencies.jar`
-  - 文件大小：250.5 MB
-  - 下载链接：[点击这里下载](https://downloads.landingbj.com/lagi/lagi-core-1.0.4-jar-with-dependencies.jar)
-
+  - 文件名：`lagi-core-1.0.6-jar-with-dependencies.jar`
+  - 下载链接：[点击这里下载](https://downloads.landingbj.com/lagi/lagi-core-1.0.6-jar-with-dependencies.jar)
 - **War 文件**：LinkMind(联智)的Web应用，可直接部署到Web容器。
   - 文件名：`lagi-web.war`
-  - 文件大小：279 MB
   - 下载链接：[点击这里下载](https://downloads.landingbj.com/lagi/lagi-web.war)
 
 

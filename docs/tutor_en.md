@@ -14,35 +14,98 @@ Before getting started, ensure you have the following environment ready:
 
 For developers, we provide an easy method to compile and run the LinkMind application. You can either use the Maven command-line tool to package it or run it through popular integrated development environments (IDEs) such as IntelliJ IDEA.
 
-### Method 1: Using Maven Commands
+### Method 1: Use IDE+maven packaging
 
-1. **Clone the Repository**: First, clone the LinkMind project repository:
+1. **Clone the project**:
 
-   ```shell
-   git clone https://github.com/landingbj/lagi.git
+**Open the GitHub repository**: Connect to LinkMind's GitHub repository in the IDE, and use the IDE's clone function to clone the LinkMind project to your local computer.
 
-1. **Navigate to the Project Directory**: Switch to the project directory:
+| | GitHub repository |
+| ----- | ------------------------------------- |
+| SSH | git@github.com:landingbj/lagi.git |
+| HTTPS | https://github.com/landingbj/lagi.git |
+```shell
+git clone https://github.com/landingbj/lagi.git
+```
+2. **Enter the project**: Switch to the project directory:
 
-   ```shell
-   cd lagi
-   ```
+```shell
+cd lagi
+```
 
-2. **Compile the Project**: Run the Maven command in the root directory to compile the project:
+3. **Compile the project**: Run the Maven command in the project root directory to compile:
 
-   ```bash
-   mvn clean install
-   ```
+```bash
+mvn clean install
+```
 
-### Method 2: Using an IDE
+4. **Select IDE**: You can choose to use mainstream IDEs such as IntelliJ IDEA or Eclipse.
 
-1. **Choose an IDE**: You can use IntelliJ IDEA or Eclipse.
+5. **Compile the project**: Use the compilation function of the IDE to compile the LinkMind project.
 
-2. **Connect to the GitHub Repository**: In the IDE, connect to the LinkMind GitHub repository. Use the IDE’s cloning feature to clone the LinkMind project locally.
+### Method 2: Use Web container (Tomcat)
 
-   |       | GitHub Repository                                          |
-   | ----- | ---------------------------------------------------------- |
-   | SSH   | [git@github.com](mailto:git@github.com):landingbj/lagi.git |
-   | HTTPS | https://github.com/landingbj/lagi.git                      |
+Before installing tomcat, you must first install jdk1.8; check the relevant version
+
+If idk1.8 is not installed, please refer to Note 1, install idk1.8 before proceeding to the next step
+
+If Tomcat is not installed, please refer to Note 2, install Tomcat before proceeding to the next step
+
+1. **Download War file**: LinkMind's Web application can be directly deployed to the Web container.
+- File name: `lagi-web.war`
+- Download link: [Click here to download](https://downloads.landingbj.com/lagi/lagi-web.war)
+
+2. **Start the project**:
+* Put the downloaded war package file into the unzipped Tomcat webapps path, such as:
+
+```bash
+apache-tomcat-8.5.99\webapps\
+```
+
+* If elastic and chroma are not installed locally, modify the corresponding configuration item in \apache-tomcat-8.5.99\webapps\ROOT\WEB-INF\classes\lagi.yml to enable: false
+
+```yml
+   term:
+   # This is an adapter for Elasticsearch, providing search and analytics capabilities on large datasets.
+   - name: elastic
+     driver: ai.bigdata.impl.ElasticSearchAdapter
+     host: localhost
+     port: 9200
+     enable: false
+
+   rag: # RAG enhances large language models by integrating external knowledge retrieval.
+      vector: chroma
+      term: elastic
+      graph: landing
+      enable: false
+      priority: 10
+      default: "Please give prompt more precisely"
+      track: true
+```
+
+* Open the executable file 'startup.bat', such as:
+
+```bash
+apache-tomcat-8.5.99\bin\startup.bat
+```
+
+You can visit http://localhost:8000/ through the browser to check whether the startup is successful
+
+### Method 3: Docker
+
+- Image name: `landingbj/lagi`
+
+- Pull command:
+
+```bash
+docker pull landingbj/lagi 
+```
+
+- Start the container: 
+
+```bash 
+docker run -d --name lagi-web -p 8080:8080 landingbj/lagi
+```
 
 3. **Compile the Project**: Use the IDE's compile feature to build the LinkMind project.
 
@@ -54,27 +117,27 @@ LinkMind supports various vector databases such as ChromaDB. If you want to use 
 
 ### Method 1: Python
 
-***Ensure Python is installed on your system***
+*** Make sure the Python runtime environment is installed (download resources are at the end of the document Note 3) ***
 
-- Install ChromaDB:
+- Install ChromaDB (command execution is executed in a black window)
 
-  ```bash
-  pip install chromadb
-  ```
+```bash
+pip install chromadb
+```
 
-- Create a database storage directory:
+- Create a database storage directory 'db_data'
 
-  ```bash
-  mkdir db_data
-  ```
+```bash
+mkdir db_data
+```
 
-- Start the database service:
+- Start the database service ('db_data' is the name of the folder created in the previous step)
 
-  ```bash
-  # The --path parameter specifies the data persistence path
-  # By default, the service runs on port 8000
-  chroma run --path db_data
-  ```
+```bash
+# The --path parameter can specify the data persistence path
+# Port 8000 is enabled by default
+chroma run --path db_data
+```
 
 **Note:**
 
@@ -110,41 +173,54 @@ Once installed, you can verify the service is running by accessing: http://local
 
 ![img_1.png](images/img_1.png)
 
-## 3. Configuration File
+## 3. Configuration file
 
-Modify the `lagi.yml` configuration file to specify the model you want to use. Replace the `your-api-key` placeholders with your actual API keys and set the `enable` field of the desired model to `true`.
+Modify the `lagi.yml` configuration file, select the model you like, replace the `your-api-key` and other information of the model with your own key, and set the `enable` field of the enabled model to `true` as required.
 
-***Example: Configuring the Kimi Model***
+***Take the configuration of kimi as an example:***
 
-- Enable the model and set the `enable` field to `true`:
+If it is started in Tomcat form, modify the path to: \apache-tomcat-8.5.99\webapps\ROOT\WEB-INF\classes\lagi.yml
 
-  ```yaml
-  - name: kimi
-    type: Moonshot
-    enable: true
-    model: moonshot-v1-8k,moonshot-v1-32k,moonshot-v1-128k
-    driver: ai.llm.adapter.impl.MoonshotAdapter
-    api_key: your-api-key
-  ```
+- Fill in the model information and start the model, modify the enable setting to true.
 
-- Adjust the streaming and priority settings as needed:
+```yaml
+   - name: kimi
+     type: Moonshot
+     enable: true
+     model: moonshot-v1-8k,moonshot-v1-32k,moonshot-v1-128k
+     driver: ai.llm.adapter.impl.MoonshotAdapter
+     api_key: your-api-key
+```
 
-  ```yaml
-  chat:
-    - backend: doubao
-      model: doubao-pro-4k
-      enable: true
-      stream: true
-      priority: 160
-  
-    - backend: kimi
-      model: moonshot-v1-8k
-      enable: true
-      stream: true
-      priority: 150
-  ```
+- According to your needs, set the model output mode stream and priority priority. The larger the value, the higher the priority.
 
-Configure the vector database information:
+```yaml
+   chat:
+     - backend: doubao
+       model: doubao-pro-4k
+       enable: true
+       stream: true
+       priority: 160
+   
+     - backend: kimi
+       model: moonshot-v1-8k
+       enable: true
+       stream: true
+       priority: 150
+```
+
+- According to your needs, add route modification.
+
+```yaml
+   # Rule: (Xiaoxin Agent & Stock Agent & Exchange Rate Agent) # A|B -> Polling, A or B, means randomly polling between A and B;
+   # A,B -> Failover, execute A first, if A fails, then execute B;
+   # A&B -> Parallel, call A and B at the same time, and select the appropriate unique result;
+   # This rule can be combined into ((A&B&C), (E|F)), which means calling ABC at the same time first, and if it fails, randomly call E or F.
+   chat:
+     route: best((landing&chatgpt), (kimi|ernie))
+```
+
+Select the configured vector database and fill in the corresponding configuration information.
 
 ***Example: Configuring a Local Chroma Database***
 
@@ -208,26 +284,35 @@ Visit the LinkMind page using your browser. Test features such as text conversat
 LinkMind supports dynamic model switching. Update the `lagi.yml` configuration file to enable different models based on your needs. For non-streaming calls, LinkMind will automatically switch to another model based on priority if the current model fails.
 
 ```yaml
-- backend: chatglm
-  model: glm-3-turbo
-  enable: true
-  stream: true
-  priority: 10
-
-- backend: ernie
-  model: ERNIE-Speed-128K
-  enable: false
-  stream: true
-  priority: 10
+   - backend: chatglm
+     model: glm-3-turbo
+     enable: true
+     stream: true
+     priority: 10
+   
+   - backend: ernie
+     model: ERNIE-Speed-128K
+     enable: false
+     stream: true
+     priority: 10
 ```
+- Add route modifications according to your needs.
 
+```yaml
+   # Rule: (Xiaoxin Agent & Stock Agent & Exchange Rate Agent) # A|B -> Polling, A or B, means randomly polling between A and B;
+   # A,B -> Failover, execute A first, if A fails, then execute B;
+   # A&B -> Parallel, call A and B at the same time, and select the appropriate unique result;
+   # This rule can be combined into ((A&B&C), (E|F)), which means calling ABC at the same time first, and if it fails, randomly call E or F.
+   chat:
+     route: best((landing&chatgpt), (kimi|ernie))
+```
 Switch models online via the interface:
 
 ![img.png](images/img_3.png)
 
 ## 8. Extend Functionality
 
-If LinkMind's supported models or vector databases do not meet your needs, refer to the [extension documentation](extend_en.md) to adapt LinkMind for your preferred models or databases.
+If LinkMind's supported models or vector databases do not meet your needs, refer to the [extension documentation](extend_zh.md) to adapt LinkMind for your preferred models or databases.
 
 ## 9. Custom Training with QA Pairs
 
@@ -275,24 +360,49 @@ For different types of files, Lagi will adopt differentiated processing strategi
     - For files with a chapter structure, Lagi will prioritize removing non-content elements such as directories, then apply intelligent algorithms to analyze the content and accurately divide it into paragraphs, ensuring the completeness of the paragraphs for easy learning and processing by the model.
 
 3. **Spreadsheet File Processing**:
-    - When processing regular spreadsheet files, Lagi will identify the header's position and layout, converting the content into Markdown format to optimize the model's learning and processing.
+    - When processing regular spreadsheet files, LinkMind will identify the header's position and layout, converting the content into Markdown format to optimize the model's learning and processing.
 
 4. **Pure Numeric Spreadsheet File Processing**:
-    - For spreadsheet files containing pure numbers, Lagi will provide the optimal table slicing solution based on the types of numeric data in the table. It will use text2sql technology to convert the table content into structured data and import it into a MySQL database, where sql2text technology will enable intelligent querying. If MySQL is not configured, it will follow the "Spreadsheet File Processing" procedure.
+    - For spreadsheet files containing pure numbers, LinkMind will provide the optimal table slicing solution based on the types of numeric data in the table. It will use text2sql technology to convert the table content into structured data and import it into a MySQL database, where sql2text technology will enable intelligent querying. If MySQL is not configured, it will follow the "Spreadsheet File Processing" procedure.
 
 5. **Image and Text File Processing**:
-    - For files containing both text and images, Lagi will integrate image-text layout technology to accurately extract images and content from the document, assisting the large model in learning and processing the file. If image-text layout is not configured, the file will be processed using the standard file processing procedure.
+    - For files containing both text and images, LinkMind will integrate image-text layout technology to accurately extract images and content from the document, assisting the large model in learning and processing the file. If image-text layout is not configured, the file will be processed using the standard file processing procedure.
 
 6. **Title File Processing**:
     - Titles in files will be extracted separately as key information units for specialized processing. Accurate recognition of titles ensures they are effectively extracted as core elements of the content, providing high-quality learning data for the large model.
 
 7. **Presentation File Processing**:
-    - For presentation files, Lagi will read the content of each page, associating the page text with images to improve the large model's ability to learn and process the content.
+    - For presentation files, LinkMind will read the content of each page, associating the page text with images to improve the large model's ability to learn and process the content.
 
 8. **Image File Processing**:
-    - When processing image files, Lagi will use OCR technology to perform text and image recognition, associating the recognized information with the image as key information units. If OCR is not configured, the default method will be to associate the image name with the image for processing.
+    - When processing image files, LinkMind will use OCR technology to perform text and image recognition, associating the recognized information with the image as key information units. If OCR is not configured, the default method will be to associate the image name with the image for processing.
 
 ## Conclusion
 
 By following this tutorial, you have successfully integrated LinkMind into your project. You can now start leveraging LinkMind's powerful AI features to enhance user experience and improve efficiency.
 
+**Note 1**: Tutorial for installing idk1.8
+
+1. **Download and install jdk1.8**: jdk1.8 download address: https://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html
+
+2. **Configure jdk environment variables**:
+Search for ‘Edit system environment variables’ to enter the system environment variables and add the corresponding environment variables for jdk.
+* Add JAVA_HOME variable: Click New, in the New dialog box that pops up, add the following content:
+Variable name: JAVA_HOME
+Variable value: C:\Program Files\java\jdk
+* Add CLASSPATH variable: Click New, in the New dialog box that pops up, add the following content:
+Variable name: CLASSPATH
+Variable value: .;%JAVA_HOME%\lib\dt.jar;%JAVA_HOME%\lib\tools.jar
+* Change Path variable: Click Edit, click New in the New dialog box that pops up, add %JAVA_HOME%\bin;%JAVA_HOME%\jre\bin.
+* Test whether jdk configuration is complete, win+R opens a black window, and enter cmd
+Use the java -version command to check the java version. If the jdk version number is displayed, the installation and configuration are complete
+```bash
+java -version
+```
+**Note 2**: Tutorial for installing Tomcat
+
+**Download Tomcat**: Tomcat download address: https://archive.apache.org/dist/tomcat/tomcat-8/v8.5.99/bin/apache-tomcat-8.5.99.zip
+
+**Note 3**: Tutorial on installing Python
+
+**Download Python**: Python official website: https://www.python.org/

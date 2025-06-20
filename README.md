@@ -2,7 +2,7 @@
 
 ## **Introduction**
 
-LinkMind is a solution designed by Beijing Landing Technologies Co.,Ltd. specifically for the significant gap between the powerful forces of the large model open-source community and enterprise application deployment. It is an enterprise-level composite multimodal large model middleware aimed at bridging this gap, by providing a secure and professional platform, enabling enterprises to customize and deploy large models in a low-cost, efficient manner.
+LinkMind is a solution carefully developed by Beijing Liandong North Technology Co., Ltd. to address the significant gap between the rapid development of open source big model technology and its actual application in enterprises. It is an enterprise-level composite multimodal big model middleware that aims to bridge this gap and enable enterprises to customize and deploy big models in a low-cost and efficient manner by providing a secure and professional platform.
 
 Supports but is not limited to the following models:
 
@@ -44,9 +44,12 @@ Supports but is not limited to the following models:
         <span style="font-size: 12px;width: 70px; text-align: left;">DeepSeek&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
         <img src="docs/images/logo/model/img_15.webp" width="20" style="margin: 10px;" height="20">
         <span style="font-size: 12px;width: 70px; text-align: left;">Claude&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+        <img src="docs/images/logo/model/img_16.jpg" width="20" style="margin: 10px;" height="20">
+        <span style="font-size: 12px;width: 70px; text-align: left;">MiniMax&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
     </div>
 	</br>
 </div>
+
 
 Supports but is not limited to the following intelligent agent platforms:
 
@@ -63,13 +66,65 @@ Supports but is not limited to the following intelligent agent platforms:
     </div>
 </div>
 
+  </br>
+The following database types are supported but not limited to:
+  </br>
+<div style="display: flex; flex-wrap: wrap; justify-content: flex-start;">
+    <div style="display: flex; align-items: center; margin: 10px;">
+        <img src="docs/images/logo/img_4.png" width="20" style="margin: 10px;" height="20">
+        <span style="font-size: 12px;">Chroma&nbsp;&nbsp;&nbsp;</span>
+        <img src="docs/images/logo/img_5.png" width="20" style="margin: 10px;" height="20">
+        <span style="font-size: 12px;">elastic&nbsp;&nbsp;&nbsp;</span>
+        <img src="docs/images/logo/img_6.png" width="20" style="margin: 10px;" height="20">
+        <span style="font-size: 12px;">mysql&nbsp;&nbsp;&nbsp;</span>
+    </div>
+</div>
+
+## Product Features
+This product provides efficient, stable and easy-to-use functions through a series of advanced technologies and optimized designs to meet diverse user needs. The following are the main features:
+
+**More accurate retrieval enhancement (RAG)**
+
+Through refined data management and optimization algorithms, ensure high accuracy of model output.
+
+Support continuous model learning and gradually improve overall performance and response accuracy.
+
+**Faster pre-read cache (Medusa)**
+
+Introducing Medusa technology, effectively reducing user waiting time through pre-read cache mechanism.
+
+Optimize data processing flow to further improve model operation efficiency.
+
+**More efficient model performance improvement**
+
+Adopt advanced performance optimization strategies to significantly improve the computing efficiency and response speed of the model.
+
+Maintain high performance in a variety of application scenarios to meet complex task requirements.
+
+**More stable automatic switching of large models**
+
+Support multi-link backup mechanism to ensure that the system can seamlessly switch to the backup model when a failure occurs.
+
+Provide a stable operating environment to reduce the risk of service interruption caused by technical failures.
+
+**More powerful intent detection (Graph)**
+
+Use knowledge graph technology to accurately identify user intent and provide targeted responses.
+
+Quickly analyze user input to ensure accurate, stable and easy-to-use responses.
+
+**More convenient one-time writing for multiple models**
+
+Supports one-time writing to adapt to multiple models, significantly reducing duplication of work in development.
+
+Reduces development and maintenance difficulties and improves overall development efficiency.
 ## Online Demo
 
 To allow users to intuitively experience the powerful functionality and convenience of LinkMind, we offer an online demo. You can visit and experience it through the following link: [https://lagi.landingbj.com](https://lagi.landingbj.com/).
 
 ## Quick Start
 
-For developers, we provide a simple way to compile and run the LinkMind application. You can choose to use the Maven command-line tool to package, or run it through mainstream Integrated Development Environments (IDEs) like IntelliJ IDEA. Please ensure your JDK version meets at least the requirements of version 8.
+For developers, we provide a simple way to compile and run the LinkMind application. You can choose to use the Maven command-line tool to package, or run it through mainstream Integrated Development Environments (IDEs) like IntelliJ IDEA. Please make sure you are using JDK version 8 or above.
 
 ### Method 1: Using Maven
 
@@ -141,7 +196,7 @@ If you find the vector databases currently integrated with LinkMind to be less t
 
 ## Security
 
-To better integrate LinkMind into your business,You can do this by adding the keywords you want to filter in the  [`sensitive_word.json`](lagi-web/src/main/resources/sensitive_word.json) file,In the [priority_word.json](lagi-web/src/main/resources/priority_word.json) file, you specify which keywords to answer first.And set the stop keyword in the [stopping_word.json](lagi-web/src/main/resources/stopping_word.json) file,Thus, the returned results of the dialogue are changed, the dialogue is guided in a specific direction, and the dialogue is automatically stopped when needed.
+In order to better integrate LinkMind into your business, you can add the keywords you need to filter in the [sensitive_word.json](lagi-web/src/main/resources/sensitive_word.json) file, specify the priority keywords in the [priority_word.json](lagi-web/src/main/resources/priority_word.json) file, and set the stopping keywords in the [stopping_word.json](lagi-web/src/main/resources/stopping_word.json) file to change the return results of the conversation, guide the conversation in a specific direction, and automatically stop the conversation when needed.
 
 Example: 
 
@@ -174,11 +229,9 @@ Example：Set priority keywords and stop keywords:
 Thank you for your support of LinkMind ! To help you get started quickly and easily, we have provided a pre-packaged LinkMind application that is ready for immediate use.
 
 - **Jar File**: The core dependency library of LinkMind.
-  - File Name: lagi-core-1.0.4-jar-with-dependencies.jar
-  - File Size: 250.5 MB
-  - Download Link: [Click here to download](https://downloads.landingbj.com/lagi/lagi-core-1.0.4-jar-with-dependencies.jar)
+  - File Name: lagi-core-1.0.6-jar-with-dependencies.jar
+  - Download Link: [Click here to download](https://downloads.landingbj.com/lagi/lagi-core-1.0.6-jar-with-dependencies.jar)
 
 - **War File**: The Web application of LinkMind, which can be directly deployed to a web container.
   - File Name: lagi-web.war
-  - File Size: 279 MB
   - Download Link: [Click here to download](https://downloads.landingbj.com/lagi/lagi-web.war)

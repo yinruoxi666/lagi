@@ -23,7 +23,7 @@ models:
     type: Landing
     enable: false
     drivers: # Multi-driver configuration.
-      - model: turing,qa,tree,proxy # List of features supported by the driver.
+      - model: turing,qa,tree,proxy # Driver Model List
         driver: ai.llm.adapter.impl.LandingAdapter # Driver address.
       - model: image # List of features supported by the driver.
         driver: ai.image.adapter.impl.LandingImageAdapter # Driver address.
@@ -47,7 +47,7 @@ stores:
       driver: ai.vector.impl.ChromaVectorStore # Vector database driver.
       default_category: default # Category for vector database storage.
       similarity_top_k: 10 # Parameter used for vector database queries.
-      similarity_cutoff: 0.5
+      similarity_cutoff: 0.5 # Will cut off those results whose similarity to the query vector is less than 0.5.
       parent_depth: 1
       child_depth: 1
       url: http://localhost:8000 # Storage configuration of the vector database.
@@ -87,7 +87,11 @@ stores:
       priority: 10 # Priority; if this priority exceeds the model's, it will return the default prompt if no context is matched.
       default: "Please give prompt more precisely" # Default prompt returned when no context is matched.
       track: true # Enables document tracking.
-  # This section is the configuration for Medusa's accelerated inference service. You can prepopulate the cache using the pre-trained `medusa.json`. Set `flush` to true for the first initialization, and later you can set it back to false for routine start/stop operations.
+      
+  # This section contains the configuration for Medusa's accelerated inference service. 
+  # You can use the pre-trained `medusa.model` to prepopulate the cache. 
+  # Set `flush` to true for the initial run to initialize it; afterward, you can change it back to false for routine start/stop operations.
+  # Full download link for the `medusa.model` file: https://downloads.landingbj.com/lagi/medusa.model
   medusa:
       enable: true # Whether to enable
       algorithm: hash,llm,tree # Algorithms to use
@@ -97,6 +101,9 @@ stores:
       consumer_thread_num: 2 # Number of consumer threads
       cache_persistent_path: medusa_cache # Cache persistence path
       cache_persistent_batch_size: 2 # Cache persistence batch size
+      cache_hit_window: 16    # size of the sliding window for cache hits
+      cache_hit_ratio: 0.3    # minimum cache hit ratio
+      temperature_tolerance: 0.1  # tolerance for the temperature parameter on cache hits
       flush: true # Whether to reload the cache on every startup
 ```
 
@@ -247,7 +254,7 @@ functions:
     #       606 Other errors.
     #       607 Timeout.
     #       608 No available model.
-    handle: failover
+    handle: failover #parallel #failover
     grace_time: 20 # Retry interval after failure.
     maxgen: 3 # Maximum retries after failure (default is Integer.MAX_VALUE).
 ```
@@ -345,3 +352,11 @@ routers:
 
 ```
 
+MCP configuration
+
+```yaml
+mcps:
+  servers:
+    - name: baidu_search_mcp  # MCP service name
+      url: http://appbuilder.baidu.com/v2/ai_search/mcp/sse?api_key=Bearer+your_api_key  # MCP service URL
+```

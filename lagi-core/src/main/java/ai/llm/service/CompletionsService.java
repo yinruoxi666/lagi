@@ -265,7 +265,7 @@ public class CompletionsService implements ChatCompletion {
     }
 
     public GetRagContext getRagContext(List<IndexSearchData> indexSearchDataList) {
-        if (indexSearchDataList.isEmpty()) {
+        if (indexSearchDataList == null || indexSearchDataList.isEmpty()) {
             return null;
         }
         List<String> filePaths = new ArrayList<>();

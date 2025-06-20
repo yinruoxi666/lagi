@@ -21,12 +21,13 @@ public class SqliteAdapter {
     }
 
     private void init() {
-        // url = "jdbc:sqlite:D:\\Tomcat8\\apache-tomcat-9.0.0.M21\\bin\\saas.db";
-        url = "jdbc:sqlite:saas.db";
+        String tomcatPath = System.getProperty("user.dir");
+        String dbPath = tomcatPath + "/saas.db";
+        url = "jdbc:sqlite:" + dbPath;
         Connection conn = null;
         Statement stmt = null;
         try {
-            conn = DriverManager.getConnection(url);
+            conn = getCon(url);
             stmt = conn.createStatement();
             DatabaseMetaData dbm = conn.getMetaData();
             ResultSet tables = dbm.getTables(null, null, "table_info", null);
@@ -65,12 +66,17 @@ public class SqliteAdapter {
         }
     }
 
+    public Connection getCon() {
+        return getCon(url);
+    }
+
     /**
      * 打开连接
      */
-    public Connection getCon() {
+    public Connection getCon(String url) {
         Connection con = null;
         try {
+            Class.forName("org.sqlite.JDBC");
             con = DriverManager.getConnection(url);
         } catch (Exception e) {
             e.printStackTrace();

@@ -132,7 +132,6 @@ public class UploadFileServlet extends HttpServlet {
         req.setCharacterEncoding("utf-8");
         resp.setContentType("application/json;charset=utf-8");
         String category = req.getParameter("category");
-
         List<String> idList = gson.fromJson(requestToJson(req), new TypeToken<List<String>>() {
         }.getType());
         if(StrUtil.isBlank(category)) {
@@ -158,6 +157,7 @@ public class UploadFileServlet extends HttpServlet {
         int pageNumber = 1;
 
         String category = req.getParameter("category");
+        String userId = req.getParameter("lagiUserId");
 
         if (req.getParameter("pageNumber") != null) {
             pageSize = Integer.parseInt(req.getParameter("pageSize"));
@@ -168,8 +168,8 @@ public class UploadFileServlet extends HttpServlet {
         List<UploadFile> result = null;
         int totalRow = 0;
         try {
-            result = uploadFileService.getUploadFileList(pageNumber, pageSize, category);
-            totalRow = uploadFileService.getTotalRow(category);
+            result = uploadFileService.getUploadFileList(pageNumber, pageSize, category, userId);
+            totalRow = uploadFileService.getTotalRow(category, userId);
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -443,6 +443,7 @@ public class UploadFileServlet extends HttpServlet {
                 entity.setFilename(filename);
                 entity.setFilepath(filepath);
                 entity.setFileId(fileId);
+                entity.setCreateTime(new Date().getTime());
                 uploadFileService.addUploadFile(entity);
             } catch (IOException | SQLException e) {
                 e.printStackTrace();

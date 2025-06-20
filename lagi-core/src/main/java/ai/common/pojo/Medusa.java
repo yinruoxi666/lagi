@@ -31,4 +31,12 @@ public class Medusa {
     private Integer cachePersistentBatchSize;
     @JsonProperty("flush")
     private Boolean flush;
+    @JsonProperty("cache_hit_window")
+    private Integer cacheHitWindow;
+    @JsonProperty("cache_hit_ratio")
+    private Double cacheHitRatio;
+    @JsonProperty("dynamic_similarity")
+    private Boolean dynamicSimilarity;
+    @JsonProperty("temperature_tolerance")
+    private Double temperatureTolerance;
 }

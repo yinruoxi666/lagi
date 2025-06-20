@@ -23,7 +23,7 @@ models:
     type: Landing
     enable: false
     drivers: # 多驱动配置.
-      - model: turing,qa,tree,proxy # 驱动支持功能列表
+      - model: turing,qa,tree,proxy # 驱动模型列表
         driver: ai.llm.adapter.impl.LandingAdapter # 驱动地址
       - model: image # 驱动支持功能列表
         driver: ai.image.adapter.impl.LandingImageAdapter # 驱动地址
@@ -48,7 +48,7 @@ stores:
       driver: ai.vector.impl.ChromaVectorStore # 向量数据库驱动
       default_category: default # 向量数据库存储的分类
       similarity_top_k: 10 # 向量数据库查询时使用的参数
-      similarity_cutoff: 0.5
+      similarity_cutoff: 0.5 # 会切掉那些与查询向量相似度 低于 0.5 的结果。
       parent_depth: 1
       child_depth: 1
       url: http://localhost:8000 # 向量数据库的存储配置
@@ -88,7 +88,8 @@ stores:
       priority: 10 # 优先级，当该优先级大于模型时,则匹配不到上下文就只返回default中提示语
       default: "Please give prompt more precisely" # 如未匹配到上下文，则返回该提示语
       track: true # 开启文档跟踪
-  # 这部分是美杜莎的加速推理服务的配置，可以通过预训练的medusa.json来预准备缓存，第一次flush置成true来初始化，后续可以改回false用做日常启停。
+  # 这部分是美杜莎的加速推理服务的配置，可以通过预训练的medusa.model来预准备缓存，第一次flush置成true来初始化，后续可以改回false用做日常启停。
+  # 完整的medusa.model文件下载地址：https://downloads.landingbj.com/lagi/medusa.model
   medusa:
     enable: true # 是否开启
     algorithm: hash,llm,tree # 使用的算法
@@ -98,6 +99,9 @@ stores:
     consumer_thread_num: 2 # 消费者线程数
     cache_persistent_path: medusa_cache # 缓存持久化路径
     cache_persistent_batch_size: 2 # 缓存持久化批次大小
+    cache_hit_window: 16 # cache命中的滑动窗口大小
+    cache_hit_ratio: 0.3 # cache命中的最低比例
+    temperature_tolerance: 0.1  # cache命中时温度参数的容忍度
     flush: true # 缓存是否每次启动时都重新加载
 ```
 
@@ -189,7 +193,7 @@ functions:
       model: vision
       enable: true
       priority: 10
-  # 图片OCR配置列表
+  # 图片OCR配置列表 OCR（Optical Character Recognition，光学字符识别）是将图片中的文字内容识别并提取为可编辑文本的技术
   image2ocr:
     - backend: qwen
       model: ocr
@@ -207,7 +211,7 @@ functions:
       model: vision
       enable: true
       priority: 10
-  # 文档OCR配置列表
+  # 文档OCR配置列表 OCR（Optical Character Recognition，光学字符识别）是将图片中的文字内容识别并提取为可编辑文本的技术
   doc2ocr:
     - backend: qwen
       model: ocr
@@ -248,7 +252,7 @@ functions:
     #     606 其他错误
     #     607 超时
     #     608 没有可用的模型
-    handle: failover
+    handle: failover #parallel #failover
     grace_time: 20 # 故障后重试间隔时间
     maxgen: 3 # 故障后最大重试次数 默认为 Integer.MAX_VALUE
 ```
@@ -344,5 +348,12 @@ routers:
     rule: '%'
 ```
 
+MCP配置
 
+```yaml
+mcps:
+  servers:
+    - name: baidu_search_mcp # mcp服务名称
+      url: http://appbuilder.baidu.com/v2/ai_search/mcp/sse?api_key=Bearer+your_api_key # mcp服务地址
+```
 
