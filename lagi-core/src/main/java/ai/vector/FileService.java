@@ -84,9 +84,9 @@ public class FileService {
         String extString = file.getName().substring(file.getName().lastIndexOf("."));
         String fileType = extString.toLowerCase().toLowerCase();
         if (fileType.equals(".xls")||fileType.equals(".xlsx")){
-            return EasyExcelUtil.getChunkDocumentExcel(file,chunkSize);
+//            return EasyExcelUtil.getChunkDocumentExcel(file,chunkSize);
         }else if (fileType.equals(".csv")){
-            return EasyExcelUtil.getChunkDocumentCsv(file);
+//            return EasyExcelUtil.getChunkDocumentCsv(file);
         }else if (fileType.equals(".jpeg")||fileType.equals(".png")||
                   fileType.equals(".gif")||fileType.equals(".bmp")||
                   fileType.equals(".webp")||fileType.equals(".jpg")){
@@ -99,23 +99,18 @@ public class FileService {
     }
 
     public static List<FileChunkResponse.Document> splitContentChunks(int chunkSize, String content) {
+        return splitContentChunks(chunkSize, content, false);
+    }
+
+    public static List<FileChunkResponse.Document> splitContentChunks(int chunkSize, String content, boolean lineSeparator) {
         List<FileChunkResponse.Document> result = new ArrayList<>();
-        int start = 0;
-        while (start < content.length()) {
-            int end = Math.min(start + chunkSize, content.length());
-            int lastSentenceEnd = Math.max(content.lastIndexOf('.', end), content.lastIndexOf('\n', end));
-            if (lastSentenceEnd != -1 && lastSentenceEnd > start) {
-                end = lastSentenceEnd + 1;
-            }
-            String text = content.substring(start, end).replaceAll("\\s+", " ");
+        StringSplitUtils.splitContentChunks(chunkSize, content, lineSeparator).forEach(text -> {
             FileChunkResponse.Document doc = new FileChunkResponse.Document();
             doc.setText(text);
             result.add(doc);
-            start = end;
-        }
+        });
         return result;
     }
-
 
     public static List<FileChunkResponse.Document> getChunkDocumentImage(File file,Integer chunkSize) {
         List<FileChunkResponse.Document> result = new ArrayList<>();

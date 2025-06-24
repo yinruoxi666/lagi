@@ -120,6 +120,22 @@ models:
     api_key: cvUdhNJQEFXOOHfDFtPx:wDeBmrxvJfwdyjFsIzQz  # https://console.xfyun.cn/
     secret_key: ZDYyMjNmMTlkYTE0YWRmOWUwZTYxNjYz   # https://console.xfyun.cn/
 
+  - name: zhishu
+    type: Zhishu-ds
+    enable: true
+    model: DeepSeek-R1-7B,qwen2.5-instruct
+    driver: ai.llm.adapter.impl.OpenAIStandardAdapter
+    api_address: http://47.95.158.33:22346/v2/chat/completions
+    api_key: 123123
+
+  - name: yitu
+    type: Qwen
+    enable: true
+    model:  qwen2.5-72b-instruct
+    driver: ai.llm.adapter.impl.OpenAIStandardAdapter
+    api_address: https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
+    api_key: sk-f4f5565da70f49228a8f3fc2d231a543
+
   # ChatGPT is a state-of-the-art language model developed by OpenAI
   - name: ayenaspring
     type: Ayena
@@ -127,6 +143,7 @@ models:
     model: ayenaspring-advanced-001
     driver: ai.llm.adapter.impl.AyenaAdapter
     api_key: sk-4a78244e7fab4af9ba2a3bf8eb3cacb4ldiehkid4h6tjkx2 # https://platform.openai.com/
+    api_address: https://www.ayenaspring.com:8081/v2/chat/completions
 
   # SenseChat(RiRiXin) is a large language model developed by SenseTime
   - name: SenseChat
@@ -279,6 +296,18 @@ functions:
         api_version: 2025-01-01-preview
         deployment: gpt-4.1-nano
 
+      - backend: zhishu
+        model: qwen2.5-instruct
+        enable: true
+        stream: true
+        priority: 80
+
+      - backend: yitu
+        model: qwen2.5-72b-instruct
+        enable: true
+        stream: true
+        priority: 80
+
       - backend: ernie
         model: ERNIE-Speed-128K
         enable: false
@@ -387,10 +416,8 @@ functions:
       priority: 10
 
   text2qa:
-    - backend: landing
-      model: cascade
-      enable: true
-      priority: 10
+    enable: true
+    model: gpt-4o-20240513
 
 
 # The following is the configuration of agents, name is the name of the agent,
