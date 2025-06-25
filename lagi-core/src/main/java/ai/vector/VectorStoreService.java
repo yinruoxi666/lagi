@@ -433,6 +433,7 @@ public class VectorStoreService {
             return null;
         }).filter(Objects::nonNull).collect(Collectors.toList());
     }
+
     public List<IndexSearchData> search(String question, String category) {
         return search(question, new HashMap<>(), category);
     }
