@@ -255,7 +255,7 @@ After downloading the embedding model, add the following configuration to enable
 
 The **Rerank** feature only requires the AI database file, while the **Embedding** model requires both.
 
-For API references, see [API Documentation](docs/API_zh.md).
+For API references, see [API Documentation](docs/API_en.md).
 
 ## Downloads
 
