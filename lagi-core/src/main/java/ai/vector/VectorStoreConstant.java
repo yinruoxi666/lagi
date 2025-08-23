@@ -4,7 +4,7 @@ public class VectorStoreConstant {
     public static final String VECTOR_STORE_CHROMA = "Chroma";
     public static final String VECTOR_STORE_PINECONE = "Pinecone";
     public static final String VECTOR_METRIC_COSINE = "cosine";
-    public static final int VECTOR_LINK_CACHE = 10000;
+    public static final int VECTOR_CACHE_SIZE = 10000;
 
     public static final String FILE_CHUNK_SOURCE_LLM = "llm";
 }

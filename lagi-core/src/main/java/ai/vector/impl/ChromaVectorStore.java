@@ -2,16 +2,16 @@ package ai.vector.impl;
 
 import ai.embedding.Embeddings;
 import ai.common.pojo.VectorStoreConfig;
-import ai.vector.pojo.QueryCondition;
-import ai.vector.pojo.IndexRecord;
-import ai.vector.pojo.UpsertRecord;
-import ai.vector.pojo.VectorCollection;
+import ai.utils.OkHttpUtil;
+import ai.vector.pojo.*;
+import com.google.gson.Gson;
 import com.google.gson.internal.LinkedTreeMap;
 import tech.amikos.chromadb.Client;
 import tech.amikos.chromadb.Collection;
 import tech.amikos.chromadb.EmbeddingFunction;
 import tech.amikos.chromadb.handler.ApiException;
 
+import java.io.IOException;
 import java.util.*;
 
 public class ChromaVectorStore extends BaseVectorStore {
@@ -154,6 +154,23 @@ public class ChromaVectorStore extends BaseVectorStore {
         return getIndexRecords(result, gr);
     }
 
+    private static final Gson gson = new Gson();
+
+    public List<IndexRecord> fetch(int limit, int offset, String category) {
+        List<IndexRecord> result = new ArrayList<>();
+        Collection.GetResult gr;
+        ChromaGetRequest chromaGetRequest = ChromaGetRequest.builder().limit(limit).offset(offset).build();
+        Collection collection = getCollection(category);
+        String url = this.config.getUrl() + "/api/v1/collections/" + collection.getId() + "/get";
+        try {
+            String json = OkHttpUtil.post(url, new Gson().toJson(chromaGetRequest));
+            gr = gson.fromJson(json, Collection.GetResult.class);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return getIndexRecords(result, gr);
+    }
+
     public List<IndexRecord> fetch(Map<String, String> where) {
         return fetch(where, this.config.getDefaultCategory());
     }
@@ -169,6 +186,7 @@ public class ChromaVectorStore extends BaseVectorStore {
         }
         return getIndexRecords(result, gr);
     }
+
 
     public void delete(List<String> ids) {
         this.delete(ids, this.config.getDefaultCategory());

@@ -156,6 +156,11 @@ public class PineconeVectorStore implements VectorStore {
         return null;
     }
 
+    public List<IndexRecord> fetch(int limit, int offset, String category) {
+        // TODO: Implement this method
+        return null;
+    }
+
     @Override
     public void delete(List<String> ids) {
         this.delete(ids, this.config.getDefaultCategory());

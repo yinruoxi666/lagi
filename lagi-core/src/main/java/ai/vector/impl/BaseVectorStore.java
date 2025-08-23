@@ -77,4 +77,9 @@ public class BaseVectorStore implements VectorStore {
     public List<VectorCollection> listCollections() {
         return null;
     }
+
+    @Override
+    public List<IndexRecord> fetch(int limit, int offset, String category) {
+        return null;
+    }
 }

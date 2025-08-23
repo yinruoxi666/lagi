@@ -25,6 +25,8 @@ public interface VectorStore {
 
     List<IndexRecord> fetch(Map<String, String> where, String category);
 
+    List<IndexRecord> fetch(int limit, int offset, String category);
+
     void delete(List<String> ids);
 
     void delete(List<String> ids, String category);
