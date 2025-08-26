@@ -146,6 +146,81 @@ public class VectorStoreService {
         return results;
     }
 
+    public CompletableFuture<List<List<String>>> addFileVectorsAsync(
+            File file, Map<String, Object> metadatas, String category, IngestListener listener) {
+
+        String fileId = (String) metadatas.computeIfAbsent("file_id",
+                k -> UUID.randomUUID().toString().replace("-", ""));
+
+        // 1) 切片放到线程池里跑
+        CompletableFuture<List<List<FileChunkResponse.Document>>> splitFuture =
+                CompletableFuture.supplyAsync(() -> {
+                    Integer wenben_type = 512, biaoge_type = 512, tuwen_type = 256;
+                    String suffix = file.getName().toLowerCase().split("\\.")[1];
+                    DocumentLoader loader = loaderMap.getOrDefault(suffix, loaderMap.get("common"));
+                    return loader.load(file.getPath(),
+                            new SplitConfig(wenben_type, tuwen_type, biaoge_type, category, metadatas));
+                }, executor).whenComplete((docs, ex) -> {
+                    if (listener != null) {
+                        if (ex == null) listener.onSplitReady(fileId, docs);    // —— 切片完成立刻可见 —— //
+                        else listener.onError(fileId, ex);
+                    }
+                });
+
+        // 2) 切片后→问答抽取（组级回调）
+        CompletableFuture<List<List<FileChunkResponse.Document>>> qaFuture =
+                splitFuture.thenCompose(docs -> {
+                    String name = file.getName().toLowerCase();
+                    if (name.endsWith(".docx") || name.endsWith(".doc")
+                            || name.endsWith(".txt") || name.endsWith(".pdf")) {
+                        return DocQaExtractor.parseTextAsync(
+                                docs, executor,
+                                (groupIdx, qaDocs) -> { // —— 每组完成立刻回调 —— //
+                                    if (listener != null) listener.onQaGroupReady(fileId, groupIdx, qaDocs);
+                                });
+                    } else {
+                        // 非文本类，直接透传
+                        return CompletableFuture.completedFuture(docs);
+                    }
+                });
+
+        // 3) （可选）在这之后你再继续 upsert，每组 upsert 完成也可以回调 vectorIds
+        return qaFuture.thenCompose(qaDocs -> {
+            // 维持你原来的：把 qaDocs -> fileParseList -> 并发 upsert -> 归并 vectorIds 的逻辑
+            List<CompletableFuture<List<String>>> upserts = new ArrayList<>();
+
+            for (int i = 0; i < qaDocs.size(); i++) {
+                final int idx = i;
+                final List<FileChunkResponse.Document> group = qaDocs.get(i);
+                final List<FileInfo> fileList = getFileInfoList(metadatas, group);
+
+                CompletableFuture<List<String>> f = CompletableFuture.supplyAsync(() -> {
+                    try {
+                        upsertFileVectors(fileList, category);
+                    } catch (IOException e) {
+                        throw new CompletionException(e);
+                    }
+                    // 组内按 order 归并 vectorId
+                    return fileList.stream()
+                            .filter(fi -> fi.getOrder() != null && fi.getOrder() > 0)
+                            .sorted(Comparator.comparing(FileInfo::getOrder))
+                            .map(FileInfo::getEmbedding_id)
+                            .collect(Collectors.toList());
+                }, executor)
+                        // 如果你也想“每组 upsert 完就把 vectorIds 回传”，这里再加一个 listener 方法：
+                        // .whenComplete((vectorIds, ex) -> { if (listener != null) ... })
+                        ;
+                upserts.add(f);
+            }
+
+            return CompletableFuture
+                    .allOf(upserts.toArray(new CompletableFuture[0]))
+                    .thenApply(v -> upserts.stream().map(CompletableFuture::join).collect(Collectors.toList()));
+        }).whenComplete((r, ex) -> {
+            if (listener != null && ex != null) listener.onError(fileId, ex);
+        });
+    }
+
     private List<FileInfo> getFileInfoList(Map<String, Object> metadatas, List<FileChunkResponse.Document> docList) {
         List<FileInfo> fileList = new ArrayList<>();
 //        String fileName = metadatas.get("filename").toString();

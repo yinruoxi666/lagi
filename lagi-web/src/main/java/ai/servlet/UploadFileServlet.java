@@ -23,8 +23,7 @@ import ai.medusa.pojo.InstructionPairRequest;
 import ai.migrate.service.UploadFileService;
 import ai.utils.ExcelSqlUtil;
 import ai.utils.LRUCacheUtil;
-import ai.vector.VectorCacheLoader;
-import ai.vector.VectorStoreService;
+import ai.vector.*;
 import ai.vector.pojo.UpsertRecord;
 import cn.hutool.core.util.StrUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -35,8 +34,6 @@ import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.fileupload.servlet.ServletFileUpload;
 
-import ai.vector.FileService;
-import ai.vector.VectorDbService;
 import ai.utils.MigrateGlobal;
 
 import com.google.gson.Gson;
@@ -82,6 +79,8 @@ public class UploadFileServlet extends HttpServlet {
             this.asynchronousUpload(req, resp);
         } else if (method.equals("getProgress")) {
             this.getProgress(req, resp);
+        } else if (method.equals("uploadFileChunk")) {
+
         }
     }
 
@@ -464,7 +463,10 @@ public class UploadFileServlet extends HttpServlet {
             JsonArray fileList = new JsonArray();
             for (File file : files) {
                 if (file.exists() && file.isFile()) {
+
                     String filename = realNameMap.get(file.getName());
+                    tracker.addPlaceholder(file.getName(), filename);
+                    LRUCacheUtil.put(taskId, tracker);
                     Future<?> future = uploadExecutorService.submit(new AddDocIndex(file, category, filename, level, taskId));
                     futures.add(future);
                     JsonObject jsonObject = new JsonObject();
@@ -491,6 +493,7 @@ public class UploadFileServlet extends HttpServlet {
         if (tracker != null) {
             map.put("status", "success");
             map.put("progress", tracker.getProgress());
+            map.put("files", tracker.getFilesSnapshot());
             if (tracker.getProgress() == 100){
                 map.put("msg", "上传完毕！");
             }else if(0 < tracker.getProgress()) {
@@ -509,6 +512,17 @@ public class UploadFileServlet extends HttpServlet {
         out.close();
     }
 
+    private void uploadFileChunk(HttpServletRequest req, HttpServletResponse resp) throws IOException{
+        String fileId = req.getParameter("file_id");
+
+        Map<String, Object>map = new HashMap<>();
+
+
+        PrintWriter out = resp.getWriter();
+        out.print(gson.toJson(map));
+        out.flush();
+        out.close();
+    }
 
 
     public class AddDocIndex implements Callable<JsonObject> {
@@ -531,6 +545,39 @@ public class UploadFileServlet extends HttpServlet {
         public JsonObject call() throws Exception {
             // 1) 先生成 fileId，后面直接返回
             String fileId = UUID.randomUUID().toString().replace("-", "");
+
+            IngestListener listener = new IngestListener() {
+                @Override
+                public void onSplitReady(String fid, List<List<FileChunkResponse.Document>> docs) {
+                    ProgressTrackerEntity t = LRUCacheUtil.get(taskId);
+                    if (t != null) {
+                        t.saveSplitResult(file.getName(), docs); // 你实现：按文件保存切片数据
+                        // 也可以顺便更新阶段进度：比如 30%
+                        t.updateFileStage(file.getName(), 30, "文件分片完成", "组数=" + docs.size());
+                        LRUCacheUtil.put(taskId, t);
+                    }
+                }
+
+                @Override
+                public void onQaGroupReady(String fid, int groupIndex, List<FileChunkResponse.Document> qaDocs) {
+                    ProgressTrackerEntity t = LRUCacheUtil.get(taskId);
+                    if (t != null) {
+                        t.saveQaGroup(file.getName(), groupIndex, qaDocs); // 你实现：按组保存问答抽取结果
+                        t.updateFileStage(file.getName(), 70, "问答抽取进行中", "完成组=" + (groupIndex + 1));
+                        LRUCacheUtil.put(taskId, t);
+                    }
+                }
+
+                @Override
+                public void onError(String fid, Throwable ex) {
+                    ProgressTrackerEntity t = LRUCacheUtil.get(taskId);
+                    if (t != null) {
+                        t.markFailed(file.getName(), ex.getMessage());
+                        LRUCacheUtil.put(taskId, t);
+                    }
+                }
+            };
+
             List<List<String>> vectorIds = addDocIndexes(fileId);
             // 将文件名和vectorIds转成json返回
             if (vectorIds == null || vectorIds.isEmpty()) {

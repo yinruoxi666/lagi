@@ -21,6 +21,8 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.BiConsumer;
+import java.util.stream.Collectors;
 
 public class DocQaExtractor {
     private static final Backend text2qaBackend = ContextLoader.configuration.getFunctions().getText2qa();
@@ -176,5 +178,85 @@ public class DocQaExtractor {
         messages.add(message);
         chatCompletionRequest.setMessages(messages);
         return chatCompletionRequest;
+    }
+
+    public static CompletableFuture<List<List<FileChunkResponse.Document>>> parseTextAsync(
+            List<List<FileChunkResponse.Document>> docs,
+            ExecutorService executor,
+            BiConsumer<Integer, List<FileChunkResponse.Document>> onGroupReady
+    ) {
+        if (text2qaBackend == null || !text2qaBackend.getEnable()) {
+            // 兼容：不开启时直接同步包一层 future
+            return CompletableFuture.completedFuture(docs);
+        }
+
+        List<CompletableFuture<List<FileChunkResponse.Document>>> groupFutures = new ArrayList<>();
+
+        for (int gi = 0; gi < docs.size(); gi++) {
+            final int groupIndex = gi;
+            final List<FileChunkResponse.Document> group = docs.get(gi);
+
+            CompletableFuture<List<FileChunkResponse.Document>> gf =
+                    CompletableFuture.supplyAsync(() -> {
+                        // —— 组内并发，但“分桶合并”以保证顺序 —— //
+                        @SuppressWarnings("unchecked")
+                        List<FileChunkResponse.Document>[] buckets =
+                                (List<FileChunkResponse.Document>[]) new List[group.size()];
+
+                        List<CompletableFuture<Void>> inner = new ArrayList<>(group.size());
+
+                        for (int i = 0; i < group.size(); i++) {
+                            final int idx = i;
+                            final FileChunkResponse.Document original = group.get(i);
+
+                            inner.add(CompletableFuture.runAsync(() -> {
+                                String prompt = String.format(PROMPT_TEMPLATE, original.getText());
+                                String json = extract(prompt);
+                                List<FileChunkResponse.Document> block = new ArrayList<>();
+                                try {
+                                    if (json != null) {
+                                        ObjectMapper om = new ObjectMapper();
+                                        List<Map<String, String>> dataList =
+                                                om.readValue(json, new TypeReference<List<Map<String, String>>>() {});
+                                        for (Map<String, String> map : dataList) {
+                                            FileChunkResponse.Document doc = new FileChunkResponse.Document();
+                                            doc.setText(map.get("instruction"));
+                                            doc.setSource(VectorStoreConstant.FILE_CHUNK_SOURCE_LLM);
+                                            doc.setOrder(null);
+                                            doc.setReferenceDocumentId(String.valueOf(idx + 1));
+                                            block.add(doc);
+                                        }
+                                    }
+                                } catch (Exception e) {
+                                    // 解析失败就只回原文
+                                }
+                                original.setOrder(idx + 1);
+                                block.add(original);
+
+                                buckets[idx] = block; // 写到自己的槽位
+                            }, executor));
+                        }
+
+                        CompletableFuture.allOf(inner.toArray(new CompletableFuture[0])).join();
+
+                        // 按索引顺序合并
+                        List<FileChunkResponse.Document> qaDocs = new ArrayList<>();
+                        for (int i = 0; i < buckets.length; i++) {
+                            if (buckets[i] != null) qaDocs.addAll(buckets[i]);
+                        }
+                        return qaDocs;
+                    }, executor).whenComplete((qaDocs, ex) -> {
+                        if (ex == null && onGroupReady != null) {
+                            onGroupReady.accept(groupIndex, qaDocs); // —— 该组完成立刻回调 —— //
+                        }
+                    });
+
+            groupFutures.add(gf);
+        }
+
+        // 等全部组完成后返回总结果（不影响“每组先回调”的流式体验）
+        return CompletableFuture
+                .allOf(groupFutures.toArray(new CompletableFuture[0]))
+                .thenApply(v -> groupFutures.stream().map(CompletableFuture::join).collect(Collectors.toList()));
     }
 }

@@ -134,16 +134,16 @@ public class OpenAiApiUtil {
                                                    Function<String, ChatCompletionResult> convertResponseFunc,
                                                    Function<Response, Integer> convertErrorFunc, Map<String, String> headers,
                                                    Proxy proxy) {
-        java.net.Authenticator.setDefault(new java.net.Authenticator() {
-            @Override
-            protected java.net.PasswordAuthentication getPasswordAuthentication() {
-                return new java.net.PasswordAuthentication("socks5", "digimeta".toCharArray());
-            }
-        });
+//        java.net.Authenticator.setDefault(new java.net.Authenticator() {
+//            @Override
+//            protected java.net.PasswordAuthentication getPasswordAuthentication() {
+//                return new java.net.PasswordAuthentication("socks5", "digimeta".toCharArray());
+//            }
+//        });
         OkHttpClient client = new OkHttpClient.Builder()
                 .connectTimeout(timeout, TimeUnit.SECONDS)
                 .connectionPool(CONNECTION_POOL)
-                .proxy(proxy)
+//                .proxy(proxy)
 //                .proxyAuthenticator(proxyAuthenticator)
                 .build();
         MediaType mediaType = MediaType.get("application/json");
@@ -183,6 +183,7 @@ public class OpenAiApiUtil {
             }
             @Override
             public void onEvent(@NotNull EventSource eventSource, @Nullable String id, @Nullable String type, @NotNull String data) {
+                log.info("ServerSentEventUtil streamCompletions onEvent: data = {}" , data);
                 ChatCompletionResult chatCompletionResult = convertResponseFunc.apply(data);
                 if (chatCompletionResult != null) {
                     res.add(chatCompletionResult);
@@ -223,6 +224,7 @@ public class OpenAiApiUtil {
         Iterable<ChatCompletionResult> iterable = res.getObservable().blockingIterable();
         iterable.iterator().hasNext();
         result.setStreamData(Observable.fromIterable(iterable));
+//        result.setStreamData(res.getObservable());
         return result;
     }
 
