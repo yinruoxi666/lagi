@@ -213,7 +213,7 @@ public class SearchServlet extends RestfulServlet {
         request.setModel("");
         request.setTemperature(0);
         request.setMessages(messages);
-        IntentResult intentResult = sampleIntentService.detectIntent(request);
+        IntentResult intentResult = sampleIntentService.detectIntent(request, null);
         String intent = intentResult.getType();
         PrintWriter out = resp.getWriter();
 
@@ -519,7 +519,7 @@ public class SearchServlet extends RestfulServlet {
         request.setMax_tokens(0);
         request.setModel("");
         request.setTemperature(0);
-        IntentResult intentResult = sampleIntentService.detectIntent(request);
+        IntentResult intentResult = sampleIntentService.detectIntent(request, null);
         return intentResult.getType();
     }
 }

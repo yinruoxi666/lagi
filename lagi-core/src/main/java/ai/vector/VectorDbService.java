@@ -73,8 +73,8 @@ public class VectorDbService {
         return PriorityWordUtil.sortByPriorityWord(search);
     }
 
-    public void addFileVectors(File file, Map<String, Object> metadatas, String category) throws IOException {
-        vectorStoreService.addFileVectors(file, metadatas, category);
+    public List<List<String>> addFileVectors(File file, Map<String, Object> metadatas, String category) throws IOException {
+        return vectorStoreService.addFileVectors(file, metadatas, category);
     }
 
     public List<String> getImageFiles(IndexSearchData indexData) {

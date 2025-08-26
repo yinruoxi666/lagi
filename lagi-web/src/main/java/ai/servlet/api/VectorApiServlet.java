@@ -17,6 +17,7 @@ import ai.vector.pojo.IndexRecord;
 import ai.vector.pojo.QueryCondition;
 import ai.vector.pojo.UpsertRecord;
 import ai.vector.pojo.VectorCollection;
+import cn.hutool.core.util.StrUtil;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -144,8 +145,17 @@ public class VectorApiServlet extends BaseServlet {
         String text = request.getText();
         String category = request.getCategory();
         Map<String, String> where = request.getWhere();
-        vectorStoreService.search(text, where, category);
-        List<IndexSearchData> indexSearchData = vectorStoreService.search(text, where, category);
+        List<IndexSearchData> indexSearchData = null;
+        if (StrUtil.isNotBlank(text)) {
+            indexSearchData = vectorStoreService.search(text, where, category);
+        }
+        else {
+            ChatCompletionRequest chatCompletionRequest = new ChatCompletionRequest();
+            chatCompletionRequest.setMax_tokens(4096);
+            chatCompletionRequest.setMessages(request.getMessages());
+            chatCompletionRequest.setCategory(category);
+            indexSearchData = vectorStoreService.searchByContext(chatCompletionRequest,where);
+        }
         Map<String, Object> result = new HashMap<>();
         if (indexSearchData == null || indexSearchData.isEmpty()) {
             result.put("status", "failed");

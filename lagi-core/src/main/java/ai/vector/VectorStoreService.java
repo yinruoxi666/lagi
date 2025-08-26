@@ -102,7 +102,7 @@ public class VectorStoreService {
     }
 
 
-    public void addFileVectors(File file, Map<String, Object> metadatas, String category) throws IOException {
+    public List<List<String>> addFileVectors(File file, Map<String, Object> metadatas, String category) throws IOException {
         Integer wenben_type = 512;
         Integer biaoge_type = 512;
         Integer tuwen_type = 512;
@@ -114,10 +114,13 @@ public class VectorStoreService {
             docs = DocQaExtractor.parseText(docs);
         }
         List<Future<?>> futures = new ArrayList<>();
+        List<List<FileInfo>> fileParseList = new ArrayList<>();
         for (List<FileChunkResponse.Document> docList : docs) {
+            List<FileInfo> fileList = getFileInfoList(metadatas, docList);
+            fileParseList.add(fileList);
             futures.add(executor.submit(() -> {
                 try {
-                    List<FileInfo> fileList = getFileInfoList(metadatas, docList);
+
                     upsertFileVectors(fileList, category);
                 } catch (IOException e) {
                     log.error("Error processing document chunk", e);
@@ -132,6 +135,15 @@ public class VectorStoreService {
                 log.error("Error waiting for task completion", e);
             }
         }
+        List<List<String>> results = new ArrayList<>();
+        for (int i = 0; i < docs.size(); i++) {
+            List<String> vectorIds = fileParseList.get(i).stream().filter(fileInfo -> fileInfo.getOrder() != null && fileInfo.getOrder() > 0)
+                    .sorted(Comparator.comparing(FileInfo::getOrder))
+                    .map(FileInfo::getEmbedding_id)
+                    .collect(Collectors.toList());
+            results.add(vectorIds);
+        }
+        return results;
     }
 
     private List<FileInfo> getFileInfoList(Map<String, Object> metadatas, List<FileChunkResponse.Document> docList) {
@@ -151,11 +163,21 @@ public class VectorStoreService {
 //            fi1.setMetadatas(t1);
 //            fileList.add(fi1);
 //        }
+        Map<String, String> refrenceDocMap = new HashMap<>();
+        Map<String, String> extraMetadatas = new HashMap<>();
         for (FileChunkResponse.Document doc : docList) {
             FileInfo fileInfo = new FileInfo();
             String embeddingId = UUID.randomUUID().toString().replace("-", "");
             fileInfo.setEmbedding_id(embeddingId);
             fileInfo.setText(doc.getText());
+            fileInfo.setOrder(doc.getOrder());
+            if (fileInfo.getOrder() != null && fileInfo.getOrder() > 0) {
+                refrenceDocMap.put(fileInfo.getOrder().toString(), embeddingId);
+            } else {
+                if (doc.getReferenceDocumentId() != null && !doc.getReferenceDocumentId().isEmpty()) {
+                    extraMetadatas.put(embeddingId, doc.getReferenceDocumentId());
+                }
+            }
             Map<String, Object> tmpMetadatas = new HashMap<>(metadatas);
             if (doc.getImages() != null) {
                 tmpMetadatas.put("image", gson.toJson(doc.getImages()));
@@ -166,6 +188,14 @@ public class VectorStoreService {
             fileInfo.setMetadatas(tmpMetadatas);
             fileList.add(fileInfo);
         }
+        fileList.forEach(fileInfo -> {
+            if (extraMetadatas.containsKey(fileInfo.getEmbedding_id())) {
+                String referenceId = refrenceDocMap.get(extraMetadatas.get(fileInfo.getEmbedding_id()));
+                if (referenceId != null) {
+                    fileInfo.getMetadatas().put("reference_document_id", referenceId);
+                }
+            }
+        });
         return fileList;
     }
 
@@ -176,6 +206,9 @@ public class VectorStoreService {
     public void upsertCustomVectors(List<UpsertRecord> upsertRecords, String category, boolean isContextLinked) {
         for (UpsertRecord upsertRecord : upsertRecords) {
             String embeddingId = UUID.randomUUID().toString().replace("-", "");
+            if (upsertRecord.getId() != null && !upsertRecord.getId().isEmpty()) {
+                embeddingId = upsertRecord.getId();
+            }
             upsertRecord.setId(embeddingId);
         }
         if (isContextLinked) {
@@ -320,7 +353,7 @@ public class VectorStoreService {
 
     public List<IndexSearchData> searchByContext(EnhanceChatCompletionRequest request) {
         List<ChatMessage> messages = request.getMessages();
-        IntentResult intentResult = intentService.detectIntent(request);
+        IntentResult intentResult = intentService.detectIntent(request, null);
         if (intentResult.getIndexSearchDataList() != null) {
             return intentResult.getIndexSearchDataList();
         }
@@ -353,7 +386,40 @@ public class VectorStoreService {
 
     public List<IndexSearchData> searchByContext(ChatCompletionRequest request) {
         List<ChatMessage> messages = request.getMessages();
-        IntentResult intentResult = intentService.detectIntent(request);
+        IntentResult intentResult = intentService.detectIntent(request, null);
+        if (intentResult.getIndexSearchDataList() != null) {
+            return intentResult.getIndexSearchDataList();
+        }
+        String question = null;
+        if (intentResult.getStatus() != null && intentResult.getStatus().equals(IntentStatusEnum.CONTINUE.getName())) {
+            if (intentResult.getContinuedIndex() != null) {
+                ChatMessage chatMessage = messages.get(intentResult.getContinuedIndex());
+                String content = chatMessage.getContent();
+                String[] split = content.split("[， ,.。！!?？]");
+                String source = Arrays.stream(split).filter(StoppingWordUtil::containsStoppingWorlds).findAny().orElse("");
+                if (StrUtil.isBlank(source)) {
+                    source = content;
+                }
+                if (chatMessage.getRole().equals(LagiGlobal.LLM_ROLE_SYSTEM)) {
+                    source = "";
+                }
+                question = source + ChatCompletionUtil.getLastMessage(request);
+            } else {
+                List<ChatMessage> userMessages = messages.stream().filter(m -> m.getRole().equals("user")).collect(Collectors.toList());
+                if (userMessages.size() > 1) {
+                    question = userMessages.get(userMessages.size() - 2).getContent().trim();
+                }
+            }
+        }
+        if (question == null) {
+            question = ChatCompletionUtil.getLastMessage(request);
+        }
+        return search(question, request.getCategory());
+    }
+
+    public List<IndexSearchData> searchByContext(ChatCompletionRequest request, Map<String,String> where) {
+        List<ChatMessage> messages = request.getMessages();
+        IntentResult intentResult = intentService.detectIntent(request, where);
         if (intentResult.getIndexSearchDataList() != null) {
             return intentResult.getIndexSearchDataList();
         }
@@ -565,6 +631,7 @@ public class VectorStoreService {
         String text = data.getText().trim();
 
         if (data.getSource() != null) {
+            data.setRefQuestion(text);
             text = "";
             childDepth = childDepth + 1;
         }

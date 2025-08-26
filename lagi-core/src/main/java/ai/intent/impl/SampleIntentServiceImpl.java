@@ -18,7 +18,9 @@ import cn.hutool.core.util.StrUtil;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
@@ -54,7 +56,7 @@ public class SampleIntentServiceImpl implements IntentService {
     }
 
     @Override
-    public IntentResult detectIntent(ChatCompletionRequest chatCompletionRequest) {
+    public IntentResult detectIntent(ChatCompletionRequest chatCompletionRequest, Map<String, String> where) {
         IntentTypeEnum intentTypeEnum = detectType(chatCompletionRequest);
         IntentResult intentResult = new IntentResult();
         intentResult.setType(intentTypeEnum.getName());
@@ -79,20 +81,20 @@ public class SampleIntentServiceImpl implements IntentService {
             intentResult.setContinuedIndex(lIndex);
             return intentResult;
         }
-        setIntentByVector(chatCompletionRequest, lIndex, lastQ, intentResult);
+        setIntentByVector(chatCompletionRequest, lIndex, lastQ, intentResult, where);
         return intentResult;
     }
 
-    private static void setIntentByVector(ChatCompletionRequest chatCompletionRequest, Integer lIndex, String lastQ, IntentResult intentResult) {
+    private static void setIntentByVector(ChatCompletionRequest chatCompletionRequest, Integer lIndex, String lastQ, IntentResult intentResult, Map<String,String> where) {
         VectorStoreService vectorStoreService = new VectorStoreService();
         String lQ = chatCompletionRequest.getMessages().get(lIndex).getContent();
         String complexQ = lQ + lastQ;
         lastQ = StrFilterUtil.filterPunctuations(lastQ);
         complexQ = StrFilterUtil.filterPunctuations(complexQ);
         String finalLastQ = lastQ;
-        Future<List<IndexSearchData>> lastFuture = executor.submit(() -> vectorStoreService.search(finalLastQ, chatCompletionRequest.getCategory()));
+        Future<List<IndexSearchData>> lastFuture = executor.submit(() -> vectorStoreService.search(finalLastQ, where, chatCompletionRequest.getCategory()));
         String finalComplexQ = complexQ;
-        Future<List<IndexSearchData>> complexFuture = executor.submit(() -> vectorStoreService.search(finalComplexQ, chatCompletionRequest.getCategory()));
+        Future<List<IndexSearchData>> complexFuture = executor.submit(() -> vectorStoreService.search(finalComplexQ, where, chatCompletionRequest.getCategory()));
         try {
             List<IndexSearchData> l = lastFuture.get();
             List<IndexSearchData> c = complexFuture.get();
@@ -111,6 +113,14 @@ public class SampleIntentServiceImpl implements IntentService {
             } else {
                 intentResult.setIndexSearchDataList(l);
             }
+//            List<IndexSearchData> mergedList = l.stream()
+//                    .filter(item -> c.stream().noneMatch(cItem -> cItem.getId().equals(item.getId())))
+//                    .collect(Collectors.toList());
+//            mergedList.addAll(c);
+//            // 按照距离排序
+//            mergedList.sort(Comparator.comparingDouble(IndexSearchData::getDistance));
+//            intentResult.setIndexSearchDataList(mergedList);
+
         } catch (Exception e) {
             log.error("detectIntent error", e);
         }

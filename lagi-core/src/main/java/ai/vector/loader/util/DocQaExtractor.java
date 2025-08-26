@@ -102,6 +102,7 @@ public class DocQaExtractor {
 
                     for (int i = 0; i < documentList.size(); i++) {
                         FileChunkResponse.Document document = documentList.get(i);
+                        int finalI = i;
                         innerFutures.add(CompletableFuture.runAsync(() -> {
                             String prompt = String.format(PROMPT_TEMPLATE, document.getText());
                             String json = extract(prompt);
@@ -116,8 +117,11 @@ public class DocQaExtractor {
                                     FileChunkResponse.Document doc = new FileChunkResponse.Document();
                                     doc.setText(instruction);
                                     doc.setSource(VectorStoreConstant.FILE_CHUNK_SOURCE_LLM);
+                                    doc.setOrder(null);
+                                    doc.setReferenceDocumentId(Integer.valueOf(finalI + 1).toString());
                                     qaDocs.add(doc);
                                 }
+                                document.setOrder(finalI + 1); // 设置文档的顺序
                                 qaDocs.add(document);
                             } catch (JsonProcessingException e) {
                                 System.out.println(document + " JSON解析错误：" + json);

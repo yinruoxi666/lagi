@@ -385,8 +385,9 @@ public class UploadFileServlet extends HttpServlet {
         // 等待所有任务完成
             for (int i = 0; i< futures.size(); i++ ) {
                 try {
-                    String fileId = (String)futures.get(i).get();
-                    fileList.get(i).getAsJsonObject().addProperty("fileId", fileId);
+                    JsonObject fileInfo = (JsonObject)futures.get(i).get();
+                    fileList.get(i).getAsJsonObject().addProperty("fileId", fileInfo.get("fileId").getAsString());
+                    fileList.get(i).getAsJsonObject().add("vectorIds", fileInfo.get("vectorIds").getAsJsonArray());
                 } catch (InterruptedException e) {
                     //任务终断
                     status = "failed";
@@ -509,7 +510,8 @@ public class UploadFileServlet extends HttpServlet {
     }
 
 
-    public class AddDocIndex implements Callable<String> {
+
+    public class AddDocIndex implements Callable<JsonObject> {
         private final VectorDbService vectorDbService = new VectorDbService(config);
         private final File file;
         private final String category;
@@ -526,14 +528,21 @@ public class UploadFileServlet extends HttpServlet {
         }
 
         @Override
-        public String call() throws Exception {
+        public JsonObject call() throws Exception {
             // 1) 先生成 fileId，后面直接返回
             String fileId = UUID.randomUUID().toString().replace("-", "");
-            addDocIndexes(fileId);
-            return fileId;            // 2) 把结果抛给上层
+            List<List<String>> vectorIds = addDocIndexes(fileId);
+            // 将文件名和vectorIds转成json返回
+            if (vectorIds == null || vectorIds.isEmpty()) {
+                throw new IOException("Failed to add document indexes for file: " + file.getName());
+            }
+            JsonObject jsonObject = new JsonObject();
+            jsonObject.addProperty("fileId", fileId);
+            jsonObject.add("vectorIds", gson.toJsonTree(vectorIds));
+            return jsonObject;            // 2) 把结果抛给上层
         }
 
-        private void addDocIndexes(String fileId) {
+        private List<List<String>> addDocIndexes(String fileId) {
             Map<String, Object> metadatas = new HashMap<>();
             String filepath = file.getName();
 
@@ -553,7 +562,7 @@ public class UploadFileServlet extends HttpServlet {
                     LRUCacheUtil.put(taskId, tracker);
                 }
 
-                vectorDbService.addFileVectors(this.file, metadatas, category);
+                List<List<String>> vectorIds = vectorDbService.addFileVectors(this.file, metadatas, category);
                 UploadFile entity = new UploadFile();
                 entity.setCategory(category);
                 entity.setFilename(filename);
@@ -566,11 +575,13 @@ public class UploadFileServlet extends HttpServlet {
                     tracker.setProgress(100);
                     LRUCacheUtil.put(taskId, tracker);
                 }
+                return vectorIds;
             } catch (IOException | SQLException e) {
                 tracker.setProgress(-1);
                 LRUCacheUtil.put(taskId, tracker);
                 e.printStackTrace();
             }
+            return null;
         }
     }
 

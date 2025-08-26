@@ -23,4 +23,5 @@ public class IndexSearchData {
     private String parentId;
     private String source;
     private Map<String,Object> metadata;
+    private String refQuestion;
 }
