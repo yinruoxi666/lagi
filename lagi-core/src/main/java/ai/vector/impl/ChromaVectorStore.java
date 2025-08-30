@@ -1,9 +1,10 @@
 package ai.vector.impl;
 
-import ai.embedding.Embeddings;
 import ai.common.pojo.VectorStoreConfig;
+import ai.embedding.Embeddings;
 import ai.utils.OkHttpUtil;
 import ai.vector.pojo.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.google.gson.internal.LinkedTreeMap;
 import tech.amikos.chromadb.Client;
@@ -14,10 +15,21 @@ import tech.amikos.chromadb.handler.ApiException;
 import java.io.IOException;
 import java.util.*;
 
+import static com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL;
+
 public class ChromaVectorStore extends BaseVectorStore {
     private static final int TIMEOUT = 60 * 3;
+    private final CustomEmbeddingFunction embeddingFunction;
+    private final Map<String, String> colMetadata;
+    private static final Gson gson = new Gson();
+    private static final ObjectMapper objectMapper = new ObjectMapper();
+
+    static {
+        objectMapper.setSerializationInclusion(NON_NULL);
+    }
+
     public static class CustomEmbeddingFunction implements EmbeddingFunction {
-        private Embeddings ef;
+        private final Embeddings ef;
 
         public CustomEmbeddingFunction(Embeddings ef) {
             this.ef = ef;
@@ -33,9 +45,6 @@ public class ChromaVectorStore extends BaseVectorStore {
             return null;
         }
     }
-
-    private CustomEmbeddingFunction embeddingFunction;
-    private Map<String, String> colMetadata;
 
     public ChromaVectorStore(VectorStoreConfig config, Embeddings embeddingFunction) {
         this.config = config;
@@ -85,40 +94,47 @@ public class ChromaVectorStore extends BaseVectorStore {
     }
 
     public List<IndexRecord> query(QueryCondition queryCondition) {
-        return query(queryCondition, this.config.getDefaultCategory());
-    }
-
-    public List<IndexRecord> query(QueryCondition queryCondition, String category) {
         List<IndexRecord> result = new ArrayList<>();
+        String category = queryCondition.getCategory() != null ? queryCondition.getCategory() : this.config.getDefaultCategory();
         Collection collection = getCollection(category);
-        Collection.GetResult gr;
-        if (queryCondition.getText() == null) {
-            try {
-                gr = collection.get(null, queryCondition.getWhere(), null);
-            } catch (ApiException e) {
-                throw new RuntimeException(e);
-            }
-            return getIndexRecords(result, gr);
+        if (queryCondition.getText() == null || queryCondition.getText().isEmpty()) {
+            GetEmbedding getEmbedding = GetEmbedding.builder()
+                    .category(category)
+                    .where(queryCondition.getWhere())
+                    .limit(queryCondition.getN())
+                    .offset(0)
+                    .whereDocument(queryCondition.getWhereDocument())
+                    .build();
+            return get(getEmbedding);
         }
-        List<String> queryTexts = Collections.singletonList(queryCondition.getText());
-        Integer n = queryCondition.getN();
-        Map<String, String> where = queryCondition.getWhere();
-        Collection.QueryResponse qr = null;
+
+        List<List<Float>> queryEmbeddings = this.embeddingFunction.createEmbedding(Collections.singletonList(queryCondition.getText()));
+        ChromaQueryRequest queryEmbedding = ChromaQueryRequest.builder()
+                .where(queryCondition.getWhere())
+                .whereDocument(queryCondition.getWhereDocument())
+                .queryEmbeddings(queryEmbeddings)
+                .nResults(queryCondition.getN())
+                .build();
+
+        String url = this.config.getUrl() + "/api/v1/collections/" + collection.getId() + "/query";
+        Collection.QueryResponse qr;
         try {
-            qr = collection.query(queryTexts, n, where, null, null);
-        } catch (ApiException e) {
-            e.printStackTrace();
+            String json = OkHttpUtil.post(url, objectMapper.writeValueAsString(queryEmbedding));
+            qr = gson.fromJson(json, Collection.QueryResponse.class);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
+
         if (qr == null) {
             return result;
         }
         for (int i = 0; i < qr.getDocuments().size(); i++) {
             for (int j = 0; j < qr.getDocuments().get(i).size(); j++) {
-                IndexRecord indexRecord = IndexRecord.newBuilder()
-                        .withDocument(qr.getDocuments().get(i).get(j))
-                        .withId(qr.getIds().get(i).get(j))
-                        .withMetadata(qr.getMetadatas().get(i).get(j))
-                        .withDistance(qr.getDistances().get(i).get(j))
+                IndexRecord indexRecord = IndexRecord.builder()
+                        .document(qr.getDocuments().get(i).get(j))
+                        .id(qr.getIds().get(i).get(j))
+                        .metadata(qr.getMetadatas().get(i).get(j))
+                        .distance(qr.getDistances().get(i).get(j))
                         .build();
                 result.add(indexRecord);
             }
@@ -126,24 +142,39 @@ public class ChromaVectorStore extends BaseVectorStore {
         return result;
     }
 
-    private List<IndexRecord> getIndexRecords(List<IndexRecord> result, Collection.GetResult gr) {
+    private List<IndexRecord> getIndexRecords(Collection.GetResult gr) {
+        List<IndexRecord> result = new ArrayList<>();
         for (int i = 0; i < gr.getDocuments().size(); i++) {
-            IndexRecord indexRecord = IndexRecord.newBuilder()
-                    .withDocument(gr.getDocuments().get(i))
-                    .withId(gr.getIds().get(i))
-                    .withMetadata(gr.getMetadatas().get(i))
+            IndexRecord indexRecord = IndexRecord.builder()
+                    .document(gr.getDocuments().get(i))
+                    .id(gr.getIds().get(i))
+                    .metadata(gr.getMetadatas() == null ? null : gr.getMetadatas().get(i))
                     .build();
             result.add(indexRecord);
         }
         return result;
     }
 
+    private List<IndexRecord> getIndexRecords(GetResult gr) {
+        List<IndexRecord> result = new ArrayList<>();
+        for (int i = 0; i < gr.getIds().size(); i++) {
+            IndexRecord indexRecord = IndexRecord.builder()
+                    .id(gr.getIds().get(i))
+                    .document(gr.getDocuments() == null ? null : gr.getDocuments().get(i))
+                    .metadata(gr.getMetadatas() == null ? null : gr.getMetadatas().get(i))
+                    .embeddings(gr.getEmbeddings() == null ? null : gr.getEmbeddings().get(i))
+                    .build();
+            result.add(indexRecord);
+        }
+        return result;
+    }
+
+
     public List<IndexRecord> fetch(List<String> ids) {
         return fetch(ids, this.config.getDefaultCategory());
     }
 
     public List<IndexRecord> fetch(List<String> ids, String category) {
-        List<IndexRecord> result = new ArrayList<>();
         Collection.GetResult gr;
         Collection collection = getCollection(category);
         try {
@@ -151,13 +182,11 @@ public class ChromaVectorStore extends BaseVectorStore {
         } catch (ApiException e) {
             throw new RuntimeException(e);
         }
-        return getIndexRecords(result, gr);
+        return getIndexRecords(gr);
     }
 
-    private static final Gson gson = new Gson();
 
     public List<IndexRecord> fetch(int limit, int offset, String category) {
-        List<IndexRecord> result = new ArrayList<>();
         Collection.GetResult gr;
         ChromaGetRequest chromaGetRequest = ChromaGetRequest.builder().limit(limit).offset(offset).build();
         Collection collection = getCollection(category);
@@ -168,7 +197,7 @@ public class ChromaVectorStore extends BaseVectorStore {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        return getIndexRecords(result, gr);
+        return getIndexRecords(gr);
     }
 
     public List<IndexRecord> fetch(Map<String, String> where) {
@@ -176,7 +205,6 @@ public class ChromaVectorStore extends BaseVectorStore {
     }
 
     public List<IndexRecord> fetch(Map<String, String> where, String category) {
-        List<IndexRecord> result = new ArrayList<>();
         Collection.GetResult gr;
         Collection collection = getCollection(category);
         try {
@@ -184,7 +212,7 @@ public class ChromaVectorStore extends BaseVectorStore {
         } catch (ApiException e) {
             throw new RuntimeException(e);
         }
-        return getIndexRecords(result, gr);
+        return getIndexRecords(gr);
     }
 
 
@@ -250,5 +278,101 @@ public class ChromaVectorStore extends BaseVectorStore {
             throw new RuntimeException(e);
         }
         return result;
+    }
+
+    @Override
+    public List<IndexRecord> get(GetEmbedding getEmbedding) {
+        GetResult gr;
+        String category = getEmbedding.getCategory() != null ? getEmbedding.getCategory() : this.config.getDefaultCategory();
+        Collection collection = getCollection(category);
+        String url = this.config.getUrl() + "/api/v1/collections/" + collection.getId() + "/get";
+        try {
+            String reqJson = objectMapper.writeValueAsString(getEmbedding);
+            String json = OkHttpUtil.post(url, reqJson);
+            gr = gson.fromJson(json, GetResult.class);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return getIndexRecords(gr);
+    }
+
+    @Override
+    public void add(AddEmbedding addEmbedding) {
+        String category = addEmbedding.getCategory() != null ? addEmbedding.getCategory() : this.config.getDefaultCategory();
+        Collection collection = getCollection(category);
+        String url = this.config.getUrl() + "/api/v1/collections/" + collection.getId() + "/add";
+
+        ChromaAddRequest chromaAddRequest = ChromaAddRequest.builder()
+                .ids(new ArrayList<>())
+                .documents(new ArrayList<>())
+                .metadatas(new ArrayList<>())
+                .embeddings(new ArrayList<>())
+                .build();
+
+        for (AddEmbedding.AddEmbeddingData addEmbeddingData : addEmbedding.getData()) {
+            if (addEmbeddingData.getId() == null || addEmbeddingData.getId().isEmpty()) {
+                addEmbeddingData.setId(UUID.randomUUID().toString().replace("-", ""));
+            }
+            chromaAddRequest.getIds().add(addEmbeddingData.getId());
+            chromaAddRequest.getDocuments().add(addEmbeddingData.getDocument());
+            chromaAddRequest.getMetadatas().add(addEmbeddingData.getMetadata());
+            if (addEmbeddingData.getEmbedding() == null || addEmbeddingData.getEmbedding().isEmpty()) {
+                List<List<Float>> embeddings = this.embeddingFunction.createEmbedding(Collections.singletonList(addEmbeddingData.getDocument()));
+                addEmbeddingData.setEmbedding(embeddings.get(0));
+            }
+            chromaAddRequest.getEmbeddings().add(addEmbeddingData.getEmbedding());
+        }
+        try {
+            OkHttpUtil.post(url, objectMapper.writeValueAsString(chromaAddRequest));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public void update(UpdateEmbedding updateEmbedding) {
+        String category = updateEmbedding.getCategory() != null ? updateEmbedding.getCategory() : this.config.getDefaultCategory();
+        Collection collection = getCollection(category);
+        String url = this.config.getUrl() + "/api/v1/collections/" + collection.getId() + "/update";
+        ChromaUpdateRequest chromaUpdateRequest = ChromaUpdateRequest.builder()
+                .ids(new ArrayList<>())
+                .documents(new ArrayList<>())
+                .metadatas(new ArrayList<>())
+                .embeddings(new ArrayList<>())
+                .build();
+
+        for (UpdateEmbedding.UpdateEmbeddingData updateEmbeddingData : updateEmbedding.getData()) {
+            chromaUpdateRequest.getIds().add(updateEmbeddingData.getId());
+            chromaUpdateRequest.getMetadatas().add(updateEmbeddingData.getMetadata());
+            chromaUpdateRequest.getDocuments().add(updateEmbeddingData.getDocument());
+            List<Float> embedding = updateEmbeddingData.getEmbedding();
+            String document = updateEmbeddingData.getDocument();
+            if (document != null && !document.trim().isEmpty() &&
+                    (embedding == null || embedding.isEmpty())) {
+                List<List<Float>> generatedEmbeddings = embeddingFunction.createEmbedding(Collections.singletonList(document));
+                if (generatedEmbeddings != null && !generatedEmbeddings.isEmpty()) {
+                    embedding = generatedEmbeddings.get(0);
+                }
+            }
+            chromaUpdateRequest.getEmbeddings().add(embedding);
+        }
+
+        try {
+            OkHttpUtil.post(url, objectMapper.writeValueAsString(chromaUpdateRequest));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public void delete(DeleteEmbedding deleteEmbedding) {
+        String category = deleteEmbedding.getCategory() != null ? deleteEmbedding.getCategory() : this.config.getDefaultCategory();
+        Collection collection = getCollection(category);
+        String url = this.config.getUrl() + "/api/v1/collections/" + collection.getId() + "/delete";
+        try {
+            OkHttpUtil.post(url, objectMapper.writeValueAsString(deleteEmbedding));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

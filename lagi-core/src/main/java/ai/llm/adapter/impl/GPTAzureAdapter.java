@@ -5,10 +5,14 @@ import ai.common.ModelService;
 import ai.common.exception.RRException;
 import ai.llm.adapter.ILlmAdapter;
 import ai.llm.pojo.LlmApiResponse;
-import ai.llm.utils.OpenAiApiUtil;
+import ai.llm.utils.OpenAiApiUtil;;
 import ai.llm.utils.convert.GptAzureConvert;
 import ai.openai.pojo.ChatCompletionRequest;
 import ai.openai.pojo.ChatCompletionResult;
+import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.map.MapUtil;
+import cn.hutool.json.JSONObject;
+import cn.hutool.json.JSONUtil;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,6 +21,7 @@ import io.reactivex.Observable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.Proxy;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -49,10 +54,10 @@ public class GPTAzureAdapter extends ModelService implements ILlmAdapter {
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }
-
+        Proxy proxy = new Proxy(Proxy.Type.SOCKS, GptAzureConvert.convertProxyUrl2InetSocketAddress());
         LlmApiResponse completions = OpenAiApiUtil.completions(getApiKey(), getApiAddress(), HTTP_TIMEOUT, json,
                 GptAzureConvert::convert2ChatCompletionResult, GptAzureConvert::convertByResponse,
-                headers);
+                headers,proxy);
         if(completions.getCode() != 200) {
             logger.error("open ai  api error {}", completions.getMsg());
             throw new RRException(completions.getCode(), completions.getMsg());
@@ -67,18 +72,20 @@ public class GPTAzureAdapter extends ModelService implements ILlmAdapter {
         String apiKey = getApiKey();
         Map<String, String> headers = new HashMap<>();
         headers.put("api-key", apiKey);
-
+        Map incloudUsage = new HashMap<>();
+        incloudUsage.put("include_usage", true);
+        chatCompletionRequest.setStream_options(incloudUsage);
+        Proxy proxy = new Proxy(Proxy.Type.SOCKS, GptAzureConvert.convertProxyUrl2InetSocketAddress());
         String json;
         try {
             json = mapper.writeValueAsString(chatCompletionRequest);
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }
-
         LlmApiResponse llmApiResponse = OpenAiApiUtil.streamCompletions(apiKey, apiUrl, HTTP_TIMEOUT, json,
-                GptAzureConvert::convertStreamLine2ChatCompletionResult, GptAzureConvert::convertByResponse, headers);
+                GptAzureConvert::convertStreamLine2ChatCompletionResult, GptAzureConvert::convertByResponse, headers, proxy);
         Integer code = llmApiResponse.getCode();
-        if(code != 200) {
+        if(code != null && code != 200) {
             logger.error("open ai stream api error {}", llmApiResponse.getMsg());
             throw new RRException(code, llmApiResponse.getMsg());
         }

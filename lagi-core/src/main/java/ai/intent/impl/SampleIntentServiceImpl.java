@@ -19,6 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
@@ -26,10 +27,8 @@ import java.util.stream.Collectors;
 
 @Slf4j
 public class SampleIntentServiceImpl implements IntentService {
-
     private static final String punctuations = "[\\.,;!\\?，。；！？]";
-
-    private static ExecutorService executor;
+    private static final ExecutorService executor;
 
     static {
         ThreadPoolManager.registerExecutor("vector_intent");
@@ -45,8 +44,8 @@ public class SampleIntentServiceImpl implements IntentService {
         String lastMessage = ChatCompletionUtil.getLastMessage(chatCompletionRequest);
         List<String> segments = splitByPunctuation(lastMessage);
         IntentTypeEnum[] enums = IntentTypeEnum.values();
-        for(IntentTypeEnum e : enums) {
-            if(e.matches(lastMessage ,segments)) {
+        for (IntentTypeEnum e : enums) {
+            if (e.matches(lastMessage, segments)) {
                 return e;
             }
         }
@@ -54,57 +53,62 @@ public class SampleIntentServiceImpl implements IntentService {
     }
 
     @Override
-    public IntentResult detectIntent(ChatCompletionRequest chatCompletionRequest) {
+    public IntentResult detectIntent(ChatCompletionRequest chatCompletionRequest, Map<String, Object> where) {
         IntentTypeEnum intentTypeEnum = detectType(chatCompletionRequest);
         IntentResult intentResult = new IntentResult();
         intentResult.setType(intentTypeEnum.getName());
-        if(intentTypeEnum != IntentTypeEnum.TEXT
+        if (intentTypeEnum != IntentTypeEnum.TEXT
                 || chatCompletionRequest.getMax_tokens() <= 0) {
             return intentResult;
         }
         intentResult.setStatus(IntentStatusEnum.COMPLETION.getName());
         List<Integer> res = PromptCacheTrigger.analyzeChatBoundariesForIntent(chatCompletionRequest);
-        if(res.size() == 1) {
+        if (res.size() == 1) {
             return intentResult;
         }
         String lastQ = ChatCompletionUtil.getLastMessage(chatCompletionRequest);
         boolean isStop = StoppingWordUtil.containsStoppingWorlds(lastQ);
-        if(isStop) {
+        if (isStop) {
             return intentResult;
         }
         Integer lIndex = res.get(0);
         boolean isContinue = ContinueWordUtil.containsStoppingWorlds(lastQ);
-        if(isContinue) {
+        if (isContinue) {
             intentResult.setStatus(IntentStatusEnum.CONTINUE.getName());
             intentResult.setContinuedIndex(lIndex);
             return intentResult;
         }
-        setIntentByVector(chatCompletionRequest, lIndex, lastQ, intentResult);
+        setIntentByVector(chatCompletionRequest, lIndex, lastQ, intentResult, where);
         return intentResult;
     }
 
-    private static void setIntentByVector(ChatCompletionRequest chatCompletionRequest, Integer lIndex, String lastQ, IntentResult intentResult) {
+    @Override
+    public IntentResult detectIntent(ChatCompletionRequest chatCompletionRequest) {
+        return detectIntent(chatCompletionRequest, null);
+    }
+
+    private static void setIntentByVector(ChatCompletionRequest chatCompletionRequest, Integer lIndex, String lastQ, IntentResult intentResult, Map<String, Object> where) {
         VectorStoreService vectorStoreService = new VectorStoreService();
         String lQ = chatCompletionRequest.getMessages().get(lIndex).getContent();
         String complexQ = lQ + lastQ;
         lastQ = StrFilterUtil.filterPunctuations(lastQ);
         complexQ = StrFilterUtil.filterPunctuations(complexQ);
         String finalLastQ = lastQ;
-        Future<List<IndexSearchData>> lastFuture = executor.submit(() -> vectorStoreService.search(finalLastQ, chatCompletionRequest.getCategory()));
+        Future<List<IndexSearchData>> lastFuture = executor.submit(() -> vectorStoreService.search(finalLastQ, where, chatCompletionRequest.getCategory()));
         String finalComplexQ = complexQ;
-        Future<List<IndexSearchData>> complexFuture = executor.submit(() -> vectorStoreService.search(finalComplexQ, chatCompletionRequest.getCategory()));
+        Future<List<IndexSearchData>> complexFuture = executor.submit(() -> vectorStoreService.search(finalComplexQ, where, chatCompletionRequest.getCategory()));
         try {
             List<IndexSearchData> l = lastFuture.get();
             List<IndexSearchData> c = complexFuture.get();
             boolean vectorContinue = false;
-            if(!l.isEmpty() && !c.isEmpty()) {
-                if(c.get(0).getDistance() < l.get(0).getDistance()) {
+            if (!l.isEmpty() && !c.isEmpty()) {
+                if (c.get(0).getDistance() < l.get(0).getDistance()) {
                     vectorContinue = true;
                 }
-            } else if(!l.isEmpty()){
+            } else if (!l.isEmpty()) {
                 vectorContinue = true;
             }
-            if(vectorContinue) {
+            if (vectorContinue) {
                 intentResult.setStatus(IntentStatusEnum.CONTINUE.getName());
                 intentResult.setContinuedIndex(lIndex);
                 intentResult.setIndexSearchDataList(c);
@@ -115,6 +119,4 @@ public class SampleIntentServiceImpl implements IntentService {
             log.error("detectIntent error", e);
         }
     }
-
-
 }

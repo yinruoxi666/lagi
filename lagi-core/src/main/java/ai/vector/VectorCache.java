@@ -5,13 +5,15 @@ import ai.config.ContextLoader;
 import ai.config.pojo.RAGFunction;
 import ai.utils.LRUCache;
 
+import java.util.List;
+
 public class VectorCache {
     private static final RAGFunction RAG_CONFIG = ContextLoader.configuration.getStores().getRag();
 
     private static final VectorCache INSTANCE = new VectorCache();
     private static final LRUCache<String, IndexSearchData> vectorLinkCache;
     private static final LRUCache<String, IndexSearchData> parentElementCache;
-    private static final LRUCache<String, IndexSearchData> childElementCache;
+    private static final LRUCache<String, List<IndexSearchData>> childElementCache;
     private static int CACHE_SIZE;
 
     static {
@@ -39,6 +41,10 @@ public class VectorCache {
         vectorLinkCache.put(id, extendedIndexSearchData);
     }
 
+    public void removeFromVectorLinkCache(String id) {
+        vectorLinkCache.remove(id);
+    }
+
     public IndexSearchData getFromParentElementCache(String id) {
         return parentElementCache.get(id);
     }
@@ -51,15 +57,29 @@ public class VectorCache {
         parentElementCache.put(id, extendedIndexSearchData);
     }
 
-    public IndexSearchData getFromChildElementCache(String id) {
+    public void removeFromParentElementCache(String id) {
+        parentElementCache.remove(id);
+    }
+
+    public List<IndexSearchData> getFromChildElementCache(String id) {
         return childElementCache.get(id);
     }
 
-    public void putToChildElementCache(String id, IndexSearchData extendedIndexSearchData) {
+    public void putToChildElementCache(String id, List<IndexSearchData> extendedIndexSearchData) {
         childElementCache.put(id, extendedIndexSearchData);
+    }
+
+    public void removeFromChildElementCache(String id) {
+        childElementCache.remove(id);
     }
 
     public boolean isChildCacheFull() {
         return childElementCache.size() >= CACHE_SIZE;
+    }
+
+    public void removeFromAllCache(String id) {
+        removeFromVectorLinkCache(id);
+        removeFromParentElementCache(id);
+        removeFromChildElementCache(id);
     }
 }

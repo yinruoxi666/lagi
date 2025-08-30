@@ -10,6 +10,7 @@ import ai.utils.qa.ChatCompletionUtil;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 public class VectorDbService {
@@ -73,8 +74,13 @@ public class VectorDbService {
         return PriorityWordUtil.sortByPriorityWord(search);
     }
 
-    public void addFileVectors(File file, Map<String, Object> metadatas, String category) throws IOException {
-        vectorStoreService.addFileVectors(file, metadatas, category);
+    public List<List<String>> addFileVectors(File file, Map<String, Object> metadatas, String category) throws IOException {
+        return vectorStoreService.addFileVectors(file, metadatas, category);
+    }
+
+    public CompletableFuture<List<List<String>>> addFileVectorsAsync(
+            File file, Map<String, Object> metadatas, String category, IngestListener listener) {
+        return vectorStoreService.addFileVectorsAsync(file, metadatas, category, listener);
     }
 
     public List<String> getImageFiles(IndexSearchData indexData) {

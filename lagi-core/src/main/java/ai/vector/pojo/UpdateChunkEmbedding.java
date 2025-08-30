@@ -6,17 +6,20 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
 import java.util.Map;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class QueryCondition {
+public class UpdateChunkEmbedding {
     private String category;
-    private Map<String, Object> where;
-    @JsonProperty("where_document")
-    private Map<String, Object> whereDocument;
-    private Integer n;
-    private String text;
+    private List<UpdateChunkEmbeddingData> data;
+
+    @Data
+    public static class UpdateChunkEmbeddingData {
+        private String id;
+        private String document;
+    }
 }

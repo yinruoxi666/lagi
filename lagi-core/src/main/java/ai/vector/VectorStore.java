@@ -1,9 +1,6 @@
 package ai.vector;
 
-import ai.vector.pojo.QueryCondition;
-import ai.vector.pojo.IndexRecord;
-import ai.vector.pojo.UpsertRecord;
-import ai.vector.pojo.VectorCollection;
+import ai.vector.pojo.*;
 
 import java.util.List;
 import java.util.Map;
@@ -38,4 +35,12 @@ public interface VectorStore {
     void deleteCollection(String category);
 
     List<VectorCollection> listCollections();
+
+    List<IndexRecord> get(GetEmbedding getEmbedding);
+
+    void add(AddEmbedding addEmbedding);
+
+    void update(UpdateEmbedding updateEmbedding);
+
+    void delete(DeleteEmbedding deleteEmbedding);
 }

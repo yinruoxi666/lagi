@@ -19,6 +19,8 @@ public class FileChunkResponse {
         private String text;
         private List<Image> images;
         private String source;
+        private Integer order;
+        private String referenceDocumentId;
     }
 
     @Data

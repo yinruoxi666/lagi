@@ -1,10 +1,9 @@
 package ai.vector.impl;
 
-import ai.embedding.Embeddings;
 import ai.common.pojo.VectorStoreConfig;
-import ai.vector.VectorStore;
-import ai.vector.pojo.QueryCondition;
+import ai.embedding.Embeddings;
 import ai.vector.pojo.IndexRecord;
+import ai.vector.pojo.QueryCondition;
 import ai.vector.pojo.UpsertRecord;
 import ai.vector.pojo.VectorCollection;
 import com.google.protobuf.Struct;
@@ -21,7 +20,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class PineconeVectorStore implements VectorStore {
+public class PineconeVectorStore extends BaseVectorStore {
     private static final String DOCUMENT = "document";
     private PineconeClientConfig pineconeClientConfig;
     private PineconeClient pineconeClient;
@@ -101,8 +100,14 @@ public class PineconeVectorStore implements VectorStore {
     public List<IndexRecord> query(QueryCondition queryCondition, String category) {
         String text = queryCondition.getText();
         Integer n = queryCondition.getN();
-        Map<String, String> where = queryCondition.getWhere();
-        Struct whereStruct = generateWhereStruct(where);
+        Map<String, Object> where = queryCondition.getWhere();
+        Map<String, String> strWhere = new HashMap<>();
+        if (where != null) {
+            for (Map.Entry<String, Object> entry : where.entrySet()) {
+                strWhere.put(entry.getKey(), entry.getValue().toString());
+            }
+        }
+        Struct whereStruct = generateWhereStruct(strWhere);
         List<IndexRecord> result = new ArrayList<>();
         PineconeConnectionConfig connectionConfig = new PineconeConnectionConfig()
                 .withIndexName(this.config.getIndexName());
@@ -144,21 +149,6 @@ public class PineconeVectorStore implements VectorStore {
             e.printStackTrace();
         }
         return result;
-    }
-
-    public List<IndexRecord> fetch(Map<String, String> where) {
-        // TODO: Implement this method
-        return null;
-    }
-
-    public List<IndexRecord> fetch(Map<String, String> where, String category) {
-        // TODO: Implement this method
-        return null;
-    }
-
-    public List<IndexRecord> fetch(int limit, int offset, String category) {
-        // TODO: Implement this method
-        return null;
     }
 
     @Override
@@ -220,11 +210,11 @@ public class PineconeVectorStore implements VectorStore {
             }
             Float distance = queryResponse.getMatches(i).getScore();
 
-            IndexRecord indexRecord = IndexRecord.newBuilder()
-                    .withDocument(document)
-                    .withId(id)
-                    .withMetadata(metadata)
-                    .withDistance(distance)
+            IndexRecord indexRecord = IndexRecord.builder()
+                    .document(document)
+                    .id(id)
+                    .metadata(metadata)
+                    .distance(distance)
                     .build();
             result.add(indexRecord);
         }
@@ -269,4 +259,5 @@ public class PineconeVectorStore implements VectorStore {
         }
         return result;
     }
+
 }

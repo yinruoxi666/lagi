@@ -5,9 +5,15 @@ import ai.llm.utils.LLMErrorConstants;
 import ai.openai.pojo.ChatCompletionResult;
 import com.google.gson.Gson;
 import okhttp3.Response;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.net.InetSocketAddress;
 
 public class GptAzureConvert {
-
+    private static final Logger logger = LoggerFactory.getLogger(GptAzureConvert.class);
+    private static final String PROXY_URL = "proxy.digimeta.com.cn";
+    private static final Integer PROXY_PORT = 18888;
     private static final Gson gson = new Gson();
     public static int convert(Object object) {
         if(object instanceof  Integer) {
@@ -112,6 +118,10 @@ public class GptAzureConvert {
             choice.setDelta(null);
         });
         return result;
+    }
+
+    public static InetSocketAddress convertProxyUrl2InetSocketAddress() {
+        return new InetSocketAddress(PROXY_URL, PROXY_PORT);
     }
 
     public static int convertByResponse(Response response) {

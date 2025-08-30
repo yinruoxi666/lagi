@@ -23,8 +23,7 @@ import ai.medusa.pojo.InstructionPairRequest;
 import ai.migrate.service.UploadFileService;
 import ai.utils.ExcelSqlUtil;
 import ai.utils.LRUCacheUtil;
-import ai.vector.VectorCacheLoader;
-import ai.vector.VectorStoreService;
+import ai.vector.*;
 import ai.vector.pojo.UpsertRecord;
 import cn.hutool.core.util.StrUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -35,8 +34,6 @@ import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.fileupload.servlet.ServletFileUpload;
 
-import ai.vector.FileService;
-import ai.vector.VectorDbService;
 import ai.utils.MigrateGlobal;
 
 import com.google.gson.Gson;
@@ -366,41 +363,47 @@ public class UploadFileServlet extends HttpServlet {
         ProgressTrackerEntity tracker = new ProgressTrackerEntity(taskId);
         LRUCacheUtil.put(taskId, tracker);
         List<Future<?>> futures = new ArrayList<>();
+        JsonArray fileList = new JsonArray();
         if (!files.isEmpty()) {
-            JsonArray fileList = new JsonArray();
+
+
             for (File file : files) {
                 if (file.exists() && file.isFile()) {
                     String filename = realNameMap.get(file.getName());
-                    Future<?> future =uploadExecutorService.submit(new AddDocIndex(file, category, filename, level ,taskId));
-                    futures.add(future);
+//                    Future<?> future =uploadExecutorService.submit(new AddDocIndex(file, category, filename, level ,taskId));
+//                    futures.add(future);
+                    AddDocIndex addDocIndex = new AddDocIndex(file, category, filename, level, taskId);
+                    JsonObject fileInfo = addDocIndex.handleAddDocIndexes();
                     JsonObject jsonObject = new JsonObject();
                     jsonObject.addProperty("filename", filename);
                     jsonObject.addProperty("filepath", file.getName());
+                    jsonObject.addProperty("fileId", fileInfo.get("fileId").getAsString());
+                    jsonObject.add("vectorIds", fileInfo.get("vectorIds").getAsJsonArray());
                     fileList.add(jsonObject);
                 }
             }
-            jsonResult.addProperty("data", fileList.toString());
         }
         String status ="success";
         // 等待所有任务完成
-            for (Future<?> future : futures) {
-                try {
-                    future.get();
-                } catch (InterruptedException e) {
-                    //任务终断
-                    status = "failed";
-                    Thread.currentThread().interrupt();
-                } catch (ExecutionException e) {
-                    //执行中异常
-                    status = "failed";
-                    e.printStackTrace();
-                }
-            }
+//            for (int i = 0; i< futures.size(); i++ ) {
+//                try {
+//                    JsonObject fileInfo = (JsonObject)futures.get(i).get();
+//                    fileList.get(i).getAsJsonObject().addProperty("fileId", fileInfo.get("fileId").getAsString());
+//                    fileList.get(i).getAsJsonObject().add("vectorIds", fileInfo.get("vectorIds").getAsJsonArray());
+//                } catch (InterruptedException e) {
+//                    //任务终断
+//                    status = "failed";
+//                    Thread.currentThread().interrupt();
+//                } catch (ExecutionException e) {
+//                    //执行中异常
+//                    status = "failed";
+//                    e.printStackTrace();
+//                }
+//            }
+            jsonResult.addProperty("data", fileList.toString());
             if (!jsonResult.has("msg")) {
                 jsonResult.addProperty("status", status);
             }
-            tracker.setProgress(100);
-            LRUCacheUtil.put(taskId, tracker);
             jsonResult.addProperty("task_id", taskId);
             PrintWriter out = resp.getWriter();
             out.write(gson.toJson(jsonResult));
@@ -410,81 +413,76 @@ public class UploadFileServlet extends HttpServlet {
     }
     private void asynchronousUpload(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         HttpSession session = req.getSession();
-        String taskId = UUID.randomUUID().toString();
-        ProgressTrackerEntity tracker = new ProgressTrackerEntity(taskId);
-
         String category = req.getParameter("category");
         String level = req.getParameter("level");
+        String userId = req.getParameter("userId");
         JsonObject jsonResult = new JsonObject();
         jsonResult.addProperty("status", "success");
         DiskFileItemFactory factory = new DiskFileItemFactory();
-        tracker.setProgress(10);
+        ServletFileUpload upload = new ServletFileUpload(factory);
+        upload.setFileSizeMax(MigrateGlobal.DOC_FILE_SIZE_LIMIT);
+        upload.setSizeMax(MigrateGlobal.DOC_FILE_SIZE_LIMIT);
+        String uploadDir = getServletContext().getRealPath(UPLOAD_DIR);
+        if (!new File(uploadDir).isDirectory()) {
+            new File(uploadDir).mkdirs();
+        }
+
+        List<File> files = new ArrayList<>();
+        Map<String, String> realNameMap = new HashMap<>();
+
+        try {
+            List<?> fileItems = upload.parseRequest(req);
+            for (Object fileItem : fileItems) {
+                FileItem fi = (FileItem) fileItem;
+                if (!fi.isFormField()) {
+                    String fileName = fi.getName();
+                    File file;
+                    String newName;
+                    do {
+                        SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
+                        newName = sdf.format(new Date()) + ("" + Math.random()).substring(2, 6);
+                        newName = newName + fileName.substring(fileName.lastIndexOf("."));
+                        String lastFilePath = uploadDir + File.separator + newName;
+                        file = new File(lastFilePath);
+                        session.setAttribute(newName, file.toString());
+                        session.setAttribute("lastFilePath", lastFilePath);
+                    } while (file.exists());
+                    fi.write(file);
+                    files.add(file);
+                    realNameMap.put(file.getName(), fileName);
+                }
+            }
+        } catch (Exception ex) {
+            jsonResult.addProperty("msg", "解析文件出现错误");
+            ex.printStackTrace();
+        }
+
+        String taskId = UUID.randomUUID().toString();
+        ProgressTrackerEntity tracker = new ProgressTrackerEntity(taskId);
         LRUCacheUtil.put(taskId, tracker);
+
+        List<Future<?>> futures = new ArrayList<>();
+        if (!files.isEmpty()) {
+            JsonArray fileList = new JsonArray();
+            for (File file : files) {
+                if (file.exists() && file.isFile()) {
+                    String filename = realNameMap.get(file.getName());
+                    Future<?> future = uploadExecutorService.submit(new AddDocIndex(file, category, filename, level, taskId));
+                    futures.add(future);
+                    JsonObject jsonObject = new JsonObject();
+                    jsonObject.addProperty("filename", filename);
+                    jsonObject.addProperty("filepath", file.getName());
+                    fileList.add(jsonObject);
+                }
+            }
+            jsonResult.add("data", fileList);
+        }
 
         jsonResult.addProperty("task_id", taskId);
         PrintWriter out = resp.getWriter();
         out.write(gson.toJson(jsonResult));
         out.flush();
-
-        try {
-            ServletFileUpload upload = new ServletFileUpload(factory);
-            upload.setFileSizeMax(MigrateGlobal.DOC_FILE_SIZE_LIMIT);
-            upload.setSizeMax(MigrateGlobal.DOC_FILE_SIZE_LIMIT);
-            String uploadDir = getServletContext().getRealPath(UPLOAD_DIR);
-            if (!new File(uploadDir).isDirectory()) {
-                new File(uploadDir).mkdirs();
-            }
-
-            List<File> files = new ArrayList<>();
-            Map<String, String> realNameMap = new HashMap<>();
-                List<?> fileItems = upload.parseRequest(req);
-                for (Object fileItem : fileItems) {
-                    FileItem fi = (FileItem) fileItem;
-                    if (!fi.isFormField()) {
-                        String fileName = fi.getName();
-                        File file;
-                        String newName;
-                        do {
-                            SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
-                            newName = sdf.format(new Date()) + ("" + Math.random()).substring(2, 6);
-                            newName = newName + fileName.substring(fileName.lastIndexOf("."));
-                            String lastFilePath = uploadDir + File.separator + newName;
-                            file = new File(lastFilePath);
-                            session.setAttribute(newName, file.toString());
-                            session.setAttribute("lastFilePath", lastFilePath);
-                        } while (file.exists());
-                        fi.write(file);
-                        files.add(file);
-                        realNameMap.put(file.getName(), fileName);
-                    }
-                }
-            out.close();
-            tracker.setProgress(30);
-            LRUCacheUtil.put(taskId, tracker);
-            List<Future<?>> futures = new ArrayList<>();
-            if (!files.isEmpty()) {
-                JsonArray fileList = new JsonArray();
-                for (File file : files) {
-                    if (file.exists() && file.isFile()) {
-                        String filename = realNameMap.get(file.getName());
-                        Future<?> future = uploadExecutorService.submit(new AddDocIndex(file, category, filename, level, taskId));
-                        futures.add(future);
-                        JsonObject jsonObject = new JsonObject();
-                        jsonObject.addProperty("filename", filename);
-                        jsonObject.addProperty("filepath", file.getName());
-                        fileList.add(jsonObject);
-                    }
-                }
-                jsonResult.add("data", fileList);
-            }
-            tracker.setProgress(80);
-            LRUCacheUtil.put(taskId, tracker);
-        } catch (Exception ex) {
-            jsonResult.addProperty("msg", "解析文件出现错误");
-            tracker.setProgress(-1);
-            LRUCacheUtil.put(taskId, tracker);
-            ex.printStackTrace();
-        }
+        out.close();
     }
 
     private void getProgress(HttpServletRequest req, HttpServletResponse resp) throws IOException {
@@ -495,13 +493,10 @@ public class UploadFileServlet extends HttpServlet {
         if (tracker != null) {
             map.put("status", "success");
             map.put("progress", tracker.getProgress());
+            map.put("files", tracker.getFilesSnapshot());
             if (tracker.getProgress() == 100){
                 map.put("msg", "上传完毕！");
-            }if (tracker.getProgress() >= 80){
-                map.put("msg", "模型处理完成，入库中");
-            }else if(30 <= tracker.getProgress()) {
-                map.put("msg", "正在分析您的文档进行语料注入...");
-            }else if(10 <= tracker.getProgress()) {
+            }else if(0 < tracker.getProgress()) {
                 map.put("msg", "上传中...");
             }else if(0 > tracker.getProgress()) {
                 map.put("status", "failed");
@@ -518,7 +513,7 @@ public class UploadFileServlet extends HttpServlet {
     }
 
 
-    public class AddDocIndex extends Thread {
+    public class AddDocIndex implements Callable<JsonObject> {
         private final VectorDbService vectorDbService = new VectorDbService(config);
         private final File file;
         private final String category;
@@ -534,15 +529,37 @@ public class UploadFileServlet extends HttpServlet {
             this.taskId = taskId;
         }
 
-        public void run() {
-            if (vectorDbService.vectorStoreEnabled()) {
-                addDocIndexes();
-            }
+        @Override
+        public JsonObject call() throws Exception {
+            // 1) 先生成 fileId，后面直接返回
+            String fileId = UUID.randomUUID().toString().replace("-", "");
+//            List<List<String>> vectorIds = addDocIndexes(fileId);
+            // 将文件名和vectorIds转成json返回
+//            if (vectorIds == null || vectorIds.isEmpty()) {
+//                throw new IOException("Failed to add document indexes for file: " + file.getName());
+//            }
+            CompletableFuture<List<List<String>>> future = addDocIndexesAsync(fileId);
+            JsonObject jsonObject = new JsonObject();
+            jsonObject.addProperty("fileId", fileId);
+//            jsonObject.add("vectorIds", gson.toJsonTree(vectorIds));
+            return jsonObject;            // 2) 把结果抛给上层
         }
 
-        private void addDocIndexes() {
-            Map<String, Object> metadatas = new HashMap<>();
+        public JsonObject handleAddDocIndexes() throws IOException{
+            // 1) 先生成 fileId，后面直接返回
             String fileId = UUID.randomUUID().toString().replace("-", "");
+            List<List<String>> vectorIds = addDocIndexes(fileId);
+            // 将文件名和vectorIds转成json返回
+            if (vectorIds == null || vectorIds.isEmpty()) {
+                throw new IOException("Failed to add document indexes for file: " + file.getName());
+            }
+            JsonObject jsonObject = new JsonObject();
+            jsonObject.addProperty("fileId", fileId);
+            jsonObject.add("vectorIds", gson.toJsonTree(vectorIds));
+            return jsonObject;
+        }
+        private List<List<String>> addDocIndexes(String fileId) {
+            Map<String, Object> metadatas = new HashMap<>();
             String filepath = file.getName();
 
             metadatas.put("filename", filename);
@@ -557,17 +574,11 @@ public class UploadFileServlet extends HttpServlet {
             ProgressTrackerEntity tracker = LRUCacheUtil.get(taskId);
             try {
                 if (tracker != null) {
-                    tracker.setProgress(50);
+                    tracker.setProgress(30);
                     LRUCacheUtil.put(taskId, tracker);
                 }
 
-                vectorDbService.addFileVectors(this.file, metadatas, category);
-
-                if (tracker != null) {
-                    tracker.setProgress(70);
-                    LRUCacheUtil.put(taskId, tracker);
-                }
-
+                List<List<String>> vectorIds = vectorDbService.addFileVectors(this.file, metadatas, category);
                 UploadFile entity = new UploadFile();
                 entity.setCategory(category);
                 entity.setFilename(filename);
@@ -580,13 +591,99 @@ public class UploadFileServlet extends HttpServlet {
                     tracker.setProgress(100);
                     LRUCacheUtil.put(taskId, tracker);
                 }
+                return vectorIds;
             } catch (IOException | SQLException e) {
                 tracker.setProgress(-1);
                 LRUCacheUtil.put(taskId, tracker);
                 e.printStackTrace();
             }
+            return null;
+        }
+
+        private CompletableFuture<List<List<String>>> addDocIndexesAsync(String fileId) {
+            Map<String, Object> metadatas = new HashMap<>();
+            String filepath = file.getName();
+
+            metadatas.put("filename", filename);
+            metadatas.put("category", category);
+            metadatas.put("filepath", filepath);
+            metadatas.put("file_id", fileId);
+            if (level == null) {
+                metadatas.put("level", "user");
+            } else {
+                metadatas.put("level", level);
+            }
+            ProgressTrackerEntity tracker = LRUCacheUtil.get(taskId);
+            tracker.updateFileInfo(filepath, fileId, filename);
+            IngestListener listener = new IngestListener() {
+                @Override
+                public void onSplitReady(String fid, List<List<FileChunkResponse.Document>> docs) {
+                    ProgressTrackerEntity t = LRUCacheUtil.get(taskId);
+                    if (t != null) {
+                        t.saveSplitResult(file.getName(), docs); // 你实现：按文件保存切片数据
+                        // 也可以顺便更新阶段进度：比如 30%
+                        t.updateFileStage(file.getName(), 30, "文件分片完成", "组数=" + docs.size());
+                        LRUCacheUtil.put(taskId, t);
+                    }
+                }
+
+                @Override
+                public void onQaGroupReady(String fid, int groupIndex, List<FileChunkResponse.Document> qaDocs) {
+                    ProgressTrackerEntity t = LRUCacheUtil.get(taskId);
+                    if (t != null) {
+                        t.saveQaGroup(file.getName(), groupIndex, qaDocs); // 你实现：按组保存问答抽取结果
+                        t.updateFileStage(file.getName(), 70, "问答抽取进行中", "完成组=" + (groupIndex + 1));
+                        LRUCacheUtil.put(taskId, t);
+                    }
+                }
+
+                @Override
+                public void onQaChunk(String fileId, int groupIndex,int docIndex, List<FileChunkResponse.Document> qaDocs) {
+                    ProgressTrackerEntity t = LRUCacheUtil.get(taskId);
+                    t.saveQaChunk(file.getName(), groupIndex, docIndex, qaDocs);
+                }
+
+                @Override
+                public void onComplete(String fileId) {
+                    ProgressTrackerEntity t = LRUCacheUtil.get(taskId);
+                    t.setProgress(100);
+                }
+
+                @Override
+                public void onError(String fid, Throwable ex) {
+                    ProgressTrackerEntity t = LRUCacheUtil.get(taskId);
+                    if (t != null) {
+                        t.markFailed(file.getName(), ex.getMessage());
+                        LRUCacheUtil.put(taskId, t);
+                    }
+                }
+            };
+            if (tracker != null) {
+                tracker.setProgress(30);
+                LRUCacheUtil.put(taskId, tracker);
+            }
+            return vectorDbService.addFileVectorsAsync(this.file, metadatas, category, listener).whenComplete((allVectorIds,ex)-> {
+                ProgressTrackerEntity t = LRUCacheUtil.get(taskId);
+                if (t != null) {
+                    if (ex == null) {
+                        System.out.println("All vectors added for file: " + file.getName() + ", total vectors: " + (allVectorIds == null ? 0 : allVectorIds.size()));
+                        for (List<String> vecIds : allVectorIds) {
+                            System.out.println("  Chunk with " + (vecIds == null ? 0 : vecIds.size()) + " vectors.");
+                            for (String vid : vecIds) {
+                                System.out.println("  vectorId: " + vid);
+                            }
+                        }
+                        t.markSuccess(file.getName(), fileId, allVectorIds);
+                    }
+                    else {
+                        t.markFailed(file.getName(), ex.getMessage());
+                    }
+                }
+            });
         }
     }
+
+
 
     protected String requestToJson(HttpServletRequest request) throws IOException {
         InputStream in = request.getInputStream();

@@ -12,7 +12,7 @@ import java.util.Map;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class QueryCondition {
+public class QueryEmbedding {
     private String category;
     private Map<String, Object> where;
     @JsonProperty("where_document")

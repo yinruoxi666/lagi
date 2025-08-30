@@ -56,7 +56,7 @@ public class QaCache {
     }
 
     public String getPromptInVectorDb(String key, double similarityCutoff) {
-        Map<String, String> metadata = new HashMap<>();
+        Map<String, Object> metadata = new HashMap<>();
         metadata.put("category", MEDUSA_CATEGORY);
         List<IndexSearchData> indexSearchDataList = vectorStoreService.search(key, QA_SIMILARITY_TOP_K,
                 similarityCutoff, metadata, MEDUSA_CATEGORY);

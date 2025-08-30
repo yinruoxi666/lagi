@@ -6,6 +6,7 @@ public class FileInfo {
     private String text;
     private String embedding_id;
     private Map<String, Object> metadatas;
+    private Integer order;
 
     public String getText() {
         return text;
@@ -29,6 +30,14 @@ public class FileInfo {
 
     public void setMetadatas(Map<String, Object> metadatas) {
         this.metadatas = metadatas;
+    }
+
+    public Integer getOrder() {
+        return order;
+    }
+
+    public void setOrder(Integer order) {
+        this.order = order;
     }
 
     @Override
