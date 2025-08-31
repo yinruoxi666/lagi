@@ -175,6 +175,14 @@ public class VectorStoreService {
                             || name.endsWith(".txt") || name.endsWith(".pdf")) {
                         return DocQaExtractor.parseTextAsync(
                                 docs, executor,
+                                (gIdx, cIdx, block) -> {
+//                                    ProgressTrackerEntity t = LRUCacheUtil.get(taskId);
+//                                    if (t != null) {
+//                                        t.saveQaChunk(file.getName(), gIdx, cIdx, block);
+//                                        LRUCacheUtil.put(taskId, t);
+//                                    }
+                                    if (listener != null) listener.onQaChunk(fileId,gIdx,cIdx, block);
+                                },
                                 (groupIdx, qaDocs) -> { // —— 每组完成立刻回调 —— //
                                     if (listener != null) listener.onQaGroupReady(fileId, groupIdx, qaDocs);
                                 });

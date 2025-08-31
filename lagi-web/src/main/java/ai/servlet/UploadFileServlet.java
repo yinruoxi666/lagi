@@ -26,6 +26,7 @@ import ai.utils.LRUCacheUtil;
 import ai.vector.*;
 import ai.vector.pojo.UpsertRecord;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONObject;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.JsonArray;
 import com.google.gson.reflect.TypeToken;
@@ -368,35 +369,40 @@ public class UploadFileServlet extends HttpServlet {
         JsonArray fileList = new JsonArray();
         if (!files.isEmpty()) {
 
+
             for (File file : files) {
                 if (file.exists() && file.isFile()) {
                     String filename = realNameMap.get(file.getName());
-                    Future<?> future =uploadExecutorService.submit(new AddDocIndex(file, category, filename, level ,taskId));
-                    futures.add(future);
+//                    Future<?> future =uploadExecutorService.submit(new AddDocIndex(file, category, filename, level ,taskId));
+//                    futures.add(future);
+                    AddDocIndex addDocIndex = new AddDocIndex(file, category, filename, level, taskId);
+                    JsonObject fileInfo = addDocIndex.handleAddDocIndexes();
                     JsonObject jsonObject = new JsonObject();
                     jsonObject.addProperty("filename", filename);
                     jsonObject.addProperty("filepath", file.getName());
+                    jsonObject.addProperty("fileId", fileInfo.get("fileId").getAsString());
+                    jsonObject.add("vectorIds", fileInfo.get("vectorIds").getAsJsonArray());
                     fileList.add(jsonObject);
                 }
             }
         }
         String status ="success";
         // 等待所有任务完成
-            for (int i = 0; i< futures.size(); i++ ) {
-                try {
-                    JsonObject fileInfo = (JsonObject)futures.get(i).get();
-                    fileList.get(i).getAsJsonObject().addProperty("fileId", fileInfo.get("fileId").getAsString());
-                    fileList.get(i).getAsJsonObject().add("vectorIds", fileInfo.get("vectorIds").getAsJsonArray());
-                } catch (InterruptedException e) {
-                    //任务终断
-                    status = "failed";
-                    Thread.currentThread().interrupt();
-                } catch (ExecutionException e) {
-                    //执行中异常
-                    status = "failed";
-                    e.printStackTrace();
-                }
-            }
+//            for (int i = 0; i< futures.size(); i++ ) {
+//                try {
+//                    JsonObject fileInfo = (JsonObject)futures.get(i).get();
+//                    fileList.get(i).getAsJsonObject().addProperty("fileId", fileInfo.get("fileId").getAsString());
+//                    fileList.get(i).getAsJsonObject().add("vectorIds", fileInfo.get("vectorIds").getAsJsonArray());
+//                } catch (InterruptedException e) {
+//                    //任务终断
+//                    status = "failed";
+//                    Thread.currentThread().interrupt();
+//                } catch (ExecutionException e) {
+//                    //执行中异常
+//                    status = "failed";
+//                    e.printStackTrace();
+//                }
+//            }
             jsonResult.addProperty("data", fileList.toString());
             if (!jsonResult.has("msg")) {
                 jsonResult.addProperty("status", status);
@@ -463,10 +469,7 @@ public class UploadFileServlet extends HttpServlet {
             JsonArray fileList = new JsonArray();
             for (File file : files) {
                 if (file.exists() && file.isFile()) {
-
                     String filename = realNameMap.get(file.getName());
-                    tracker.addPlaceholder(file.getName(), filename);
-                    LRUCacheUtil.put(taskId, tracker);
                     Future<?> future = uploadExecutorService.submit(new AddDocIndex(file, category, filename, level, taskId));
                     futures.add(future);
                     JsonObject jsonObject = new JsonObject();
@@ -545,39 +548,21 @@ public class UploadFileServlet extends HttpServlet {
         public JsonObject call() throws Exception {
             // 1) 先生成 fileId，后面直接返回
             String fileId = UUID.randomUUID().toString().replace("-", "");
+//            List<List<String>> vectorIds = addDocIndexes(fileId);
+            // 将文件名和vectorIds转成json返回
+//            if (vectorIds == null || vectorIds.isEmpty()) {
+//                throw new IOException("Failed to add document indexes for file: " + file.getName());
+//            }
+            CompletableFuture<List<List<String>>> future = addDocIndexesAsync(fileId);
+            JsonObject jsonObject = new JsonObject();
+            jsonObject.addProperty("fileId", fileId);
+//            jsonObject.add("vectorIds", gson.toJsonTree(vectorIds));
+            return jsonObject;            // 2) 把结果抛给上层
+        }
 
-            IngestListener listener = new IngestListener() {
-                @Override
-                public void onSplitReady(String fid, List<List<FileChunkResponse.Document>> docs) {
-                    ProgressTrackerEntity t = LRUCacheUtil.get(taskId);
-                    if (t != null) {
-                        t.saveSplitResult(file.getName(), docs); // 你实现：按文件保存切片数据
-                        // 也可以顺便更新阶段进度：比如 30%
-                        t.updateFileStage(file.getName(), 30, "文件分片完成", "组数=" + docs.size());
-                        LRUCacheUtil.put(taskId, t);
-                    }
-                }
-
-                @Override
-                public void onQaGroupReady(String fid, int groupIndex, List<FileChunkResponse.Document> qaDocs) {
-                    ProgressTrackerEntity t = LRUCacheUtil.get(taskId);
-                    if (t != null) {
-                        t.saveQaGroup(file.getName(), groupIndex, qaDocs); // 你实现：按组保存问答抽取结果
-                        t.updateFileStage(file.getName(), 70, "问答抽取进行中", "完成组=" + (groupIndex + 1));
-                        LRUCacheUtil.put(taskId, t);
-                    }
-                }
-
-                @Override
-                public void onError(String fid, Throwable ex) {
-                    ProgressTrackerEntity t = LRUCacheUtil.get(taskId);
-                    if (t != null) {
-                        t.markFailed(file.getName(), ex.getMessage());
-                        LRUCacheUtil.put(taskId, t);
-                    }
-                }
-            };
-
+        public JsonObject handleAddDocIndexes() throws IOException{
+            // 1) 先生成 fileId，后面直接返回
+            String fileId = UUID.randomUUID().toString().replace("-", "");
             List<List<String>> vectorIds = addDocIndexes(fileId);
             // 将文件名和vectorIds转成json返回
             if (vectorIds == null || vectorIds.isEmpty()) {
@@ -586,9 +571,8 @@ public class UploadFileServlet extends HttpServlet {
             JsonObject jsonObject = new JsonObject();
             jsonObject.addProperty("fileId", fileId);
             jsonObject.add("vectorIds", gson.toJsonTree(vectorIds));
-            return jsonObject;            // 2) 把结果抛给上层
+            return jsonObject;
         }
-
         private List<List<String>> addDocIndexes(String fileId) {
             Map<String, Object> metadatas = new HashMap<>();
             String filepath = file.getName();
@@ -630,7 +614,91 @@ public class UploadFileServlet extends HttpServlet {
             }
             return null;
         }
+
+        private CompletableFuture<List<List<String>>> addDocIndexesAsync(String fileId) {
+            Map<String, Object> metadatas = new HashMap<>();
+            String filepath = file.getName();
+
+            metadatas.put("filename", filename);
+            metadatas.put("category", category);
+            metadatas.put("filepath", filepath);
+            metadatas.put("file_id", fileId);
+            if (level == null) {
+                metadatas.put("level", "user");
+            } else {
+                metadatas.put("level", level);
+            }
+            ProgressTrackerEntity tracker = LRUCacheUtil.get(taskId);
+            tracker.updateFileInfo(filepath, fileId, filename);
+            IngestListener listener = new IngestListener() {
+                @Override
+                public void onSplitReady(String fid, List<List<FileChunkResponse.Document>> docs) {
+                    ProgressTrackerEntity t = LRUCacheUtil.get(taskId);
+                    if (t != null) {
+                        t.saveSplitResult(file.getName(), docs); // 你实现：按文件保存切片数据
+                        // 也可以顺便更新阶段进度：比如 30%
+                        t.updateFileStage(file.getName(), 30, "文件分片完成", "组数=" + docs.size());
+                        LRUCacheUtil.put(taskId, t);
+                    }
+                }
+
+                @Override
+                public void onQaGroupReady(String fid, int groupIndex, List<FileChunkResponse.Document> qaDocs) {
+                    ProgressTrackerEntity t = LRUCacheUtil.get(taskId);
+                    if (t != null) {
+                        t.saveQaGroup(file.getName(), groupIndex, qaDocs); // 你实现：按组保存问答抽取结果
+                        t.updateFileStage(file.getName(), 70, "问答抽取进行中", "完成组=" + (groupIndex + 1));
+                        LRUCacheUtil.put(taskId, t);
+                    }
+                }
+
+                @Override
+                public void onQaChunk(String fileId, int groupIndex,int docIndex, List<FileChunkResponse.Document> qaDocs) {
+                    ProgressTrackerEntity t = LRUCacheUtil.get(taskId);
+                    t.saveQaChunk(file.getName(), groupIndex, docIndex, qaDocs);
+                }
+
+                @Override
+                public void onComplete(String fileId) {
+                    ProgressTrackerEntity t = LRUCacheUtil.get(taskId);
+                    t.setProgress(100);
+                }
+
+                @Override
+                public void onError(String fid, Throwable ex) {
+                    ProgressTrackerEntity t = LRUCacheUtil.get(taskId);
+                    if (t != null) {
+                        t.markFailed(file.getName(), ex.getMessage());
+                        LRUCacheUtil.put(taskId, t);
+                    }
+                }
+            };
+            if (tracker != null) {
+                tracker.setProgress(30);
+                LRUCacheUtil.put(taskId, tracker);
+            }
+            return vectorDbService.addFileVectorsAsync(this.file, metadatas, category, listener).whenComplete((allVectorIds,ex)-> {
+                ProgressTrackerEntity t = LRUCacheUtil.get(taskId);
+                if (t != null) {
+                    if (ex == null) {
+                        System.out.println("All vectors added for file: " + file.getName() + ", total vectors: " + (allVectorIds == null ? 0 : allVectorIds.size()));
+                        for (List<String> vecIds : allVectorIds) {
+                            System.out.println("  Chunk with " + (vecIds == null ? 0 : vecIds.size()) + " vectors.");
+                            for (String vid : vecIds) {
+                                System.out.println("  vectorId: " + vid);
+                            }
+                        }
+                        t.markSuccess(file.getName(), fileId, allVectorIds);
+                    }
+                    else {
+                        t.markFailed(file.getName(), ex.getMessage());
+                    }
+                }
+            });
+        }
     }
+
+
 
     protected String requestToJson(HttpServletRequest request) throws IOException {
         InputStream in = request.getInputStream();

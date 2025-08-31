@@ -10,6 +10,7 @@ import ai.openai.pojo.ChatMessage;
 import ai.utils.JsonExtractor;
 import ai.utils.LagiGlobal;
 import ai.utils.qa.ChatCompletionUtil;
+import ai.vector.QaChunkCallback;
 import ai.vector.VectorStoreConstant;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -183,6 +184,7 @@ public class DocQaExtractor {
     public static CompletableFuture<List<List<FileChunkResponse.Document>>> parseTextAsync(
             List<List<FileChunkResponse.Document>> docs,
             ExecutorService executor,
+            QaChunkCallback onChunkReady, // ← 新增：分片完成回调
             BiConsumer<Integer, List<FileChunkResponse.Document>> onGroupReady
     ) {
         if (text2qaBackend == null || !text2qaBackend.getEnable()) {
@@ -234,6 +236,10 @@ public class DocQaExtractor {
                                 block.add(original);
 
                                 buckets[idx] = block; // 写到自己的槽位
+                                // ★ 每个分片完成后立刻回调
+                                if (onChunkReady != null) {
+                                    try { onChunkReady.onChunk(groupIndex, idx, block); } catch (Exception ignored) {}
+                                }
                             }, executor));
                         }
 

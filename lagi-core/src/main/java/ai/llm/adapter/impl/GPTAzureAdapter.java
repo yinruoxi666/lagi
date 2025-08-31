@@ -85,7 +85,7 @@ public class GPTAzureAdapter extends ModelService implements ILlmAdapter {
         LlmApiResponse llmApiResponse = OpenAiApiUtil.streamCompletions(apiKey, apiUrl, HTTP_TIMEOUT, json,
                 GptAzureConvert::convertStreamLine2ChatCompletionResult, GptAzureConvert::convertByResponse, headers, proxy);
         Integer code = llmApiResponse.getCode();
-        if(code != 200) {
+        if(code != null && code != 200) {
             logger.error("open ai stream api error {}", llmApiResponse.getMsg());
             throw new RRException(code, llmApiResponse.getMsg());
         }

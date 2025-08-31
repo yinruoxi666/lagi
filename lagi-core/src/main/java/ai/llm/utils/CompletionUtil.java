@@ -19,8 +19,8 @@ import java.util.UUID;
 
 public class CompletionUtil {
     private static final Gson gson = new Gson();
-    private static final VectorStoreService vectorStoreService = null;
-    private static final int MAX_INPUT = 1024;
+    private static final VectorStoreService vectorStoreService = new VectorStoreService();
+    private static final int MAX_INPUT = ContextLoader.configuration.getFunctions().getChat().getContextLength();
 
     private static final ObjectMapper mapper;
 

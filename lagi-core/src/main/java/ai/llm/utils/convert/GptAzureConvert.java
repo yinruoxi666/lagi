@@ -1,15 +1,19 @@
 package ai.llm.utils.convert;
 
 import ai.common.exception.RRException;
+import ai.llm.adapter.impl.GPTAzureAdapter;
 import ai.llm.pojo.AzureChatCompletionChoice;
 import ai.llm.utils.LLMErrorConstants;
 import ai.openai.pojo.ChatCompletionResult;
 import com.google.gson.Gson;
 import okhttp3.Response;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
 
 public class GptAzureConvert {
+    private static final Logger logger = LoggerFactory.getLogger(GptAzureConvert.class);
     private static final String PROXY_URL = "proxy.digimeta.com.cn";
     private static final Integer PROXY_PORT = 18888;
     private static final Gson gson = new Gson();
