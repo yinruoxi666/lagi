@@ -106,6 +106,7 @@ public class UploadFileServlet extends HttpServlet {
                     metadata.put("level", level);
                     metadata.put("filename", "");
                     metadata.put("seq", Long.toString(timestamp));
+                    metadata.put("source", VectorStoreConstant.FileChunkSource.FILE_CHUNK_SOURCE_QA);
                     List<UpsertRecord> upsertRecords = new ArrayList<>();
                     upsertRecords.add(UpsertRecord.newBuilder()
                             .withMetadata(metadata)

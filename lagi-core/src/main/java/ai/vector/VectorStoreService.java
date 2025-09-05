@@ -24,6 +24,7 @@ import ai.vector.loader.impl.*;
 import ai.vector.loader.pojo.SplitConfig;
 import ai.vector.loader.util.DocQaExtractor;
 import ai.vector.pojo.*;
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -37,8 +38,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
-import static ai.vector.VectorStoreConstant.FileChunkSource.FILE_CHUNK_SOURCE_FILE;
-import static ai.vector.VectorStoreConstant.FileChunkSource.FILE_CHUNK_SOURCE_LLM;
+import static ai.vector.VectorStoreConstant.FileChunkSource.*;
 
 @Slf4j
 public class VectorStoreService {
@@ -46,6 +46,7 @@ public class VectorStoreService {
     private final BaseVectorStore vectorStore;
     private static final ExecutorService executor;
     private final Map<String, DocumentLoader> loaderMap = new HashMap<>();
+    private static final List<String> DEFAULT_SOURCES = new ArrayList<>();
 
     static {
         ThreadPoolManager.registerExecutor("vector-service", new ThreadPoolExecutor(30, 100, 10, TimeUnit.SECONDS,
@@ -55,6 +56,8 @@ public class VectorStoreService {
                 }
         ));
         executor = ThreadPoolManager.getExecutor("vector-service");
+        DEFAULT_SOURCES.add(FILE_CHUNK_SOURCE_FILE);
+        DEFAULT_SOURCES.add(FILE_CHUNK_SOURCE_QA);
     }
 
     private final IntentService intentService = new SampleIntentServiceImpl();
@@ -448,17 +451,7 @@ public class VectorStoreService {
                 .map(this::toIndexSearchData)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
-        List<Future<IndexSearchData>> futureResultList = indexSearchDataList.stream()
-                .map(indexSearchData -> executor.submit(() -> extendIndexSearchData(indexSearchData, category)))
-                .collect(Collectors.toList());
-        return futureResultList.stream().map(indexSearchDataFuture -> {
-            try {
-                return indexSearchDataFuture.get();
-            } catch (Exception e) {
-                log.error("indexData get error", e);
-            }
-            return null;
-        }).filter(Objects::nonNull).collect(Collectors.toList());
+        return processFutureResults(indexSearchDataList, category);
     }
 
     public List<IndexSearchData> search(ChatCompletionRequest request) {
@@ -521,30 +514,56 @@ public class VectorStoreService {
                     .filter(indexSearchData -> indexIds.contains(indexSearchData.getId()))
                     .collect(Collectors.toList());
         }
-        String finalCategory = category;
-        List<Future<IndexSearchData>> futureResultList = indexSearchDataList.stream()
-                .map(indexSearchData -> executor.submit(() -> extendIndexSearchData(indexSearchData, finalCategory)))
-                .collect(Collectors.toList());
-        return new ArrayList<>(futureResultList.stream().map(indexSearchDataFuture -> {
-                    try {
-                        return indexSearchDataFuture.get();
-                    } catch (Exception e) {
-                        log.error("indexData get error", e);
-                    }
-                    return null;
-                }).filter(Objects::nonNull)
-                .collect(Collectors.toMap(IndexSearchData::getText, data -> data, (existing, replacement) -> existing, LinkedHashMap::new))
-                .values());
+        return processFutureResults(indexSearchDataList, category);
     }
 
-    private IndexSearchData extendIndexSearchData(IndexSearchData indexSearchData, String category) {
-        IndexSearchData extendedIndexSearchData = vectorCache.getFromVectorLinkCache(indexSearchData.getId());
-        if (extendedIndexSearchData == null) {
-            extendedIndexSearchData = extendText(indexSearchData, category);
-            vectorCache.putToVectorLinkCache(indexSearchData.getId(), extendedIndexSearchData);
+    private List<IndexSearchData> processFutureResults(List<IndexSearchData> indexSearchDataList, String category) {
+        List<Future<List<IndexSearchData>>> futureResultList = indexSearchDataList.stream()
+                .map(indexSearchData -> executor.submit(() -> extendIndexSearchData(indexSearchData, category)))
+                .collect(Collectors.toList());
+        
+        Set<String> seenTexts = ConcurrentHashMap.newKeySet();
+        
+        return futureResultList.stream()
+                .map(future -> {
+                    try {
+                        return future.get();
+                    } catch (InterruptedException | ExecutionException e) {
+                        throw new RuntimeException(e);
+                    }
+                })
+                .filter(dataList -> !dataList.isEmpty())
+                .map(dataList -> dataList.stream()
+                        .filter(data -> seenTexts.add(data.getText()))
+                        .collect(Collectors.toList()))
+                .filter(filteredList -> !filteredList.isEmpty())
+                .map(this::mergeIndexSearchData)
+                .collect(Collectors.toList());
+    }
+
+    private IndexSearchData mergeIndexSearchData(List<IndexSearchData> indexSearchDataList) {
+        IndexSearchData mergedIndexSearchData = new IndexSearchData();
+        BeanUtil.copyProperties(indexSearchDataList.get(0), mergedIndexSearchData);
+        String splitChar = "";
+        if (mergedIndexSearchData.getFilename() != null && mergedIndexSearchData.getFilename().size() == 1
+                && mergedIndexSearchData.getFilename().get(0).isEmpty()) {
+            splitChar = "\n";
         }
-        extendedIndexSearchData.setDistance(indexSearchData.getDistance());
-        return extendedIndexSearchData;
+        StringBuilder sb = new StringBuilder(mergedIndexSearchData.getText());
+        for (int i = 1; i < indexSearchDataList.size(); i++) {
+            sb.append(splitChar).append(indexSearchDataList.get(i).getText());
+        }
+        mergedIndexSearchData.setText(sb.toString());
+        return mergedIndexSearchData;
+    }
+
+    private List<IndexSearchData> extendIndexSearchData(IndexSearchData indexSearchData, String category) {
+        List<IndexSearchData> extendedList = vectorCache.getFromVectorLinkCache(indexSearchData.getId());
+        if (extendedList == null) {
+            extendedList = extendText(indexSearchData, category);
+            vectorCache.putToVectorLinkCache(indexSearchData.getId(), extendedList);
+        }
+        return extendedList;
     }
 
     public List<IndexSearchData> search(String question, int similarity_top_k, double similarity_cutoff,
@@ -611,6 +630,10 @@ public class VectorStoreService {
     }
 
     public List<IndexSearchData> getChildIndex(String parentId, String category) {
+        return getChildIndex(parentId, category, DEFAULT_SOURCES);
+    }
+
+    public List<IndexSearchData> getChildIndex(String parentId, String category, List<String> sourceList) {
         List<IndexSearchData> result = Collections.emptyList();
         if (parentId == null) {
             return result;
@@ -621,7 +644,9 @@ public class VectorStoreService {
         }
         Map<String, Object> conditions = new HashMap<>();
         conditions.put("parent_id", parentId);
-        conditions.put("source", FILE_CHUNK_SOURCE_FILE);
+        Map<String, Object> inMap = new HashMap<>();
+        inMap.put("$in", sourceList);
+        conditions.put("source", inMap);
         Map<String, Object> where = buildAndQueryCondition(conditions);
         GetEmbedding getEmbedding = GetEmbedding.builder()
                 .category(category)
@@ -638,55 +663,30 @@ public class VectorStoreService {
         return result;
     }
 
-    public IndexSearchData getRootIndex(String fileId, String category) {
-        Map<String, Object> where = new HashMap<>();
-        where.put("file_id", fileId);
-        GetEmbedding getEmbedding = GetEmbedding.builder()
-                .category(category)
-                .where(where)
-                .build();
-        List<IndexRecord> indexRecords = this.get(getEmbedding);
-        if (indexRecords != null && !indexRecords.isEmpty()) {
-            return toIndexSearchData(indexRecords.get(0));
-        }
-        return null;
-    }
-
-    public IndexSearchData extendText(IndexSearchData data) {
-        return extendText(data, vectorStore.getConfig().getDefaultCategory());
-    }
-
-    public IndexSearchData extendText(IndexSearchData data, String category) {
+    public List<IndexSearchData> extendText(IndexSearchData data, String category) {
         int parentDepth = vectorStore.getConfig().getParentDepth();
         int childDepth = vectorStore.getConfig().getChildDepth();
         return extendText(parentDepth, childDepth, data, category);
     }
 
-    public IndexSearchData extendText(int parentDepth, int childDepth, IndexSearchData data, String category) {
-        String splitChar = "";
-        if (data.getFilename() != null && data.getFilename().size() == 1
-                && data.getFilename().get(0).isEmpty()) {
-            splitChar = "\n";
-        }
-
-        String text = data.getText().trim();
+    public List<IndexSearchData> extendText(int parentDepth, int childDepth, IndexSearchData data, String category) {
+        List<IndexSearchData> resultList = new ArrayList<>();
         String parentId = data.getParentId();
-
-        IndexSearchData firstDocData = data;
+        IndexSearchData originalDocData = data;
 
         if (FILE_CHUNK_SOURCE_LLM.equals(data.getSource())) {
-            firstDocData = getParentIndex(parentId, category);
-            parentId = firstDocData.getParentId();
-            text = firstDocData.getText();
+            originalDocData = getParentIndex(parentId, category);
+            parentId = originalDocData.getParentId();
         }
 
+        List<IndexSearchData> parentNodes = new ArrayList<>();
         int parentCount = 0;
         int i = 0;
         while (i < parentDepth) {
             IndexSearchData parentData = getParentIndex(parentId, category);
             if (parentData != null) {
-                if (FILE_CHUNK_SOURCE_FILE.equals(parentData.getSource())) {
-                    text = parentData.getText() + splitChar + text;
+                if (isRawData(parentData)) {
+                    parentNodes.add(0, parentData);
                     parentCount++;
                     i++;
                 }
@@ -698,14 +698,18 @@ public class VectorStoreService {
         if (parentCount < parentDepth) {
             childDepth = childDepth + parentDepth - parentCount;
         }
-        parentId = firstDocData.getId();
+
+        resultList.addAll(parentNodes);
+        resultList.add(originalDocData);
+
+        parentId = originalDocData.getId();
         int j = 0;
         while (j < childDepth) {
             List<IndexSearchData> childDataList = getChildIndex(parentId, category);
             if (childDataList != null && !childDataList.isEmpty()) {
                 IndexSearchData childData = childDataList.get(0);
-                if (FILE_CHUNK_SOURCE_FILE.equals(childData.getSource())) {
-                    text = text + splitChar + childData.getText();
+                if (isRawData(childData)) {
+                    resultList.add(childData);
                     j++;
                 }
                 parentId = childData.getId();
@@ -713,8 +717,15 @@ public class VectorStoreService {
                 break;
             }
         }
-        data.setText(text);
-        return data;
+        for (IndexSearchData indexSearchData : resultList) {
+            BeanUtil.copyProperties(data, indexSearchData, "text");
+        }
+        return resultList;
+    }
+
+    private boolean isRawData(IndexSearchData data) {
+        return FILE_CHUNK_SOURCE_FILE.equals(data.getSource()) ||
+                FILE_CHUNK_SOURCE_QA.equals(data.getSource()) || data.getSource() == null;
     }
 
     public List<String> getImageFiles(IndexSearchData indexData) {
@@ -888,7 +899,7 @@ public class VectorStoreService {
             List<IndexSearchData> childIndexList = getChildIndex(chunkData.getId(), updateChunkEmbedding.getCategory());
             vectorCache.removeFromAllCache(chunkData.getId());
             vectorCache.removeFromAllCache(parentIndex.getId());
-            for (IndexSearchData indexSearchData: childIndexList) {
+            for (IndexSearchData indexSearchData : childIndexList) {
                 vectorCache.removeFromAllCache(indexSearchData.getId());
             }
         }

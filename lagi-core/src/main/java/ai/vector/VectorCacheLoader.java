@@ -175,16 +175,16 @@ public class VectorCacheLoader {
         logger.info("VectorCacheLoader parent and child preload cache loaded");
     }
 
-    private static void loadVectorLinkCache() {
-        Map<String, String> where = new HashMap<>();
-        where.put("filename", "");
-        List<IndexRecord> indexRecordList = vectorStoreService.fetch(where);
-        for (IndexRecord indexRecord : indexRecordList) {
-            IndexSearchData indexSearchData = vectorStoreService.toIndexSearchData(indexRecord);
-            IndexSearchData extendedIndexSearchData = vectorStoreService.extendText(indexSearchData);
-            vectorCache.putToVectorLinkCache(indexSearchData.getId(), extendedIndexSearchData);
-        }
-    }
+//    private static void loadVectorLinkCache() {
+//        Map<String, String> where = new HashMap<>();
+//        where.put("filename", "");
+//        List<IndexRecord> indexRecordList = vectorStoreService.fetch(where);
+//        for (IndexRecord indexRecord : indexRecordList) {
+//            IndexSearchData indexSearchData = vectorStoreService.toIndexSearchData(indexRecord);
+//            IndexSearchData extendedIndexSearchData = vectorStoreService.extendText(indexSearchData);
+//            vectorCache.putToVectorLinkCache(indexSearchData.getId(), extendedIndexSearchData);
+//        }
+//    }
 
     private static void loadMedusaCache() {
         Map<String, String> where = new HashMap<>();
