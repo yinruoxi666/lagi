@@ -6,10 +6,10 @@ models:
     type: Landing
     enable: true
     model:  cascade,
-            turing,qa,tree,proxy,
-            image,
-            landing-tts,landing-asr,
-            video
+      turing,qa,tree,proxy,
+      image,
+      landing-tts,landing-asr,
+      video
     # Options for default, llm, image, voice and vision, line by line above.
     driver: ai.wrapper.impl.LandingAdapter
     api_key: sk-112121 # http://saas.landingbj.com/
@@ -40,6 +40,22 @@ models:
     endpoint: https://dgman-north-central-us-gpt4.openai.azure.com/
     api_key: 56cac597a3c1477da3b83a60f67c6507
 
+  - name: chatgpt-azure-east-us
+    type: Microsoft
+    model: east-us-gpt4o-latest-deploy
+    enable: true
+    driver: ai.llm.adapter.impl.GPTAzureAdapter
+    endpoint: https://dgman-east-us-assistant.openai.azure.com/
+    api_key: 4d528a5378334237b76f95fdcf378e1e
+
+  - name: chatgpt-azure-east-us-mini
+    type: Microsoft
+    model: east-us-gpt4o-mini-deploy
+    enable: true
+    driver: ai.llm.adapter.impl.GPTAzureAdapter
+    endpoint: https://dgman-east-us-assistant.openai.azure.com/
+    api_key: 4d528a5378334237b76f95fdcf378e1e
+
   - name: chatgpt-azure-admin-m231f9dc-eastus2
     type: Microsoft
     model: gpt-4.1-nano
@@ -53,10 +69,10 @@ models:
     type: Alibaba
     enable: true
     model:  qwen-turbo,
-            qwen-plus,qwen-max,qwen-max-1201,qwen-max-longcontext,
-            asr,
-            vision,
-            ocr
+      qwen-plus,qwen-max,qwen-max-1201,qwen-max-longcontext,
+      asr,
+      vision,
+      ocr
     # Options for default, llm, voice, vision and ocr, line by line above.
     driver: ai.wrapper.impl.AlibabaAdapter
     # help document https://help.aliyun.com/document_detail/2712195.html?spm=a2c4g.2712576.0.0.733b3374np40s0
@@ -69,11 +85,11 @@ models:
     type: Baidu
     enable: true
     model:  ERNIE-Bot-turbo,
-            ERNIE-Speed-128K,ERNIE-4.0-8K,ERNIE-3.5-8K-0205,ERNIE-3.5-4K-0205, ERNIE-3.5-8K-1222,
-            Fuyu-8B,Stable-Diffusion-XL,
-            translate,
-            enhance,
-            aiVideo
+      ERNIE-Speed-128K,ERNIE-4.0-8K,ERNIE-3.5-8K-0205,ERNIE-3.5-4K-0205, ERNIE-3.5-8K-1222,
+      Fuyu-8B,Stable-Diffusion-XL,
+      translate,
+      enhance,
+      aiVideo
     # Options for default, llm, image, translate, image enhance and vision line by line above.
     driver: ai.wrapper.impl.BaiduAdapter
     # help document https://developer.baidu.com/article/detail.html?id=1089328
@@ -111,12 +127,12 @@ models:
     type: iFLYTEK
     enable: true
     model:  4.0Ultra,
-            lite,generalv3,pro-128k,generalv3.5,max-32k,
-            tti
+      lite,generalv3,pro-128k,generalv3.5,max-32k,
+      tti
     # Options for default, llm and image, line by line above.
     driver: ai.wrapper.impl.FlytekAdapter
     app_id: 948cf4b6
-#    api_key: 54f6e81f40a31d66d976496de895a7a4  # https://console.xfyun.cn/
+    #    api_key: 54f6e81f40a31d66d976496de895a7a4  # https://console.xfyun.cn/
     api_key: cvUdhNJQEFXOOHfDFtPx:wDeBmrxvJfwdyjFsIzQz  # https://console.xfyun.cn/
     secret_key: ZDYyMjNmMTlkYTE0YWRmOWUwZTYxNjYz   # https://console.xfyun.cn/
 
@@ -167,8 +183,8 @@ models:
     type: ByteDance
     enable: true
     model:  doubao-pro-4k,
-            doubao-pro-32k,
-            openspeech
+      doubao-pro-32k,
+      openspeech
     # Options for default, llm and voice, line by line above.
     driver: ai.wrapper.impl.ByteDanceAdapter
     api_key: your-api-key
@@ -183,10 +199,10 @@ models:
     model: deepseek-chat
     driver: ai.llm.adapter.impl.DeepSeekAdapter
     api_address: https://api.deepseek.com/chat/completions
-               # https://ark.cn-beijing.volces.com/api/v3/chat/completions
-               # https://dashscope.aliyuncs.com/compatible-mode/v1
-               # https://qianfan.baidubce.com/v2/chat/completions
-               # https://api.lkeap.cloud.tencent.com/v1
+      # https://ark.cn-beijing.volces.com/api/v3/chat/completions
+      # https://dashscope.aliyuncs.com/compatible-mode/v1
+      # https://qianfan.baidubce.com/v2/chat/completions
+    # https://api.lkeap.cloud.tencent.com/v1
     api_key: sk-8f41405229de4c8b8269fd4d18dcb29e # url address https://platform.deepseek.com/api_keys
 
 include_models: model.yml
@@ -200,8 +216,8 @@ stores:
     - name: chroma
       driver: ai.vector.impl.ChromaVectorStore
       default_category: default
-      similarity_top_k: 10
-      similarity_cutoff: 0.5
+      similarity_top_k: 20
+      similarity_cutoff: 0.6
       parent_depth: 1
       child_depth: 1
       url: http://test.digimeta.com.cn:16990
@@ -247,20 +263,21 @@ functions:
       api_key: sk-f4f5565da70f49228a8f3fc2d231a543
 
   chat:
-#    route: best((chatgpt-azure,chatglm))
+    context_length: 147072
+    route: best((chatgpt-azure,chatgpt-azure-east-us))
     filter: sensitive,priority,stopping,continue
     backends:
       - backend: landing
         model: cascade
-        enable: true
+        enable: false
         stream: true
-        priority: 350
+        priority: 10
 
       - backend: kimi
         model: moonshot-v1-128k
         enable: true
         stream: true
-        priority: 150
+        priority: 100
 
       - backend: spark
         model: 4.0Ultra
@@ -284,9 +301,25 @@ functions:
         model: gpt-4o-20240513
         enable: true
         stream: true
-        priority: 90
+        priority: 1600
         api_version: 2024-02-15-preview
         deployment: gpt-4o-20240513
+
+      - backend: chatgpt-azure-east-us
+        model: east-us-gpt4o-latest-deploy
+        enable: true
+        stream: true
+        priority: 170
+        api_version: 2025-01-01-preview
+        deployment: east-us-gpt4o-latest-deploy
+
+      - backend: chatgpt-azure-east-us-mini
+        model: east-us-gpt4o-mini-deploy
+        enable: true
+        stream: true
+        priority: 170
+        api_version: 2025-01-01-preview
+        deployment: east-us-gpt4o-mini-deploy
 
       - backend: chatgpt-azure-admin-m231f9dc-eastus2
         model: gpt-4.1-nano
