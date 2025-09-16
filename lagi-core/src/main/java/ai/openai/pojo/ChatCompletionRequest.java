@@ -21,5 +21,6 @@ public class ChatCompletionRequest {
     private Double frequency_penalty;
     private Double top_p;
     private ResponseFormat response_format;
-    private Map<String,Object> stream_options;
+    private Map<String, Object> stream_options;
+    private Boolean logprobs;
 }
