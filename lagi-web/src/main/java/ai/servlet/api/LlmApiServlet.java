@@ -33,6 +33,7 @@ import ai.medusa.pojo.PromptInput;
 import ai.medusa.MedusaMonitor;
 import ai.medusa.utils.PromptCacheTrigger;
 import ai.medusa.utils.PromptInputUtil;
+import ai.openai.pojo.ChatCompletionChoice;
 import ai.router.pojo.LLmRequest;
 import ai.servlet.BaseServlet;
 import ai.utils.ClientIpAddressUtil;
@@ -409,9 +410,21 @@ public class LlmApiServlet extends BaseServlet {
                 data -> {
                     lastResult[0] = data;
                     ChatCompletionResult filter = SensitiveWordUtil.filter(data);
-                    String msg = gson.toJson(filter);
-                    out.print("data: " + msg + "\n\n");
-                    out.flush();
+                    if (filter != null && filter.getChoices() != null && !filter.getChoices().isEmpty() && filter.getChoices().get(0).getFinish_reason() != null ) {
+                        ChatCompletionChoice chatCompletionChoice = filter.getChoices().get(0);
+                        String finishReason = chatCompletionChoice.getFinish_reason();
+                        chatCompletionChoice.setFinish_reason(null);
+                        String msg = gson.toJson(filter);
+                        outputChunk(out, msg);
+                        chatCompletionChoice.setFinish_reason(finishReason);
+//                        chatCompletionChoice.getDelta().setContent("");
+                        chatCompletionChoice.getMessage().setContent("");
+                        msg = gson.toJson(filter);
+                        outputChunk(out, msg);
+                    } else {
+                        String msg = gson.toJson(filter);
+                        outputChunk(out, msg);
+                    }
                     if (medusaMonitor != null && promptInput != null && filter != null) {
                         medusaMonitor.put(key, new CacheItem(promptInput, filter));
                     }
@@ -433,6 +446,11 @@ public class LlmApiServlet extends BaseServlet {
                     }
                 }
         );
+    }
+
+    private void outputChunk(PrintWriter out, String msg) {
+        out.print("data: " + msg + "\n\n");
+        out.flush();
     }
 
     private void extracted(ChatCompletionResult[] lastResult, List<IndexSearchData> indexSearchDataList, GetRagContext ragContext, PrintWriter out) {
