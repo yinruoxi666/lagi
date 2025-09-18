@@ -23,8 +23,8 @@ import org.apache.pdfbox.rendering.PDFRenderer;
 import javax.imageio.ImageIO;
 
 public class FileService {
-    private static final String EXTRACT_CONTENT_URL = AiGlobal.SAAS_URL + "/saas/extractContentWithImage";
-    private static final String TO_MARKDOWN_URL = AiGlobal.SAAS_URL + "/saas/toMarkdown";
+    private static final String EXTRACT_CONTENT_URL = "http://lagi.saasai.top:8090/file/extract_content_with_image";
+    private static final String TO_MARKDOWN_URL = "http://lagi.saasai.top:8090/file/to_markdown";
 
     private final Gson gson = new Gson();
 
