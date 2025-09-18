@@ -21,7 +21,9 @@ import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.rendering.PDFRenderer;
 
 import javax.imageio.ImageIO;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 public class FileService {
     private static final String EXTRACT_CONTENT_URL = "http://lagi.saasai.top:8090/file/extract_content_with_image";
     private static final String TO_MARKDOWN_URL = "http://lagi.saasai.top:8090/file/to_markdown";
@@ -135,9 +137,9 @@ public class FileService {
         OcrService ocrService = new OcrService();
         List<String> pdfContent = new ArrayList<>();
         try {
-            pdfContent = ocrService.doc2ocr(file, Arrays.asList("chn", "eng","tai"));
+            pdfContent = ocrService.doc2ocr(file, Arrays.asList("chn", "eng"));
         }catch (Exception e){
-            System.out.println("ocr 未启用");
+            log.error("ocr error", e);
         }
         List<FileChunkResponse.Document> result = new ArrayList<>();
         List<File> fileList = pdftoImage(file);
