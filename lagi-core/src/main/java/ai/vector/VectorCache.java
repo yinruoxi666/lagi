@@ -11,7 +11,7 @@ public class VectorCache {
     private static final RAGFunction RAG_CONFIG = ContextLoader.configuration.getStores().getRag();
 
     private static final VectorCache INSTANCE = new VectorCache();
-    private static final LRUCache<String, IndexSearchData> vectorLinkCache;
+    private static final LRUCache<String, List<IndexSearchData>> vectorLinkCache;
     private static final LRUCache<String, IndexSearchData> parentElementCache;
     private static final LRUCache<String, List<IndexSearchData>> childElementCache;
     private static int CACHE_SIZE;
@@ -33,11 +33,11 @@ public class VectorCache {
         return INSTANCE;
     }
 
-    public IndexSearchData getFromVectorLinkCache(String id) {
+    public List<IndexSearchData> getFromVectorLinkCache(String id) {
         return vectorLinkCache.get(id);
     }
 
-    public void putToVectorLinkCache(String id, IndexSearchData extendedIndexSearchData) {
+    public void putToVectorLinkCache(String id, List<IndexSearchData> extendedIndexSearchData) {
         vectorLinkCache.put(id, extendedIndexSearchData);
     }
 

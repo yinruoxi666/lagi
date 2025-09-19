@@ -9,6 +9,7 @@ public class VectorStoreConstant {
     public static class FileChunkSource {
         public static final String FILE_CHUNK_SOURCE_LLM = "llm";
         public static final String FILE_CHUNK_SOURCE_FILE = "file";
+        public static final String FILE_CHUNK_SOURCE_QA = "qa";
     }
 
     public static class LogicalOperator {

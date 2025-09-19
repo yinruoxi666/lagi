@@ -55,7 +55,7 @@ public class BaiduOcrAdapter extends ModelService implements IOcr {
 
     @Override
     public String recognize(BufferedImage image, List<String> languages) {
-        return "";
+        return recognize(image);
     }
 
     public String toFormatedText(String text) throws IOException {
