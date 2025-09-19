@@ -19,13 +19,23 @@ public class JsonExtractor {
         }
 
         List<String> jsonStrings = new ArrayList<>();
+        
+        // Use a more robust approach to avoid regex backtracking issues
+        try {
+            // Simple pattern to find potential JSON objects
+            Pattern objectPattern = Pattern.compile("\\{[^{}]*(?:\\{[^{}]*\\}[^{}]*)*\\}");
+            Matcher objectMatcher = objectPattern.matcher(input);
 
-        // Pattern to find JSON objects (starting with { and ending with })
-        Pattern objectPattern = Pattern.compile("\\{(?:[^{}]|(?:\\{[^{}]*\\}))*\\}");
-        Matcher objectMatcher = objectPattern.matcher(input);
-
-        while (objectMatcher.find()) {
-            jsonStrings.add(objectMatcher.group());
+            while (objectMatcher.find()) {
+                String candidate = objectMatcher.group();
+                // Validate that it's actually valid JSON
+                if (isValidJson(candidate)) {
+                    jsonStrings.add(candidate);
+                }
+            }
+        } catch (Exception e) {
+            // If regex fails, fall back to manual parsing
+            jsonStrings.addAll(extractJsonManually(input, '{', '}'));
         }
 
         return jsonStrings;
@@ -36,12 +46,23 @@ public class JsonExtractor {
             return new ArrayList<>();
         }
         List<String> jsonStrings = new ArrayList<>();
-        // Pattern to find JSON arrays (starting with [ and ending with ])
-        Pattern arrayPattern = Pattern.compile("\\[(?:[^\\[\\]]|(?:\\[[^\\[\\]]*\\]))*\\]");
-        Matcher arrayMatcher = arrayPattern.matcher(input);
+        
+        // Use a more robust approach to avoid regex backtracking issues
+        try {
+            // Simple pattern to find potential JSON arrays
+            Pattern arrayPattern = Pattern.compile("\\[[^\\[\\]]*(?:\\[[^\\[\\]]*\\][^\\[\\]]*)*\\]");
+            Matcher arrayMatcher = arrayPattern.matcher(input);
 
-        while (arrayMatcher.find()) {
-            jsonStrings.add(arrayMatcher.group());
+            while (arrayMatcher.find()) {
+                String candidate = arrayMatcher.group();
+                // Validate that it's actually valid JSON
+                if (isValidJson(candidate)) {
+                    jsonStrings.add(candidate);
+                }
+            }
+        } catch (Exception e) {
+            // If regex fails, fall back to manual parsing
+            jsonStrings.addAll(extractJsonManually(input, '[', ']'));
         }
 
         return jsonStrings;
@@ -59,8 +80,72 @@ public class JsonExtractor {
     }
 
     public static String extractFirstJsonArray(String input) {
+        if (input == null || input.isEmpty()) {
+            return null;
+        }
+        
         List<String> results = extractJsonArrayStrings(input);
-        return results.isEmpty() ? null : results.get(0);
+        if (results.isEmpty()) {
+            // Log the input for debugging (truncated to avoid huge logs)
+            String truncatedInput = input.length() > 500 ? input.substring(0, 500) + "..." : input;
+            System.out.println("No JSON array found in input: " + truncatedInput);
+            return null;
+        }
+        return results.get(0);
+    }
+
+    /**
+     * Validate if a string is valid JSON
+     */
+    private static boolean isValidJson(String jsonString) {
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            mapper.readTree(jsonString);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * Manual JSON extraction using bracket counting to avoid regex issues
+     */
+    private static List<String> extractJsonManually(String input, char openBracket, char closeBracket) {
+        List<String> results = new ArrayList<>();
+        int start = -1;
+        int bracketCount = 0;
+        boolean inString = false;
+        char escapeChar = '\\';
+        
+        for (int i = 0; i < input.length(); i++) {
+            char c = input.charAt(i);
+            
+            // Handle string literals to avoid counting brackets inside strings
+            if (c == '"' && (i == 0 || input.charAt(i - 1) != escapeChar)) {
+                inString = !inString;
+                continue;
+            }
+            
+            if (!inString) {
+                if (c == openBracket) {
+                    if (start == -1) {
+                        start = i;
+                    }
+                    bracketCount++;
+                } else if (c == closeBracket) {
+                    bracketCount--;
+                    if (bracketCount == 0 && start != -1) {
+                        String candidate = input.substring(start, i + 1);
+                        if (isValidJson(candidate)) {
+                            results.add(candidate);
+                        }
+                        start = -1;
+                    }
+                }
+            }
+        }
+        
+        return results;
     }
 
     // Example usage

@@ -2,10 +2,7 @@ package ai.vector.impl;
 
 import ai.common.pojo.VectorStoreConfig;
 import ai.vector.VectorStore;
-import ai.vector.pojo.IndexRecord;
-import ai.vector.pojo.QueryCondition;
-import ai.vector.pojo.UpsertRecord;
-import ai.vector.pojo.VectorCollection;
+import ai.vector.pojo.*;
 import lombok.Getter;
 
 import java.util.List;
@@ -76,5 +73,27 @@ public class BaseVectorStore implements VectorStore {
     @Override
     public List<VectorCollection> listCollections() {
         return null;
+    }
+
+    @Override
+    public List<IndexRecord> fetch(int limit, int offset, String category) {
+        return null;
+    }
+
+    @Override
+    public List<IndexRecord> get(GetEmbedding getEmbedding) {
+        return null;
+    }
+
+    @Override
+    public void add(AddEmbedding addEmbedding) {
+    }
+
+    @Override
+    public void update(UpdateEmbedding updateEmbedding) {
+    }
+
+    @Override
+    public void delete(DeleteEmbedding deleteEmbedding) {
     }
 }

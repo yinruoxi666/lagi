@@ -76,7 +76,7 @@ models:
     # Options for default, llm, voice, vision and ocr, line by line above.
     driver: ai.wrapper.impl.AlibabaAdapter
     # help document https://help.aliyun.com/document_detail/2712195.html?spm=a2c4g.2712576.0.0.733b3374np40s0
-    api_key: your-api-key # url address  https://bailian.console.aliyun.com/#/home
+    api_key: sk-f4f5565da70f49228a8f3fc2d231a543 # url address  https://bailian.console.aliyun.com/#/home
     access_key_id: your-access-key-id
     access_key_secret: your-access-key-secret
 
@@ -229,6 +229,7 @@ stores:
     enable: true
     priority: 10
     track: true
+    html: true
     default: "Please give prompt more precisely"
     use_rag: false
 
@@ -452,12 +453,9 @@ functions:
     enable: true
     model: gpt-4o-20240513
 
-
 # The following is the configuration of agents, name is the name of the agent,
 # type is the type of the agent, class is the implement class of the agent.
-
 agents:
-
   # Agent for stock queries, providing stock market information, analysis, and related services.
   - name: stock
     wrong_case: 抱歉
@@ -471,6 +469,24 @@ agents:
     driver: ai.agent.customer.WeatherAgent
 
 include_agents: agent.yml
+
+
+mcps:
+  # set default driver
+  servers:
+    - name: amap_mcp
+      url: https://mcp.amap.com/sse?key=your-key
+
+include_mcps: mcp.yml
+
+
+pnps:
+  # pnp for QQ chat application automation, enabling social interactions and services.
+  - name: qq
+    api_key: your-api-key
+    driver: ai.pnps.social.QQPnp
+
+include_pnps: pnp.yml
 
 
 # The following is the configuration of workers, name is the name of the worker,
@@ -519,13 +535,7 @@ routers:
     # if just % is given, % would be decided by parameter at calling time.
 
 
-mcps:
-  # set default driver
-  servers:
-    - name: amap_mcp
-      url: https://mcp.amap.com/sse?key=your-key
 
-include_mcps: mcp.yml
 
 
 # Filter rules for sensitive words or sentence, with priority and etc.

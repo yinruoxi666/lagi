@@ -212,7 +212,7 @@ public class TreeDiversifyPromptProducer extends DiversifyPromptProducer {
     }
 
     private List<IndexSearchData> searchWordVector(String prompt, double cutoff) {
-        Map<String, String> metadata = new HashMap<>();
+        Map<String, Object> metadata = new HashMap<>();
         metadata.put("category", MEDUSA_CATEGORY);
         return vectorStoreService.search(prompt, TREE_SIMILARITY_TOP_K, cutoff, metadata, MEDUSA_CATEGORY);
     }

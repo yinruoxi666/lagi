@@ -947,3 +947,112 @@ Status Code **200**
 | instruction | string | true     | Extracted task |
 | input       | string | true     | Task input     |
 | output      | string | true     | Task output    |
+
+## Rerank
+
+POST `/rerank`
+
+Input a query string and an array of strings to be re-ranked.
+
+### Body Request Parameters
+
+```json
+{
+  "query": "Artificial intelligence machine learning algorithms",
+  "documents": [
+    "Research on deep learning neural network algorithms",
+    "Principles of traditional database system design",
+    "Implementation of machine learning classification algorithms",
+    "Frontend user interface development technology",
+    "Artificial intelligence natural language processing"
+  ]
+}
+```
+
+### Request Parameters
+
+| Name      | Location | Type     | Required | Description                          |
+| --------- | -------- | -------- | -------- | ------------------------------------ |
+| query     | body     | string   | Yes      | The query text                       |
+| documents | body     | [string] | Yes      | The array of strings to be re-ranked |
+
+### Response Example
+
+```json
+{
+  "id": "b41b9dec-22b5-42fc-b2df-174b71702192",
+  "results": [
+    {
+      "index": 0,
+      "document": {
+        "text": "Implementation of machine learning classification algorithms"
+      }
+    },
+    {
+      "index": 1,
+      "document": {
+        "text": "Research on deep learning neural network algorithms"
+      }
+    },
+    {
+      "index": 2,
+      "document": {
+        "text": "Principles of traditional database system design"
+      }
+    },
+    {
+      "index": 3,
+      "document": {
+        "text": "Frontend user interface development technology"
+      }
+    },
+    {
+      "index": 4,
+      "document": {
+        "text": "Artificial intelligence natural language processing"
+      }
+    }
+  ]
+}
+```
+
+## Embedding
+
+POST `/v1/embeddings`
+
+Input text and return the corresponding embedding result.
+
+### Body Request Parameters
+
+```json
+{
+  "input": [
+    "Artificial intelligence refers to the intelligence exhibited by machines created by humans."
+  ]
+}
+```
+
+### Body Request Parameters
+
+| Name    | Location | Type     | Required | Description   |
+| ------- | -------- | -------- | -------- | ------------- |
+| body    | body     | object   | No       |               |
+| » input | body     | [string] | Yes      | List of texts |
+| » model | body     | string   | Yes      | Model name    |
+
+### Response Example
+
+```json
+{
+    "data": [
+        [
+            -146.10352,
+            559.4121,
+            1342.8379,
+            -543.29297     
+        ]
+    ],
+    "status": "success"
+}
+```
+

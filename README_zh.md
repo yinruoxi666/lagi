@@ -221,6 +221,37 @@ LinkMind(联智) 项目还提供了多个RESTful API接口，方便用户将AI�
 ]
 ```
 
+## Rerank与Embedding模型
+
+下载[ai数据库](https://downloads.landingbj.com/lagi/ai-sqlite.zip)和[Embedding模型](https://downloads.landingbj.com/lagi/embedding_2048.model)，然后分别在配置文件内设置ai库和embedding模型的配置。
+
+ai数据库下载完成后，解压到任意目录，参考以下内容进行数据源配置。
+
+```yaml
+  database:
+    - name: ai
+      jdbc_url: jdbc:sqlite:{ai_sqlite_path}
+      driver: org.sqlite.JDBC
+      username: root
+      password: 123456
+      maximum_pool_size: 160
+      idle_timeout: 0
+      max_lifetime: 2877700
+```
+
+embedding模型下载完成后，添加如下配置启用LinkMind的Embedding模型。
+
+```yaml
+  embedding:
+    - backend: landing
+      type: Landing
+      model_path: {embedding_model_path}
+```
+
+Rerank功能只需要ai数据库文件，Embedding模型两者都需要。
+
+两者的API接口参考[API接口文档](docs/API_zh.md)。
+
 ## 下载资源
 
 我们为用户提供了预打包的应用程序，方便直接下载和使用：

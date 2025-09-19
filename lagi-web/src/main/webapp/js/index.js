@@ -12,10 +12,11 @@ window.onload = function () {
     } else {
         getCategory(categoryTmp);
     }
-    
+
     initHelloPage();
     loadTheme();
-    showPromptNav();
+    // showPromptNav();
+    loadNavBar();
     Fingerprint2.get(function(components) {
         const values = components.map(function(component,index) {
             if (index === 0) { //把微信浏览器里UA的wifi或4G等网络替换成空,不然切换网络会ID不一样
@@ -24,19 +25,21 @@ window.onload = function () {
             return component.value
         })
         // 生成最终id murmur
-        console.log(values)  //使用的浏览器信息
+        // console.log(values)  //使用的浏览器信息
         const murmur = Fingerprint2.x64hash128(values.join(''), 31)
-        console.log(murmur) //生成的标识码
+        // console.log(murmur) //生成的标识码
         window.finger = murmur;
     })
 }
+
+
 
 
 function setCookie(cname, cvalue, exdays) {
     var d = new Date();
     d.setTime(d.getTime() + (exdays * 24 * 60 * 60 * 1000));
     var expires = "expires=" + d.toGMTString();
-    document.cookie = "category=" + cvalue + "; " + expires;
+    document.cookie = `${cname}=${cvalue}; ${expires}`;
 }
 
 function getCookie(cname) {
@@ -47,15 +50,6 @@ function getCookie(cname) {
         if (c.indexOf(name) == 0) return c.substring(name.length, c.length);
     }
     return "";
-}
-
-
-function generateUUID() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-        var r = Math.random() * 16 | 0,
-            v = c == 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
 }
 
 function getCategory(currentCategory) {
@@ -77,6 +71,14 @@ function getCategory(currentCategory) {
             setCookie("category", category, 1);
             window.category = category;
         }
+    });
+}
+
+function generateUUID() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+        var r = Math.random() * 16 | 0,
+            v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
     });
 }
 

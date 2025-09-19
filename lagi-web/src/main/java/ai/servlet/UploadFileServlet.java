@@ -80,8 +80,6 @@ public class UploadFileServlet extends HttpServlet {
             this.asynchronousUpload(req, resp);
         } else if (method.equals("getProgress")) {
             this.getProgress(req, resp);
-        } else if (method.equals("uploadFileChunk")) {
-
         }
     }
 
@@ -515,17 +513,6 @@ public class UploadFileServlet extends HttpServlet {
         out.close();
     }
 
-    private void uploadFileChunk(HttpServletRequest req, HttpServletResponse resp) throws IOException{
-        String fileId = req.getParameter("file_id");
-
-        Map<String, Object>map = new HashMap<>();
-
-
-        PrintWriter out = resp.getWriter();
-        out.print(gson.toJson(map));
-        out.flush();
-        out.close();
-    }
 
 
     public class AddDocIndex implements Callable<JsonObject> {

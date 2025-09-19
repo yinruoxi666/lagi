@@ -15,6 +15,7 @@ import ai.vector.VectorStoreConstant;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,8 +26,10 @@ import java.util.concurrent.Executors;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
+@Slf4j
 public class DocQaExtractor {
     private static final Backend text2qaBackend = ContextLoader.configuration.getFunctions().getText2qa();
+    private static final int THREAD_COUNT = 20;
 
     private static final String PROMPT_TEMPLATE = "请将长文本分割成更易于管理和处理的较小段落，以适应模型的输入限制，同时保持文本的连贯性和上下文信息。" +
             "将提供的需要拆分的内容拆分成多个问答对，以指定格式生成一个 JSON 文件，" +
@@ -50,51 +53,14 @@ public class DocQaExtractor {
 
     private final static CompletionsService completionService = new CompletionsService();
 
-    /**
-     * 串行处理，已弃用--
-     * @param docs
-     * @return
-     * @throws JsonProcessingException
-     */
-    public static List<List<FileChunkResponse.Document>> parseText1(List<List<FileChunkResponse.Document>> docs) throws JsonProcessingException {
-        if (text2qaBackend == null || !text2qaBackend.getEnable()) {
-            return docs;
-        }
-        List<List<FileChunkResponse.Document>> result = new ArrayList<>();
-        for (List<FileChunkResponse.Document> documentList : docs) {
-            List<FileChunkResponse.Document> qaDocs = new ArrayList<>();
-            for (int i = 0; i < documentList.size(); i++) {
-                FileChunkResponse.Document document = documentList.get(i);
-                String prompt = String.format(PROMPT_TEMPLATE, document.getText());
-                String json = extract(prompt);
-                if (json == null) {
-                    throw new RuntimeException("Extracted JSON is null, please check the prompt or backend configuration.");
-                }
-                ObjectMapper objectMapper = new ObjectMapper();
-                List<Map<String, String>> dataList = objectMapper.readValue(json, new TypeReference<List<Map<String, String>>>() {
-                });
-                for (Map<String, String> map : dataList) {
-                    String instruction = map.get("instruction");
-                    FileChunkResponse.Document doc = new FileChunkResponse.Document();
-                    doc.setText(instruction);
-                    doc.setSource(VectorStoreConstant.FILE_CHUNK_SOURCE_LLM);
-                    qaDocs.add(doc);
-                }
-                qaDocs.add(document);
-            }
-            result.add(qaDocs);
-        }
-        return result;
-    }
-//并行处理
+    //并行处理
     public static List<List<FileChunkResponse.Document>> parseText(List<List<FileChunkResponse.Document>> docs) throws JsonProcessingException {
         if (text2qaBackend == null || !text2qaBackend.getEnable()) {
             return docs;
         }
 
-        long startTimeMillis = System.currentTimeMillis();
         List<List<FileChunkResponse.Document>> result = new ArrayList<>();
-        ExecutorService executorService = Executors.newFixedThreadPool(20); // 控制线程池大小
+        ExecutorService executorService = Executors.newFixedThreadPool(THREAD_COUNT);
         List<CompletableFuture<List<FileChunkResponse.Document>>> futures = new ArrayList<>();
 
         try {
@@ -110,34 +76,39 @@ public class DocQaExtractor {
                             String prompt = String.format(PROMPT_TEMPLATE, document.getText());
                             String json = extract(prompt);
                             if (json == null) {
-                                throw new RuntimeException("Extracted JSON is null, please check the prompt or backend configuration.");
+                                log.warn("Failed to extract JSON from LLM response for document {}. Using original document.", finalI);
+                                document.setOrder(finalI + 1);
+                                qaDocs.add(document);
+                                return;
                             }
                             ObjectMapper objectMapper = new ObjectMapper();
                             try {
-                                List<Map<String, String>> dataList = objectMapper.readValue(json, new TypeReference<List<Map<String, String>>>() {});
+                                List<Map<String, String>> dataList = objectMapper.readValue(json, new TypeReference<List<Map<String, String>>>() {
+                                });
                                 for (Map<String, String> map : dataList) {
                                     String instruction = map.get("instruction");
-                                    FileChunkResponse.Document doc = new FileChunkResponse.Document();
-                                    doc.setText(instruction);
-                                    doc.setSource(VectorStoreConstant.FILE_CHUNK_SOURCE_LLM);
-                                    doc.setOrder(null);
-                                    doc.setReferenceDocumentId(Integer.valueOf(finalI + 1).toString());
-                                    qaDocs.add(doc);
+                                    if (instruction != null && !instruction.trim().isEmpty()) {
+                                        FileChunkResponse.Document doc = new FileChunkResponse.Document();
+                                        doc.setText(instruction);
+                                        doc.setSource(VectorStoreConstant.FileChunkSource.FILE_CHUNK_SOURCE_LLM);
+                                        doc.setOrder(null);
+                                        doc.setReferenceDocumentId(Integer.valueOf(finalI + 1).toString());
+                                        qaDocs.add(doc);
+                                    }
                                 }
                                 document.setOrder(finalI + 1); // 设置文档的顺序
                                 qaDocs.add(document);
                             } catch (JsonProcessingException e) {
-                                System.out.println(document + " JSON解析错误：" + json);
+                                log.error("JSON parsing error for document {}: {}", finalI, e.getMessage());
+                                document.setOrder(finalI + 1);
                                 qaDocs.add(document);
                             }
                         }, executorService));
                     }
-
                     // 等待所有子任务完成
                     CompletableFuture.allOf(innerFutures.toArray(new CompletableFuture[0])).join();
                     return qaDocs;
                 }, executorService);
-
                 futures.add(future);
             }
 
@@ -145,13 +116,9 @@ public class DocQaExtractor {
             for (CompletableFuture<List<FileChunkResponse.Document>> future : futures) {
                 result.add(future.get());
             }
-
-            long endTimeMillis = System.currentTimeMillis();
-            long durationMillis = endTimeMillis - startTimeMillis;
-            System.out.println("上传文件总耗时（毫秒）： " + durationMillis);
             return result;
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Error parsing text", e);
             return docs;
         } finally {
             executorService.shutdown();  // 关闭线程池
@@ -197,20 +164,16 @@ public class DocQaExtractor {
         for (int gi = 0; gi < docs.size(); gi++) {
             final int groupIndex = gi;
             final List<FileChunkResponse.Document> group = docs.get(gi);
-
             CompletableFuture<List<FileChunkResponse.Document>> gf =
                     CompletableFuture.supplyAsync(() -> {
                         // —— 组内并发，但“分桶合并”以保证顺序 —— //
                         @SuppressWarnings("unchecked")
-                        List<FileChunkResponse.Document>[] buckets =
-                                (List<FileChunkResponse.Document>[]) new List[group.size()];
-
+                        List<FileChunkResponse.Document>[] buckets = (List<FileChunkResponse.Document>[]) new List[group.size()];
                         List<CompletableFuture<Void>> inner = new ArrayList<>(group.size());
 
                         for (int i = 0; i < group.size(); i++) {
                             final int idx = i;
                             final FileChunkResponse.Document original = group.get(i);
-
                             inner.add(CompletableFuture.runAsync(() -> {
                                 String prompt = String.format(PROMPT_TEMPLATE, original.getText());
                                 String json = extract(prompt);
@@ -219,26 +182,35 @@ public class DocQaExtractor {
                                     if (json != null) {
                                         ObjectMapper om = new ObjectMapper();
                                         List<Map<String, String>> dataList =
-                                                om.readValue(json, new TypeReference<List<Map<String, String>>>() {});
+                                                om.readValue(json, new TypeReference<List<Map<String, String>>>() {
+                                                });
                                         for (Map<String, String> map : dataList) {
-                                            FileChunkResponse.Document doc = new FileChunkResponse.Document();
-                                            doc.setText(map.get("instruction"));
-                                            doc.setSource(VectorStoreConstant.FILE_CHUNK_SOURCE_LLM);
-                                            doc.setOrder(null);
-                                            doc.setReferenceDocumentId(String.valueOf(idx + 1));
-                                            block.add(doc);
+                                            String instruction = map.get("instruction");
+                                            if (instruction != null && !instruction.trim().isEmpty()) {
+                                                FileChunkResponse.Document doc = new FileChunkResponse.Document();
+                                                doc.setText(instruction);
+                                                doc.setSource(VectorStoreConstant.FileChunkSource.FILE_CHUNK_SOURCE_LLM);
+                                                doc.setOrder(null);
+                                                doc.setReferenceDocumentId(String.valueOf(idx + 1));
+                                                block.add(doc);
+                                            }
                                         }
+                                    } else {
+                                        log.warn("Failed to extract JSON from LLM response for document {}. Using original document.", idx);
                                     }
                                 } catch (Exception e) {
-                                    // 解析失败就只回原文
+                                    log.error("JSON parsing error for document {}: {}", idx, e.getMessage());
                                 }
                                 original.setOrder(idx + 1);
                                 block.add(original);
 
                                 buckets[idx] = block; // 写到自己的槽位
-                                // ★ 每个分片完成后立刻回调
+                                // 每个分片完成后立刻回调
                                 if (onChunkReady != null) {
-                                    try { onChunkReady.onChunk(groupIndex, idx, block); } catch (Exception ignored) {}
+                                    try {
+                                        onChunkReady.onChunk(groupIndex, idx, block);
+                                    } catch (Exception ignored) {
+                                    }
                                 }
                             }, executor));
                         }

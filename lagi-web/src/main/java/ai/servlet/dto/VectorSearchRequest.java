@@ -14,7 +14,7 @@ import java.util.Map;
 @ToString
 public class VectorSearchRequest {
     private String category;
-    private Map<String, String> where;
+    private Map<String, Object> where;
     private String text;
     private List<ChatMessage> messages;
 }

@@ -1,45 +1,24 @@
 package ai.vector.pojo;
 
-import java.util.HashMap;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.util.List;
 import java.util.Map;
 
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class QueryCondition {
-    private String text;
+    private String category;
+    private Map<String, Object> where;
+    @JsonProperty("where_document")
+    private Map<String, Object> whereDocument;
     private Integer n;
-    private Map<String, String> where = new HashMap<>();
-
+    private String text;
     private List<String> ids;
-
-
-    public String getText() {
-        return text;
-    }
-
-    public void setText(String text) {
-        this.text = text;
-    }
-
-    public Integer getN() {
-        return n;
-    }
-
-    public void setN(Integer n) {
-        this.n = n;
-    }
-
-    public Map<String, String> getWhere() {
-        return where;
-    }
-
-    public void setWhere(Map<String, String> where) {
-        this.where = where;
-    }
-
-    public List<String> getIds() {
-        return ids;
-    }
-    public void setIds(List<String> ids) {
-        this.ids = ids;
-    }
 }

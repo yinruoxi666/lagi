@@ -224,6 +224,39 @@ Example：Set priority keywords and stop keywords:
 ]
 ```
 
+Here’s the English translation of your document:
+
+## Rerank and Embedding Models
+
+Download the [AI database](https://downloads.landingbj.com/lagi/ai-sqlite.zip) and the [Embedding model](https://downloads.landingbj.com/lagi/embedding_2048.model), then configure the AI database and embedding model in the configuration file accordingly.
+
+After downloading the AI database, extract it to any directory and configure the data source as follows:
+
+```yaml
+  database:
+    - name: ai
+      jdbc_url: jdbc:sqlite:{ai_sqlite_path}
+      driver: org.sqlite.JDBC
+      username: root
+      password: 123456
+      maximum_pool_size: 160
+      idle_timeout: 0
+      max_lifetime: 2877700
+```
+
+After downloading the embedding model, add the following configuration to enable LinkMind’s embedding model:
+
+```yaml
+  embedding:
+    - backend: landing
+      type: Landing
+      model_path: {embedding_model_path}
+```
+
+The **Rerank** feature only requires the AI database file, while the **Embedding** model requires both.
+
+For API references, see [API Documentation](docs/API_en.md).
+
 ## Downloads
 
 Thank you for your support of LinkMind ! To help you get started quickly and easily, we have provided a pre-packaged LinkMind application that is ready for immediate use.

@@ -8,6 +8,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 public class FileUtils {
     public static String md5sum(File file) {
@@ -65,5 +66,9 @@ public class FileUtils {
                 }
             }
         }
+    }
+
+    public static String generateId() {
+        return UUID.randomUUID().toString().replace("-", "");
     }
 }

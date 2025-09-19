@@ -334,4 +334,17 @@
         <url-pattern>/mcp/*</url-pattern>
     </servlet-mapping>
 
+    <servlet>
+        <servlet-name>rerank</servlet-name>
+        <servlet-class>ai.servlet.api.RerankApiServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>rerank</servlet-name> 
+        <url-pattern>/v1/rerank</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>rerank</servlet-name>
+        <url-pattern>/rerank</url-pattern>
+    </servlet-mapping>
+
 </web-app>

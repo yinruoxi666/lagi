@@ -1,10 +1,11 @@
 package ai.vector;
 
 import ai.common.pojo.IndexSearchData;
+import ai.config.ContextLoader;
+import ai.config.pojo.RAGFunction;
 import ai.medusa.utils.PromptCacheConfig;
 import ai.utils.LagiGlobal;
 import ai.vector.pojo.IndexRecord;
-import cn.hutool.core.util.RandomUtil;
 import lombok.ToString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,9 +16,9 @@ public class VectorCacheLoader {
 
     private static final Logger logger = LoggerFactory.getLogger(VectorCacheLoader.class);
     private static final VectorCache vectorCache = VectorCache.getInstance();
-    private static VectorStoreService vectorStoreService =  new VectorStoreService();
-    private static DataStore cacheL2 = new DataStore();
-
+    private static final VectorStoreService vectorStoreService = new VectorStoreService();
+    private static final DataStore cacheL2 = new DataStore();
+    private static final RAGFunction RAG_CONFIG = ContextLoader.configuration.getStores().getRag();
 
     @lombok.Data
     @ToString
@@ -56,7 +57,7 @@ public class VectorCacheLoader {
         private TreeMap<String, Data> seqToData = new TreeMap<>(((o1, o2) -> {
             Long l1 = Long.valueOf(o1.split(":")[0]);
             Long l2 = Long.valueOf(o2.split(":")[0]);
-            if(!l1.equals(l2)) {
+            if (!l1.equals(l2)) {
                 return Long.compare(l1, l2);
             }
             return o1.compareTo(o2);
@@ -69,7 +70,7 @@ public class VectorCacheLoader {
 
         public void add(Data data) {
             qToSeq.put(data.getQ(), data.getSeq());
-            seqToData.put(getKey(data.getSeq(), data.getQ()) , data);
+            seqToData.put(getKey(data.getSeq(), data.getQ()), data);
         }
 
         public String get(String q) {
@@ -83,7 +84,7 @@ public class VectorCacheLoader {
 
         public Data getDate(String q) {
             Long seq = qToSeq.get(q);
-            if(seq == null) {
+            if (seq == null) {
                 return null;
             }
             return seqToData.get(getKey(seq, q));
@@ -96,11 +97,11 @@ public class VectorCacheLoader {
             String source = getKey(data.getSeq(), data.getQ());
             for (int i = 0; i < count; i++) {
                 source = seqToData.lowerKey(source);
-                if(source == null) {
+                if (source == null) {
                     break;
                 }
                 Data cData = seqToData.get(source);
-                if(cData == null) {
+                if (cData == null) {
                     break;
                 }
                 res.add(cData.getQ());
@@ -108,11 +109,11 @@ public class VectorCacheLoader {
             source = getKey(data.getSeq(), data.getQ());
             for (int i = 0; i < count; i++) {
                 source = seqToData.higherKey(source);
-                if(source == null) {
+                if (source == null) {
                     break;
                 }
                 Data cData = seqToData.get(source);
-                if(cData == null) {
+                if (cData == null) {
                     break;
                 }
                 res.add(cData.getQ());
@@ -125,6 +126,9 @@ public class VectorCacheLoader {
         new Thread(() -> {
             try {
                 logger.info("VectorCacheLoader started");
+                if (RAG_CONFIG.getPreloadCache() !=null && RAG_CONFIG.getPreloadCache()) {
+                    loadParentChildCache();
+                }
 //                loadVectorLinkCache();
                 if (PromptCacheConfig.MEDUSA_ENABLE && LagiGlobal.RAG_ENABLE) {
                     loadMedusaCache();
@@ -134,6 +138,41 @@ public class VectorCacheLoader {
                 logger.error("VectorCacheLoader init error", e);
             }
         }).start();
+    }
+
+    private static void loadParentChildCache() {
+        logger.info("VectorCacheLoader parent and child preload cache loading");
+        int offset = 0;
+        int limit = 500;
+        String allCategory = RAG_CONFIG.getPreloadCacheCategory();
+        if (allCategory == null) {
+            allCategory = vectorStoreService.getVectorStoreConfig().getDefaultCategory();
+        }
+        String[] categories = allCategory.split(",");
+        for (int i = 0; i < categories.length; i++) {
+            String category = categories[i].trim();
+            while (true) {
+                List<IndexRecord> indexRecordList = vectorStoreService.fetch(limit, offset, category);
+                if (indexRecordList.isEmpty() || (
+                        vectorCache.isParentCacheFull() &&
+                                vectorCache.isChildCacheFull())) {
+                    break;
+                }
+                for (IndexRecord indexRecord : indexRecordList) {
+                    String id = indexRecord.getId();
+                    String parentId = (String) indexRecord.getMetadata().get("parent_id");
+                    vectorStoreService.getParentIndex(parentId, category);
+                    vectorStoreService.getChildIndex(id, category);
+                }
+                offset += limit;
+            }
+            if (vectorCache.isParentCacheFull() &&
+                    vectorCache.isChildCacheFull()) {
+                break;
+            }
+            offset = 0;
+        }
+        logger.info("VectorCacheLoader parent and child preload cache loaded");
     }
 
     private static void loadVectorLinkCache() {

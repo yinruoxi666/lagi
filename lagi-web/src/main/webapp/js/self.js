@@ -20,13 +20,18 @@ const voiceButton = document.getElementById("voiceIcon");
 voiceButton.addEventListener("mousedown", (e) => {
     timeOutEvent = setTimeout(() => {
         longPress()
-    }, 500);
+    }, 300);
     e.preventDefault();
 });
 
 voiceButton.addEventListener("mousemove", (e) => {
     clearTimeout(timeOutEvent);
     timeOutEvent = 0;
+});
+
+voiceButton.addEventListener("mouseout", () => {
+    clearTimeout(timeOutEvent);
+    Recoder.stop();
 });
 
 // 松开按钮停止录音
@@ -104,7 +109,6 @@ var voice_url = '';
 
 // 播音功能的实现
 function txtTovoice(txt, emotion) {
-    console.log(emotion, txt)
     // 获取最后一个进行播放。
     var len = $(".myAudio1").length;
 // 检查是否至少存在一个匹配的元素
@@ -134,23 +138,13 @@ function txtTovoice(txt, emotion) {
                     console.log(json.data);
 
                     voice_url = json.data;
-                    const audioElement = document.getElementsByClassName('myAudio1')[len - 1];
+                    // const audioElement = document.getElementsByClassName('myAudio1')[len - 1];
                     $(".myAudio1")[len-  1].src = json.data
-                    const playButton = document.getElementsByClassName('playIcon1')[len - 1];
-                    const audioSource = document.getElementById("audioSource");
-                    // 添加点击事件处理程序来控制音频的播放和暂停
-                    playButton.addEventListener('click', function () {
-                        console.log("点击了")
-                        if (audioElement.paused) {
-                            // 如果音频暂停，播放音频
-                            audioElement.play();
-
-                        } else {
-                            // 如果音频正在播放，暂停音频
-                            audioElement.pause();
-
-                        }
-                    });
+                    // const playButton = document.getElementsByClassName('playIcon1')[len - 1];
+                    // const audioSource = document.getElementById("audioSource");
+                    const audioplay =  document.getElementsByClassName('audioplay')[len-1];
+                    audioplay.removeAttribute('disabled');
+                    audioplay.innerHTML = AUDIO_PLAY_ICON
                 }
                 console.log('响应数据:', responseText);
             } else {
@@ -216,9 +210,11 @@ function checkFileSizeLimit(selectedFile) {
 }
 
 let conversation1 = null;
-let robootAnswerJq1 = null;
-//   上传文件功能的实现：
+
+
 var voiceResponse = "";
+
+// 绑定文件上传按钮点击事件
 const fileUploadButton = document.getElementById("addButton");
 fileUploadButton.addEventListener("click", function () {
     const fileInput = document.createElement("input");
@@ -254,7 +250,7 @@ fileUploadButton.addEventListener("click", function () {
                 fileType === "csv") {
                 question = "您所上传的文档文件名称为：" + selectedFile.name;
                 formData.append("file", selectedFile); // 使用 "file" 作为文件字段的名称
-                serverEndpoint = "/uploadFile/asynchronousUpload?category=" + window.category;
+                serverEndpoint = "/uploadFile/uploadLearningFile?category=" + window.category;
                 fileStatus = "doc";
             } else if (fileType === "jpg" || fileType === "jpeg" || fileType === "png" || fileType === "heic") {
                 question = "您所上传的图片是：" + selectedFile.name;
@@ -275,12 +271,10 @@ fileUploadButton.addEventListener("click", function () {
                 serverEndpoint = "/uploadFile/uploadVideoFile";
                 formData.append("file", selectedFile);
                 fileStatus = "video";
-                // alert("暂不支持视频文件的上传");
-                // return;
             }
 
             if (!checkFileSizeLimit(selectedFile)) {
-                hideHelloContent();
+                // hideHelloContent();
                 let conversation1 = {
                     user: {question: question},
                     robot: {answer: '鉴于当前资源有限，请适当缩减文件大小，敬请您的谅解！'}
@@ -294,7 +288,7 @@ fileUploadButton.addEventListener("click", function () {
                 alert("请选择指定的文件类型")
                 return;
             }
-            hideHelloContent();
+            // hideHelloContent();
 
             let conversation1 = {user: {question: question}, robot: {answer: ''}}
             let robootAnswerJq1 = newConversation(conversation1);
@@ -324,67 +318,18 @@ fileUploadButton.addEventListener("click", function () {
                                 }
                             } else if (fileStatus == "doc") {
                                 if (json.status == "success") {
-                                        const task_id = json.task_id; // 从响应中提取 task_id
-                                        const startTime = new Date().getTime();
-                                        const getProgress = async () => {
-                                            return new Promise((resolve, reject) => {
-                                                const xhr = new XMLHttpRequest();
-                                                xhr.open('GET', `/training/getProgress?task_id=${task_id}`, true); // 使用 task_id 构建 URL
-                                                xhr.onload = function () {
-                                                    if (xhr.status === 200) {
-                                                        try {
-                                                            const response = JSON.parse(xhr.responseText);
-                                                            resolve(response);
-                                                        } catch (e) {
-                                                            reject(e);
-                                                        }
-                                                    } else {
-                                                        reject(new Error('获取进度失败'));
-                                                    }
-                                                };
-                                                xhr.onerror = function () {
-                                                    reject(new Error('网络错误'));
-                                                };
-                                                xhr.send();
-                                            });
-                                        };
 
-                                        const pollProgress = async () => {
-                                            let progress = 0;
-                                            let update = "上传中";
-                                            while (progress < 100) {
-                                                const { msg, progress: currentProgress, status } = await getProgress();
-                                                if (status === 'success') {
-                                                    progress = currentProgress;
-                                                    const endTime = new Date().getTime();
-                                                    const duration = endTime - startTime;
-                                                    if (progress === 100) {
-                                                        res = `已经收到您的资料文档，上传总耗时：${duration/1000}秒，您可以在新的会话中，询问与资料中内容相关问题。如果您想生成指令集，请输入\"生成指令集\"。`;
-                                                    }else {
-                                                        res = `当前上传进度：${progress}%,上传状态：${update},上传耗时：${duration/1000}秒`;
-                                                    }
-                                                    textQuery1("文件上传结果", res, "doc");
-                                                    if (progress === 100) {
-                                                        break;
-                                                    }
-                                                } else {
-                                                    textQuery1("文件上传结果", "已经收到您的资料文档，您可以在新的会话中，询问与资料中内容相关的问题。如果您想生成指令集，请输入\"生成指令集\"。", "doc");
-                                                    break;
-                                                }
-
-                                                // 每隔3秒请求一次
-                                                await new Promise(resolve => setTimeout(resolve, 3000));
-                                            }
-                                        };
-                                        // 开始轮询获取进度
-                                        pollProgress();
-
-                                        // var result = "已经收到您的资料文档，您可以在新的会话中，询问与资料中内容相关的问题。如果您想生成指令集，请输入\"生成指令集\"。"
-                                        lastFilePath = json.filePath;
-                                        console.log("文件为" + lastFilePath)
+                                    // var question = "您所上传的文档文件名称为：" + selectedFile.name;
+                                    // var result = "已经收到您的资料文档，您可以在新的会话中，询问与资料中内容相关的问题。"
+                                    // textQuery1(question, result, fileStatus);
+                                    var question = "您所上传的文档文件名称为：" + selectedFile.name;
+                                    var result = "已经收到您的资料文档，您可以在新的会话中，询问与资料中内容相关的问题。如果您想生成指令集，请输入\"生成指令集\"。"
+                                    lastFilePath = json.filePath;
+                                    console.log("文件为" + lastFilePath)
+                                    textQuery1(question, result, fileStatus);
                                 } else {
-                                        alert("上传失败")
-                                        return;
+                                    alert("上传失败")
+                                    return;
                                 }
                             } else if (fileStatus == "voice") {
                                 if (json.status == "success") {
@@ -420,7 +365,6 @@ fileUploadButton.addEventListener("click", function () {
                             }
                         }
                     } else {
-                        // 请求失败，处理上传失败的情况
                         textQuery1("文件上传结果", "上传文件失败", "doc");
                         return;
                     }
@@ -453,7 +397,7 @@ function textQuery1(questionRel, answerRel, fileStatus) {
     disableQueryBtn();
 
     // 隐藏非对话内容
-    hideHelloContent();
+    // hideHelloContent();
 
     const markdownElements = document.querySelectorAll(".markdown");
     var len = markdownElements.length;
@@ -505,12 +449,19 @@ async function voiceToTxt(selectedFile) {
 }
 
 function textToVoice(emotionSelect) {
-    var text = $(emotionSelect).parent().parent().parent().find('.result-streaming').text().trim();
-    var emotion = $(emotionSelect).find("option:selected").val();
+    
+    let text = CONVERSATION_CONTEXT[ $(emotionSelect).closest('.robot-return').data('index')].content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    let emotion = $(emotionSelect).find("option:selected").val();
 
-    const audioElement = $(emotionSelect).parent().find('.myAudio1')[0];
-    const playButton = $(emotionSelect).parent().find('.playIcon1')[0];
-    const audioSource = $(emotionSelect).parent().find("audioSource1")[0];
+    // const audioElement = $(emotionSelect).parent().find('.myAudio1')[0];
+    // const playButton = $(emotionSelect).parent().find('.playIcon1')[0];
+
+    const audioElement = $(emotionSelect).closest('.appendVoice').find('.myAudio1')[0];
+    const audioplay = $(emotionSelect).closest('.appendVoice').find('.audioplay')[0];
+    audioplay.innerHTML = MUTE_ICON;
+    audioplay.disabled = true;
+
+    // const audioSource = $(emotionSelect).parent().find("audioSource1")[0];
     audioElement.src = "";
 
     $.ajax({
@@ -526,19 +477,22 @@ function textToVoice(emotionSelect) {
             if (res.status == "success") {
                 console.log(res.data);
                 audioElement.src = res.data;
+                audioElement.load();
+                audioplay.disabled = false;
+                audioplay.innerHTML = AUDIO_PLAY_ICON;
                 // 添加点击事件处理程序来控制音频的播放和暂停
-                playButton.addEventListener('click', function () {
-                    console.log("点击了")
-                    if (audioElement.paused) {
-                        // 如果音频暂停，播放音频
-                        audioElement.play();
+                // playButton.addEventListener('click', function () {
+                //     console.log("点击了")
+                //     if (audioElement.paused) {
+                //         // 如果音频暂停，播放音频
+                //         audioElement.play();
 
-                    } else {
-                        // 如果音频正在播放，暂停音频
-                        audioElement.pause();
+                //     } else {
+                //         // 如果音频正在播放，暂停音频
+                //         audioElement.pause();
 
-                    }
-                });
+                //     }
+                // });
             }
         },
         error: function (res) {
@@ -548,6 +502,9 @@ function textToVoice(emotionSelect) {
     return;
 }
 
+
+const record_save_type = 'audio/mp3';
+
 $(document).on("change", ".emotionSelect", function () {
     textToVoice(this);
 })
@@ -555,7 +512,7 @@ $(document).on("change", ".emotionSelect", function () {
 function remoteSolve(blob) {
     const formData = new FormData();
     // 将MP3音频文件添加到FormData对象
-    formData.append('audioFile', blob, 'audiofile.mp3');
+    formData.append('audioFile', blob, 'audiofile.wav');
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/search/uploadVoice', true);
     xhr.setRequestHeader('Access-Control-Allow-Origin', 'localhost');
@@ -598,7 +555,7 @@ var Recoder = {
             {name: 'microphone'}
         ).then(function (permissionStatus) {
             if (permissionStatus.state !== 'prompt') {
-                $("#voiceIcon").css("background", "#eeeeee");
+                $("#voiceIcon").css("background", "rgb(200, 200, 200)");
                 // 停止之前的录制内容
                 mediaRecorder && mediaRecorder.stop();
 
@@ -648,7 +605,7 @@ var Recoder = {
                     // 间视频录制结束时触发
                     _mediaRecorder.onstop = () => {
                         // 通过Blob数据块, 合成完整的Blob块数据
-                        let blob = new Blob(chunks, {'type': 'audio/mp3'});
+                        let blob = new Blob(chunks, {'type': 'audio/wav'});
                         console.log(blob);
 
                         remoteSolve(blob);

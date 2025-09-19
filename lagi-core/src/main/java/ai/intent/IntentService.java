@@ -6,7 +6,7 @@ import ai.openai.pojo.ChatCompletionRequest;
 import java.util.Map;
 
 public interface IntentService {
+    IntentResult detectIntent(ChatCompletionRequest chatCompletionRequest, Map<String, Object> where);
 
-    IntentResult detectIntent(ChatCompletionRequest chatCompletionRequest, Map<String, String> where);
-
+    IntentResult detectIntent(ChatCompletionRequest chatCompletionRequest);
 }
