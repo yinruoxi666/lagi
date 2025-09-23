@@ -518,6 +518,8 @@ public class VectorStoreService {
                     .filter(indexSearchData -> indexIds.contains(indexSearchData.getId()))
                     .collect(Collectors.toList());
         }
+        log.info("VectorStoreService search | question: {}, category: {}, where: {}, after es filter result size: {}",
+                question, category, where, indexSearchDataList.size());
         return processFutureResults(indexSearchDataList, category);
     }
 
@@ -563,10 +565,12 @@ public class VectorStoreService {
 
     private List<IndexSearchData> extendIndexSearchData(IndexSearchData indexSearchData, String category) {
         List<IndexSearchData> extendedList = vectorCache.getFromVectorLinkCache(indexSearchData.getId());
+        log.info("extendIndexSearchData | id: {}, cache hit: {}", indexSearchData.getId(), extendedList != null);
         if (extendedList == null) {
             extendedList = extendText(indexSearchData, category);
             vectorCache.putToVectorLinkCache(indexSearchData.getId(), extendedList);
         }
+        log.info("extendIndexSearchData | id: {}, extended size: {}", indexSearchData.getId(), extendedList.size());
         return extendedList;
     }
 
