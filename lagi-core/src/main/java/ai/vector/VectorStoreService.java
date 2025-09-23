@@ -505,7 +505,11 @@ public class VectorStoreService {
         int similarity_top_k = vectorStore.getConfig().getSimilarityTopK();
         double similarity_cutoff = vectorStore.getConfig().getSimilarityCutoff();
         category = ObjectUtils.defaultIfNull(category, vectorStore.getConfig().getDefaultCategory());
+        log.info("VectorStoreService search | question: {}, category: {}, where: {}, similarity_top_k: {}, similarity_cutoff: {}",
+                question, category, where, similarity_top_k, similarity_cutoff);
         List<IndexSearchData> indexSearchDataList = search(question, similarity_top_k, similarity_cutoff, where, category);
+        log.info("VectorStoreService search | question: {}, category: {}, where: {}, result size: {}",
+                question, category, where, indexSearchDataList.size());
         Set<String> esIds = bigdataService.getIds(question, category);
         if (esIds != null && !esIds.isEmpty()) {
             Set<String> indexIds = indexSearchDataList.stream().map(IndexSearchData::getId).collect(Collectors.toSet());
