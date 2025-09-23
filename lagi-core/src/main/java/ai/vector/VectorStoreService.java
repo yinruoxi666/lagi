@@ -694,6 +694,7 @@ public class VectorStoreService {
         while (i < parentDepth) {
             IndexSearchData parentData = getParentIndex(parentId, category);
             if (parentData != null) {
+                log.info("extendText - parent {} : {}", i, parentData.getId());
                 if (isRawData(parentData)) {
                     parentNodes.add(0, parentData);
                     parentCount++;
@@ -716,6 +717,7 @@ public class VectorStoreService {
         while (j < childDepth) {
             List<IndexSearchData> childDataList = getChildIndex(parentId, category);
             if (childDataList != null && !childDataList.isEmpty()) {
+                log.info("extendText - child {} : {}", j, childDataList.get(0).getId());
                 IndexSearchData childData = childDataList.get(0);
                 if (isRawData(childData)) {
                     resultList.add(childData);
