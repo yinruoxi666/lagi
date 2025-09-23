@@ -238,13 +238,17 @@ public class VectorApiServlet extends BaseServlet {
         Map<String, Object> where = request.getWhere();
         List<IndexSearchData> indexSearchData = null;
         if (StrUtil.isNotBlank(text)) {
+            System.out.println("Search text: " + text);
             indexSearchData = vectorStoreService.search(text, where, category);
+
         } else {
             ChatCompletionRequest chatCompletionRequest = new ChatCompletionRequest();
             chatCompletionRequest.setMax_tokens(4096);
             chatCompletionRequest.setMessages(request.getMessages());
             chatCompletionRequest.setCategory(category);
+            System.out.println("Search messages: " + toJson(request.getMessages()));
             indexSearchData = vectorStoreService.searchByContext(chatCompletionRequest, where);
+            System.out.println("Search results: " + toJson(indexSearchData));
         }
         Map<String, Object> result = new HashMap<>();
         if (indexSearchData == null || indexSearchData.isEmpty()) {
