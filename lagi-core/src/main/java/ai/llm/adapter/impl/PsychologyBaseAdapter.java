@@ -12,6 +12,7 @@ import ai.openai.pojo.ChatMessage;
 import ai.utils.qa.HttpUtil;
 import cn.hutool.core.collection.CollUtil;
 import com.google.gson.Gson;
+import com.google.gson.JsonElement;
 import io.reactivex.Observable;
 import okhttp3.Response;
 import org.slf4j.Logger;
@@ -68,8 +69,15 @@ public class PsychologyBaseAdapter extends ModelService implements ILlmAdapter {
         chatCompletionRequest.setCategory(null);
         String userId = chatCompletionRequest.getSessionId();
         chatCompletionRequest.setSessionId(null);
-        String json = gson.toJson(chatCompletionRequest);
-        json = addUserIdToJson(json, userId);
+        JsonElement je = gson.toJsonTree(chatCompletionRequest);
+        String device_id = je.getAsJsonObject().get("agent_config").getAsJsonObject().get("psychology-base-v1").getAsJsonObject().get("device_id").getAsString();
+        String track_id = je.getAsJsonObject().get("agent_config").getAsJsonObject().get("psychology-base-v1").getAsJsonObject().get("track_id").getAsString();
+        je.getAsJsonObject().addProperty("device_id", device_id);
+        je.getAsJsonObject().addProperty("track_id", track_id);
+        je.getAsJsonObject().remove("agent_config");
+        String json = je.toString();
+        System.out.println(json);
+        json = addParamToJson(json, "userId", userId, getAppId());
         String apiKey = getApiKey();
         Function<String, ChatCompletionResult> convertFunc = e -> {
             if (e.equals("[DONE]")) {
@@ -102,7 +110,7 @@ public class PsychologyBaseAdapter extends ModelService implements ILlmAdapter {
     }
 
     // 在json中添加userId字段后返回sting格式
-    private String addUserIdToJson(String json,String userId) {
+    private String addParamToJson(String json,String paramName, String paramValue, String defaultValue) {
         if (getAppId() == null || getAppId().isEmpty()) {
             return json;
         }
@@ -111,10 +119,16 @@ public class PsychologyBaseAdapter extends ModelService implements ILlmAdapter {
         if (insertIndex == -1) {
             return json;
         }
-        userId = userId == null ? getAppId() : userId;
-        String userIdField = ",\"userId\":\"" + userId + "\"";
+        if (paramName == null || paramName.isEmpty()) {
+            return json;
+        }
+        if (defaultValue != null  && !defaultValue.isEmpty()) {
+            paramValue = paramValue == null ? defaultValue : paramValue;
+        }
+        String userIdField = ",\"" + paramName + "\":\"" + paramValue + "\"";
         return json.substring(0, insertIndex) + userIdField + json.substring(insertIndex);
     }
+
 
     private void limitChatMessages(ChatCompletionRequest request) {
         if (request.getMessages() != null ) {

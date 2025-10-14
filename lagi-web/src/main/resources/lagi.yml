@@ -77,8 +77,8 @@ models:
     driver: ai.wrapper.impl.AlibabaAdapter
     # help document https://help.aliyun.com/document_detail/2712195.html?spm=a2c4g.2712576.0.0.733b3374np40s0
     api_key: sk-f4f5565da70f49228a8f3fc2d231a543 # url address  https://bailian.console.aliyun.com/#/home
-    access_key_id: your-access-key-id
-    access_key_secret: your-access-key-secret
+    access_key_id: LTAI5tRdxsnKjJyyS5yyGsc6
+    access_key_secret: al7cQPa6KvH8svcZ8Z3n1lAeE07ImS
 
   # ERNIE Bot (WenxinYiyan) is an advanced large-scale language model developed by Baidu
   - name: ernie
@@ -121,6 +121,15 @@ models:
     model: Baichuan2-Turbo,Baichuan2-Turbo-192k,Baichuan2-53B
     driver: ai.llm.adapter.impl.BaichuanAdapter
     api_key: your-api-key # url address https://platform.baichuan-ai.com/console/apikey
+
+  - name: psychologybase
+    type: Psychologybase
+    enable: true
+    model: psychology-base-v1
+    driver: ai.llm.adapter.impl.PsychologyBaseAdapter
+    api_key: lk-Yr5fKpz9LbX2cD7RnAmQwVj3sGt6HxJkZ8FdN1eUo4iT0qWvMuIhPcS2
+    api_address: https://kcld-temp-api.dbxiao.cn/phoenix/psychologybaseMgr/api/v1/ai/assistant/iot/chat/completions
+    app_id: 30000
 
   # iFLYTEK Spark is an AI cognitive model developed by iFLYTEK, aiming to provide natural language interaction and generation capabilities
   - name: spark
@@ -276,7 +285,7 @@ functions:
 
       - backend: kimi
         model: moonshot-v1-128k
-        enable: true
+        enable: false
         stream: true
         priority: 100
 
@@ -347,6 +356,12 @@ functions:
         enable: false
         stream: true
         priority: 10
+
+      - backend: psychologybase
+        model: psychology-base-v1
+        enable: true
+        stream: true
+        priority: 80
 
   translate:
     - backend: ernie

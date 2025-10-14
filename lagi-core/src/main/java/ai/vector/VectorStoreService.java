@@ -27,6 +27,7 @@ import ai.vector.pojo.*;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 import lombok.extern.slf4j.Slf4j;
@@ -345,10 +346,12 @@ public class VectorStoreService {
         if (isContextLinked) {
             if (!upsertRecords.isEmpty()) {
                 upsertRecords.get(0).getMetadata().put("parent_id", "");
+                upsertRecords.get(0).getMetadata().put("source", FILE_CHUNK_SOURCE_QA);
             }
             for (int i = 1; i < upsertRecords.size(); i++) {
                 String parentId = upsertRecords.get(i - 1).getId();
                 upsertRecords.get(i).getMetadata().put("parent_id", parentId);
+                upsertRecords.get(i).getMetadata().put("source", FILE_CHUNK_SOURCE_QA);
             }
         }
         this.upsert(upsertRecords, category);
@@ -540,6 +543,7 @@ public class VectorStoreService {
                 })
                 .filter(dataList -> !dataList.isEmpty())
                 .map(dataList -> dataList.stream()
+                        .filter(Objects::nonNull)
                         .filter(data -> seenTexts.add(data.getText()))
                         .collect(Collectors.toList()))
                 .filter(filteredList -> !filteredList.isEmpty())
@@ -555,11 +559,47 @@ public class VectorStoreService {
                 && mergedIndexSearchData.getFilename().get(0).isEmpty()) {
             splitChar = "\n";
         }
+        if (mergedIndexSearchData.getSource() != null && mergedIndexSearchData.getSource().equals(FILE_CHUNK_SOURCE_QA)) {
+            splitChar = "$$$";
+        }
         StringBuilder sb = new StringBuilder(mergedIndexSearchData.getText());
+        // 如果image不为空，则合并image
+        JsonArray mergedImages = new JsonArray();
+        if (mergedIndexSearchData.getImage() != null && mergedIndexSearchData.getImage().isEmpty()) {
+            try {
+                JsonArray images = gson.fromJson(mergedIndexSearchData.getImage(), JsonArray.class);
+                if (images != null) {
+                    for (int i = 0; i < images.size(); i++) {
+                        mergedImages.add(images.get(i));
+                    }
+                }
+            } catch (Exception e) {
+                log.error("mergeIndexSearchData | id: {}, image parse error: {}",
+                        mergedIndexSearchData.getId(), e.getMessage());
+            }
+        }
         for (int i = 1; i < indexSearchDataList.size(); i++) {
             sb.append(splitChar).append(indexSearchDataList.get(i).getText());
+            // 合并image
+            if (indexSearchDataList.get(i).getImage() != null && !indexSearchDataList.get(i).getImage().isEmpty()) {
+                try {
+                    JsonArray images = gson.fromJson(indexSearchDataList.get(i).getImage(), JsonArray.class);
+                    if (images != null) {
+                        for (int j = 0; j < images.size(); j++) {
+                            mergedImages.add(images.get(j));
+                        }
+                    }
+                } catch (Exception e) {
+                    log.error("mergeIndexSearchData | id: {}, image parse error: {}",
+                            indexSearchDataList.get(i).getId(), e.getMessage());
+                }
+            }
+
         }
         mergedIndexSearchData.setText(sb.toString());
+        if (mergedImages.size() > 0) {
+            mergedIndexSearchData.setImage(mergedImages.toString());
+        }
         return mergedIndexSearchData;
     }
 
@@ -633,6 +673,8 @@ public class VectorStoreService {
         IndexSearchData indexSearchData = vectorCache.getFromParentElementCache(parentId);
         if (indexSearchData == null) {
             indexSearchData = toIndexSearchData(this.fetch(parentId, category));
+            log.info("update parent cache | id: {}, data: {}",
+                    parentId, indexSearchData != null ? indexSearchData.getId() : "miss");
             vectorCache.putToParentElementCache(parentId, indexSearchData);
         }
         return indexSearchData;
@@ -694,7 +736,6 @@ public class VectorStoreService {
         while (i < parentDepth) {
             IndexSearchData parentData = getParentIndex(parentId, category);
             if (parentData != null) {
-                log.info("extendText - parent {} : {}", i, parentData.getId());
                 if (isRawData(parentData)) {
                     parentNodes.add(0, parentData);
                     parentCount++;
@@ -728,10 +769,14 @@ public class VectorStoreService {
                 break;
             }
         }
+        List<IndexSearchData> copyList = new ArrayList<>();
         for (IndexSearchData indexSearchData : resultList) {
-            BeanUtil.copyProperties(data, indexSearchData, "text");
+            IndexSearchData indexSearchDataCopy = new IndexSearchData();
+            BeanUtil.copyProperties(indexSearchData, indexSearchDataCopy);
+            BeanUtil.copyProperties(data, indexSearchDataCopy, "text","image");
+            copyList.add(indexSearchDataCopy);
         }
-        return resultList;
+        return copyList;
     }
 
     private boolean isRawData(IndexSearchData data) {

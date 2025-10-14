@@ -4,6 +4,7 @@ import ai.common.pojo.IndexSearchData;
 import ai.config.ContextLoader;
 import ai.config.pojo.RAGFunction;
 import ai.utils.LRUCache;
+import cn.hutool.core.bean.BeanUtil;
 
 import java.util.List;
 
@@ -54,6 +55,10 @@ public class VectorCache {
     }
 
     public void putToParentElementCache(String id, IndexSearchData extendedIndexSearchData) {
+        // 2025-09-22 防止引用对象被外部修改，导致缓存数据不一致，改为拷贝对象存储
+//        IndexSearchData copyObj = new IndexSearchData();
+//        BeanUtil.copyProperties(extendedIndexSearchData, copyObj);
+//        System.out.println("Put to parent cache,id=" + id + ",copyObj id= " + copyObj.getId());
         parentElementCache.put(id, extendedIndexSearchData);
     }
 

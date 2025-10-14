@@ -23,4 +23,5 @@ public class ChatCompletionRequest {
     private ResponseFormat response_format;
     private Map<String, Object> stream_options;
     private Boolean logprobs;
+    private Map<String, Object> agent_config;
 }
