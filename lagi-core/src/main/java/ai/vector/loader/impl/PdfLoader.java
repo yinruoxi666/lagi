@@ -82,7 +82,7 @@ public class PdfLoader implements DocumentLoader {
             } else if (OrdinanceExtractorUtil.isOrdinanceDocument(content)) {
                 return OrdinanceExtractorUtil.getChunkDocument(content, splitConfig.getChunkSizeForText());
             } else {
-                return fileService.splitContentChunks(splitConfig.getChunkSizeForText(), content);
+                return FileService.splitContentChunks(splitConfig.getChunkSizeForText(), content);
             }
         } catch (Exception e) {
             log.error("load pdf file error", e);

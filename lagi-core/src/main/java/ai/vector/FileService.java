@@ -133,6 +133,97 @@ public class FileService {
 
         return result;
     }
+
+    /**
+     * Split content into chunks, ensuring table tags stay together
+     * Normal splitting by chunkSize, but when encountering <table> tag,
+     * ensure <table> and </table> are in the same chunk (chunk size can exceed chunkSize)
+     * @param chunkSize the chunk size
+     * @param content the content to split
+     * @return list of text chunks
+     */
+    private static List<String> splitContentWithTableAwareness(int chunkSize, String content) {
+        List<String> result = new ArrayList<>();
+        
+        if (content == null || content.isEmpty()) {
+            return result;
+        }
+        
+        int currentPos = 0;
+        
+        while (currentPos < content.length()) {
+            // Calculate the end position for this chunk
+            int chunkEnd = Math.min(currentPos + chunkSize, content.length());
+            
+            // Get the chunk text
+            String chunk = content.substring(currentPos, chunkEnd);
+            
+            // Check if there's an unclosed <table> tag in this chunk
+            int tableOpenCount = countOccurrences(chunk, "<table>");
+            int tableCloseCount = countOccurrences(chunk, "</table>");
+            
+            // If there are more opening tags than closing tags, we need to extend the chunk
+            if (tableOpenCount > tableCloseCount) {
+                // Find the next </table> tag after chunkEnd
+                int nextCloseTag = content.indexOf("</table>", chunkEnd);
+                if (nextCloseTag != -1) {
+                    // Extend chunk to include the closing tag
+                    chunkEnd = nextCloseTag + "</table>".length();
+                    chunk = content.substring(currentPos, chunkEnd);
+                }
+            }
+            // If the chunk starts in the middle of a table (more closing than opening tags)
+            else if (tableCloseCount > tableOpenCount) {
+                // Find the previous <table> tag before currentPos
+                int prevOpenTag = content.lastIndexOf("<table>", currentPos);
+                if (prevOpenTag != -1 && prevOpenTag < currentPos) {
+                    // This should not happen if we split correctly, but handle it anyway
+                    // Move back to include the opening tag
+                    currentPos = prevOpenTag;
+                    chunkEnd = Math.min(currentPos + chunkSize, content.length());
+                    chunk = content.substring(currentPos, chunkEnd);
+                    
+                    // Re-check for unclosed tables
+                    tableOpenCount = countOccurrences(chunk, "<table>");
+                    tableCloseCount = countOccurrences(chunk, "</table>");
+                    if (tableOpenCount > tableCloseCount) {
+                        int nextCloseTag = content.indexOf("</table>", chunkEnd);
+                        if (nextCloseTag != -1) {
+                            chunkEnd = nextCloseTag + "</table>".length();
+                            chunk = content.substring(currentPos, chunkEnd);
+                        }
+                    }
+                }
+            }
+            
+            // Clean up whitespace and add to result
+            String text = chunk.replaceAll("\\s+", " ");
+            if (!text.trim().isEmpty()) {
+                result.add(text);
+            }
+            
+            currentPos = chunkEnd;
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Count occurrences of a substring in a string
+     * @param str the string to search in
+     * @param substr the substring to count
+     * @return the number of occurrences
+     */
+    private static int countOccurrences(String str, String substr) {
+        int count = 0;
+        int index = 0;
+        while ((index = str.indexOf(substr, index)) != -1) {
+            count++;
+            index += substr.length();
+        }
+        return count;
+    }
+
     public static List<FileChunkResponse.Document> getChunkDocumentScannedPDF(File file,Integer chunkSize){
         OcrService ocrService = new OcrService();
         List<String> pdfContent = new ArrayList<>();
@@ -145,10 +236,7 @@ public class FileService {
         List<File> fileList = pdftoImage(file);
         for (int i = 0; i < fileList.size(); i++) {
             FileChunkResponse.Image image = new FileChunkResponse.Image();
-
-
             String normalizedPath = fileList.get(i).getPath().replace("\\", "/");
-
             String imagePath = "";
             // 查找 "upload" 目录的起始位置
             int index = normalizedPath.indexOf("/upload");
@@ -162,15 +250,12 @@ public class FileService {
 
             String content = pdfContent.get(i);
             if (content != null){
-                int start = 0;
-                while (start < content.length()) {
-                    int end = Math.min(start + chunkSize, content.length());
-                    String text = content.substring(start, end).replaceAll("\\s+", " ");
-                    FileChunkResponse.Document doc =  new FileChunkResponse.Document();
+                List<String> textChunks = splitContentWithTableAwareness(chunkSize, content);
+                for (String text : textChunks) {
+                    FileChunkResponse.Document doc = new FileChunkResponse.Document();
                     doc.setText(text);
                     doc.setImages(list);
                     result.add(doc);
-                    start = end;
                 }
             }
         }
