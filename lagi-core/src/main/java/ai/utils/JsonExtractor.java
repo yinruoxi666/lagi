@@ -86,9 +86,6 @@ public class JsonExtractor {
         
         List<String> results = extractJsonArrayStrings(input);
         if (results.isEmpty()) {
-            // Log the input for debugging (truncated to avoid huge logs)
-            String truncatedInput = input.length() > 500 ? input.substring(0, 500) + "..." : input;
-            System.out.println("No JSON array found in input: " + truncatedInput);
             return null;
         }
         return results.get(0);
