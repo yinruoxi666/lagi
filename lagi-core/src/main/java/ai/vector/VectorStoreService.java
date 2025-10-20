@@ -50,12 +50,16 @@ public class VectorStoreService {
     private static final List<String> DEFAULT_SOURCES = new ArrayList<>();
 
     static {
-        ThreadPoolManager.registerExecutor("vector-service", new ThreadPoolExecutor(30, 100, 10, TimeUnit.SECONDS,
-                new ArrayBlockingQueue<>(100),
-                (r, executor) -> {
-                    log.error(StrUtil.format("线程池队({})任务过多请求被拒绝", "vector-service"));
-                }
-        ));
+        ThreadPoolManager.registerExecutor(
+                "vector-service",
+                new ThreadPoolExecutor(
+                        30, 100, 10, TimeUnit.SECONDS,
+                        new ArrayBlockingQueue<>(100),
+                        r -> { /* 可加命名线程工厂 */
+                            return new Thread(r, "vector-service-" + UUID.randomUUID());
+                        },
+                        new ThreadPoolExecutor.CallerRunsPolicy() // ★ 队列满时在提交线程执行
+                ));
         executor = ThreadPoolManager.getExecutor("vector-service");
         DEFAULT_SOURCES.add(FILE_CHUNK_SOURCE_FILE);
         DEFAULT_SOURCES.add(FILE_CHUNK_SOURCE_QA);

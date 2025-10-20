@@ -12,7 +12,6 @@ import ai.openai.pojo.ChatMessage;
 import ai.utils.qa.HttpUtil;
 import cn.hutool.core.collection.CollUtil;
 import com.google.gson.Gson;
-import com.google.gson.JsonElement;
 import io.reactivex.Observable;
 import okhttp3.Response;
 import org.slf4j.Logger;
@@ -67,17 +66,11 @@ public class PsychologyBaseAdapter extends ModelService implements ILlmAdapter {
     @Override
     public Observable<ChatCompletionResult> streamCompletions(ChatCompletionRequest chatCompletionRequest) {
         chatCompletionRequest.setCategory(null);
+        limitChatMessages(chatCompletionRequest);
         String userId = chatCompletionRequest.getSessionId();
         chatCompletionRequest.setSessionId(null);
-        JsonElement je = gson.toJsonTree(chatCompletionRequest);
-        String device_id = je.getAsJsonObject().get("agent_config").getAsJsonObject().get("psychology-base-v1").getAsJsonObject().get("device_id").getAsString();
-        String track_id = je.getAsJsonObject().get("agent_config").getAsJsonObject().get("psychology-base-v1").getAsJsonObject().get("track_id").getAsString();
-        je.getAsJsonObject().addProperty("device_id", device_id);
-        je.getAsJsonObject().addProperty("track_id", track_id);
-        je.getAsJsonObject().remove("agent_config");
-        String json = je.toString();
-        System.out.println(json);
-        json = addParamToJson(json, "userId", userId, getAppId());
+        String json = gson.toJson(chatCompletionRequest);
+        json = addUserIdToJson(json, userId);
         String apiKey = getApiKey();
         Function<String, ChatCompletionResult> convertFunc = e -> {
             if (e.equals("[DONE]")) {
@@ -87,9 +80,9 @@ public class PsychologyBaseAdapter extends ModelService implements ILlmAdapter {
             result.getChoices().forEach(choice -> {
                 choice.setMessage(choice.getDelta());
                 choice.setDelta(null);
-            if (choice.getMessage() != null && choice.getMessage().getRole() != null && choice.getMessage().getRole().equals("docs")) {
-                choice.setMessage(new ChatMessage());
-            }
+                if (choice.getMessage() != null && choice.getMessage().getRole() != null && choice.getMessage().getRole().equals("docs")) {
+                    choice.setMessage(new ChatMessage());
+                }
             });
 //            if (result.getChoices().get(0).getMessage() != null && result.getChoices().get(0).getMessage().getRole() != null && result.getChoices().get(0).getMessage().getRole().equals("docs")) {
 //                return null;
@@ -110,7 +103,7 @@ public class PsychologyBaseAdapter extends ModelService implements ILlmAdapter {
     }
 
     // 在json中添加userId字段后返回sting格式
-    private String addParamToJson(String json,String paramName, String paramValue, String defaultValue) {
+    private String addUserIdToJson(String json,String userId) {
         if (getAppId() == null || getAppId().isEmpty()) {
             return json;
         }
@@ -119,19 +112,13 @@ public class PsychologyBaseAdapter extends ModelService implements ILlmAdapter {
         if (insertIndex == -1) {
             return json;
         }
-        if (paramName == null || paramName.isEmpty()) {
-            return json;
-        }
-        if (defaultValue != null  && !defaultValue.isEmpty()) {
-            paramValue = paramValue == null ? defaultValue : paramValue;
-        }
-        String userIdField = ",\"" + paramName + "\":\"" + paramValue + "\"";
+        userId = userId == null ? getAppId() : userId;
+        String userIdField = ",\"userId\":\"" + userId + "\"";
         return json.substring(0, insertIndex) + userIdField + json.substring(insertIndex);
     }
 
-
     private void limitChatMessages(ChatCompletionRequest request) {
-        if (request.getMessages() != null ) {
+        if (request.getMessages() != null && request.getMessages().size() > 0) {
             request.setMessages(Collections.singletonList(request.getMessages().get(request.getMessages().size() - 1)));
         }
     }
