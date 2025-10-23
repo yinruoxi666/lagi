@@ -94,17 +94,20 @@ public class PdfLoader implements DocumentLoader {
         try (PDDocument document = PDDocument.load(file)) {
             for (PDPage page : document.getPages()) {
                 PDResources resources = page.getResources();
-                for (COSName xObjectName : resources.getXObjectNames()) {
-                    if (resources.isImageXObject(xObjectName)) {
-                        PDImageXObject image = (PDImageXObject) resources.getXObject(xObjectName);
-                        if (image != null) {
-                            return true;
+                // Add null check for resources
+                if (resources != null) {
+                    for (COSName xObjectName : resources.getXObjectNames()) {
+                        if (resources.isImageXObject(xObjectName)) {
+                            PDImageXObject image = (PDImageXObject) resources.getXObject(xObjectName);
+                            if (image != null) {
+                                return true;
+                            }
                         }
                     }
                 }
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            log.error("Error checking for images in PDF file: {}", file.getName(), e);
         }
         return false;
     }
