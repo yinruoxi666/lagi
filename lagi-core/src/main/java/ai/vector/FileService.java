@@ -249,7 +249,7 @@ public class FileService {
             list.add(image);
 
             String content = pdfContent.get(i);
-            if (content != null){
+            if (content != null && !content.isEmpty()){
                 List<String> textChunks = splitContentWithTableAwareness(chunkSize, content);
                 for (String text : textChunks) {
                     FileChunkResponse.Document doc = new FileChunkResponse.Document();

@@ -104,8 +104,9 @@ public class OcrService {
                     FileUtils.writeTextToFile(pageCacheFile, resultText);
                 }
             }
-            result.add(resultText);
-
+            if (resultText != null) {
+                result.add(resultText);
+            }
             if (taskId != null) {
                 processedPageSizeCache.put(taskId, OcrProgress.builder()
                         .md5(md5)

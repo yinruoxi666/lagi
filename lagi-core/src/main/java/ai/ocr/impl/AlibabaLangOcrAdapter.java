@@ -87,6 +87,10 @@ public class AlibabaLangOcrAdapter extends ModelService implements IOcr {
     }
 
     public String toFormatedText(AlibabaOcrDocument doc) {
+        if (doc.getPrism_wordsInfo() == null) {
+            return "";
+        }
+
         Map<Integer, String> tableHtmlMap = new HashMap<>();
         if (doc.getPrism_tablesInfo() != null) {
             for (AlibabaOcrDocument.PrismTablesInfo tablesInfo : doc.getPrism_tablesInfo()) {
