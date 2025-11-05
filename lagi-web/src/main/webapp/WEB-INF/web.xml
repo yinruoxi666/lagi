@@ -347,4 +347,22 @@
         <url-pattern>/rerank</url-pattern>
     </servlet-mapping>
 
+    <servlet>
+        <servlet-name>fence</servlet-name>
+        <servlet-class>ai.servlet.FenceServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>fence</servlet-name>
+        <url-pattern>/fence/*</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
+        <servlet-name>filterConfig</servlet-name>
+        <servlet-class>ai.servlet.FilterConfigServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>filterConfig</servlet-name>
+        <url-pattern>/filterConfig/*</url-pattern>
+    </servlet-mapping>
+
 </web-app>

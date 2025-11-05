@@ -39,3 +39,25 @@ create table if not exists lagi_user_preference
     videoEnhance varchar(64)  ,
     videoTrack varchar(64)
 );
+
+create table if not exists lagi_filter_monitor
+(
+    id       Integer
+    primary key autoincrement,
+    filter_name varchar(64) not null,
+    action_type varchar(32) not null,
+    content text,
+    create_time datetime not null
+);
+
+create table if not exists lagi_filter_config
+(
+    id       Integer
+    primary key autoincrement,
+    name varchar(64) not null unique,
+    rules text,
+    groups text,
+    filter_window_length Integer default 0,
+    create_time datetime not null default CURRENT_TIMESTAMP,
+    update_time datetime not null default CURRENT_TIMESTAMP
+);

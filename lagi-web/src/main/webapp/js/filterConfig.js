@@ -1,0 +1,434 @@
+let filterConfigData = [];
+let filteredConfigData = [];
+
+function loadFilterConfigPage() {
+    $('#queryBox').hide();
+    $('#footer-info').hide();
+    $('#introduces').hide();
+    $('#topTitle').hide();
+    $('#item-content').show();
+    $('#item-content').css('height', 'calc(100vh - 60px)');
+    $('#item-content').css('overflow-y', 'auto');
+    hideBallDiv();
+    const html = `
+        <div id="filter-config-container" style="padding: 20px; height: 100%; overflow-y: auto;">
+            <div style="margin-bottom: 20px;">
+                <h2 style="margin-bottom: 10px;">安全配置管理</h2>
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <button onclick="showAddFilterDialog()" style="padding: 8px 16px; background: #1296db; color: white; border: none; border-radius: 4px; cursor: pointer;">新增过滤器</button>
+                    <input type="text" id="searchInput" placeholder="搜索过滤器..." style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; flex: 1; min-width: 200px;" onkeyup="filterConfigList()" />
+                    <select id="filterType" onchange="filterConfigList()" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;">
+                        <option value="">全部类型</option>
+                        <option value="sensitive">敏感词</option>
+                        <option value="priority">优先级</option>
+                        <option value="stopping">停止词</option>
+                        <option value="continue">继续词</option>
+                    </select>
+                </div>
+            </div>
+            <div id="filterConfigList" style="display: grid; gap: 16px;">
+            </div>
+        </div>
+        <div id="filterModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+            <div style="background: white; border-radius: 8px; padding: 24px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto;">
+                <h3 id="modalTitle" style="margin-bottom: 20px;">新增过滤器</h3>
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; margin-bottom: 8px;">过滤器类型: <span style="color: red;">*</span></label>
+                    <select id="filterName" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" onchange="onFilterTypeChange()">
+                        <option value="">请选择过滤器类型</option>
+                        <option value="sensitive">敏感词 (sensitive)</option>
+                        <option value="priority">优先级 (priority)</option>
+                        <option value="stopping">停止词 (stopping)</option>
+                        <option value="continue">继续词 (continue)</option>
+                    </select>
+                    <div style="font-size: 12px; color: #666; margin-top: 4px;">注意：只能选择以上4种系统支持的过滤器类型，自定义名称不会生效</div>
+                </div>
+                <div id="groupsContainer" style="margin-bottom: 16px;">
+                </div>
+                <div id="rulesContainer" style="margin-bottom: 16px;">
+                    <label style="display: block; margin-bottom: 8px;">规则 (用逗号分隔):</label>
+                    <textarea id="filterRules" placeholder="例如: car,weather,社*保&#10;多个规则用逗号分隔，支持正则表达式" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; min-height: 100px;"></textarea>
+                    <div style="font-size: 12px; color: #666; margin-top: 4px;">提示：多个规则用逗号分隔，支持正则表达式。如果是敏感词过滤器，请在"分组"中配置级别和规则。</div>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button onclick="hideFilterModal()" style="padding: 8px 16px; background: #ccc; color: white; border: none; border-radius: 4px; cursor: pointer;">取消</button>
+                    <button onclick="saveFilterConfig()" style="padding: 8px 16px; background: #1296db; color: white; border: none; border-radius: 4px; cursor: pointer;">保存</button>
+                </div>
+            </div>
+        </div>
+        <div id="deleteConfirmModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1001; align-items: center; justify-content: center;" onclick="if(event.target === this) { $('#deleteConfirmModal').css('display', 'none'); deleteConfirmName = null; }">
+            <div style="background: white; border-radius: 8px; padding: 24px; max-width: 400px; width: 90%;" onclick="event.stopPropagation();">
+                <h3 style="margin-bottom: 16px; color: black;">确认删除</h3>
+                <p id="deleteConfirmMessage" style="margin-bottom: 24px; color: #666;">确定要删除这个过滤器吗？此操作不可恢复。</p>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button id="deleteConfirmCancel" style="padding: 8px 16px; background: #ccc; color: white; border: none; border-radius: 4px; cursor: pointer;">取消</button>
+                    <button id="deleteConfirmOk" style="padding: 8px 16px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">确认删除</button>
+                </div>
+            </div>
+        </div>
+    `;
+    $('#item-content').html(html);
+    loadFilterConfigs();
+}
+
+function loadFilterConfigs() {
+    $.ajax({
+        type: "GET",
+        contentType: "application/json;charset=utf-8",
+        url: "filterConfig/list",
+        success: function(response) {
+            if (response.code === 0) {
+                filterConfigData = response.data || [];
+                filteredConfigData = filterConfigData;
+                renderFilterConfigList();
+            }
+        },
+        error: function() {
+            console.error("获取配置失败");
+        }
+    });
+}
+
+function filterConfigList() {
+    const searchText = $('#searchInput').val().toLowerCase();
+    const filterType = $('#filterType').val();
+
+    filteredConfigData = filterConfigData.filter(filter => {
+        const matchSearch = !searchText || (filter.name && filter.name.toLowerCase().includes(searchText));
+        const matchType = !filterType || filter.name === filterType;
+        return matchSearch && matchType;
+    });
+
+    renderFilterConfigList();
+}
+
+function renderFilterConfigList() {
+    const container = $('#filterConfigList');
+    container.empty();
+
+    if (filteredConfigData.length === 0 && filterConfigData.length > 0) {
+        container.html('<div style="text-align: center; padding: 40px; color: #999;">未找到匹配的过滤器</div>');
+        return;
+    }
+
+    if (filterConfigData.length === 0) {
+        container.html('<div style="text-align: center; padding: 40px; color: #999;">暂无过滤器配置，请点击"新增过滤器"添加</div>');
+        return;
+    }
+
+    const dataToRender = filteredConfigData.length > 0 ? filteredConfigData : filterConfigData;
+
+    dataToRender.forEach((filter, index) => {
+        const actualIndex = filterConfigData.findIndex(f => f.name === filter.name);
+        const card = `
+            <div style="background: white; border-radius: 8px; padding: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <h3 style="margin: 0;">${filter.name || ''}</h3>
+                    <div>
+                        <button onclick="editFilterConfig(${actualIndex >= 0 ? actualIndex : index})" style="padding: 6px 12px; background: #1296db; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 8px;">编辑</button>
+                        <button onclick="deleteFilterConfig('${filter.name || ''}')" style="padding: 6px 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">删除</button>
+                    </div>
+                </div>
+                ${filter.groups ? renderGroups(filter.groups) : ''}
+                ${filter.rules ? `<div style="margin-top: 12px;"><strong>规则:</strong> <div style="margin-top: 8px; padding: 8px; background: #f5f5f5; border-radius: 4px; white-space: pre-wrap;">${filter.rules}</div></div>` : ''}
+            </div>
+        `;
+        container.append(card);
+    });
+}
+
+function renderGroups(groups) {
+    if (!groups || groups.length === 0) return '';
+    let html = '<div style="margin-top: 12px;"><strong>分组:</strong><div style="margin-top: 8px;">';
+    groups.forEach((group, idx) => {
+        html += `<div style="padding: 8px; background: #f5f5f5; border-radius: 4px; margin-bottom: 8px;">
+            <div><strong>级别:</strong> ${group.level || ''}</div>
+            <div style="margin-top: 4px;"><strong>规则:</strong> <div style="margin-top: 4px; white-space: pre-wrap;">${group.rules || ''}</div></div>
+        </div>`;
+    });
+    html += '</div></div>';
+    return html;
+}
+
+let currentEditIndex = -1;
+
+function showAddFilterDialog() {
+    currentEditIndex = -1;
+    $('#modalTitle').text('新增过滤器');
+    $('#filterName').val('');
+    $('#filterName').prop('disabled', false);
+    $('#filterRules').val('');
+    $('#groupsContainer').empty();
+    onFilterTypeChange();
+    $('#filterModal').css('display', 'flex');
+}
+
+function onFilterTypeChange() {
+    const filterType = $('#filterName').val();
+    const groupsContainer = $('#groupsContainer');
+    const rulesContainer = $('#rulesContainer');
+
+    // 如果是新增模式且选择了敏感词，显示分组配置
+    if (currentEditIndex < 0 && filterType === 'sensitive') {
+        if (groupsContainer.find('.group-container').length === 0) {
+            groupsContainer.html(`
+                <label style="display: block; margin-bottom: 8px;">分组配置 (敏感词需要配置级别和规则):</label>
+                <div class="group-container" style="border: 1px solid #ddd; border-radius: 4px; padding: 12px; margin-bottom: 12px;">
+                    <div style="margin-bottom: 8px;">
+                        <label style="display: block; margin-bottom: 4px;">级别 (1=删除, 2=掩码, 3=擦除):</label>
+                        <input type="number" class="group-level" min="1" max="3" value="2" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px;" placeholder="1, 2, 或 3" />
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 4px;">规则 (用逗号分隔):</label>
+                        <textarea class="group-rules" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; min-height: 60px;" placeholder="例如: 维尼熊,敏感词,规则*"></textarea>
+                    </div>
+                </div>
+                <button type="button" onclick="addGroup()" style="padding: 6px 12px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; margin-bottom: 8px;">添加分组</button>
+            `);
+        }
+        rulesContainer.hide();
+    } else if (filterType === 'sensitive') {
+        // 编辑模式，保留现有分组
+        rulesContainer.hide();
+    } else {
+        // 其他类型，隐藏分组配置，显示规则配置
+        groupsContainer.empty();
+        rulesContainer.show();
+    }
+}
+
+function addGroup() {
+    const groupsContainer = $('#groupsContainer');
+    const newGroup = $(`
+        <div class="group-container" style="border: 1px solid #ddd; border-radius: 4px; padding: 12px; margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <label style="display: block; margin-bottom: 4px;">级别 (1=删除, 2=掩码, 3=擦除):</label>
+                <button type="button" onclick="$(this).closest('.group-container').remove()" style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">删除</button>
+            </div>
+            <div style="margin-bottom: 8px;">
+                <input type="number" class="group-level" min="1" max="3" value="2" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px;" placeholder="1, 2, 或 3" />
+            </div>
+            <div>
+                <label style="display: block; margin-bottom: 4px;">规则 (用逗号分隔):</label>
+                <textarea class="group-rules" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; min-height: 60px;" placeholder="例如: 维尼熊,敏感词,规则*"></textarea>
+            </div>
+        </div>
+    `);
+    groupsContainer.find('button[onclick="addGroup()"]').before(newGroup);
+}
+
+function editFilterConfig(index) {
+    if (index < 0 || index >= filterConfigData.length) {
+        alert('过滤器不存在');
+        return;
+    }
+    currentEditIndex = index;
+    const filter = filterConfigData[index];
+    $('#modalTitle').text('编辑过滤器');
+    $('#filterName').val(filter.name || '');
+    $('#filterName').prop('disabled', true);
+    $('#filterRules').val(filter.rules || '');
+
+    const groupsContainer = $('#groupsContainer');
+    groupsContainer.empty();
+    if (filter.groups && filter.groups.length > 0) {
+        groupsContainer.append('<label style="display: block; margin-bottom: 8px;">分组配置:</label>');
+        filter.groups.forEach((group, idx) => {
+            const groupDiv = `
+                <div class="group-container" style="border: 1px solid #ddd; border-radius: 4px; padding: 12px; margin-bottom: 12px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <label style="display: block; margin-bottom: 4px;">级别 (1=删除, 2=掩码, 3=擦除):</label>
+                        <button type="button" onclick="$(this).closest('.group-container').remove()" style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">删除</button>
+                    </div>
+                    <div style="margin-bottom: 8px;">
+                        <input type="number" class="group-level" min="1" max="3" value="${group.level || '2'}" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px;" />
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 4px;">规则 (用逗号分隔):</label>
+                        <textarea class="group-rules" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; min-height: 60px;">${(group.rules || '').replace(/"/g, '&quot;')}</textarea>
+                    </div>
+                </div>
+            `;
+            groupsContainer.append(groupDiv);
+        });
+        if (filter.name === 'sensitive') {
+            groupsContainer.append('<button type="button" onclick="addGroup()" style="padding: 6px 12px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; margin-bottom: 8px;">添加分组</button>');
+        }
+    } else if (filter.name === 'sensitive') {
+        // 敏感词但没有分组，添加一个空分组
+        groupsContainer.append('<label style="display: block; margin-bottom: 8px;">分组配置:</label>');
+        const groupDiv = `
+            <div class="group-container" style="border: 1px solid #ddd; border-radius: 4px; padding: 12px; margin-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <label style="display: block; margin-bottom: 4px;">级别 (1=删除, 2=掩码, 3=擦除):</label>
+                    <button type="button" onclick="$(this).closest('.group-container').remove()" style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">删除</button>
+                </div>
+                <div style="margin-bottom: 8px;">
+                    <input type="number" class="group-level" min="1" max="3" value="2" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px;" />
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 4px;">规则 (用逗号分隔):</label>
+                    <textarea class="group-rules" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; min-height: 60px;" placeholder="例如: 维尼熊,敏感词,规则*"></textarea>
+                </div>
+            </div>
+        `;
+        groupsContainer.append(groupDiv);
+        groupsContainer.append('<button type="button" onclick="addGroup()" style="padding: 6px 12px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; margin-bottom: 8px;">添加分组</button>');
+    }
+
+    // 根据过滤器类型显示/隐藏规则和分组
+    if (filter.name === 'sensitive') {
+        $('#rulesContainer').hide();
+    } else {
+        $('#rulesContainer').show();
+    }
+
+    onFilterTypeChange();
+    $('#filterModal').css('display', 'flex');
+}
+
+function hideFilterModal() {
+    $('#filterModal').css('display', 'none');
+}
+
+function saveFilterConfig() {
+    const name = $('#filterName').val().trim();
+    const rules = $('#filterRules').val().trim();
+
+    if (!name) {
+        alert('请选择过滤器类型');
+        return;
+    }
+
+    // 验证过滤器名称只能是系统支持的4种类型
+    const validTypes = ['sensitive', 'priority', 'stopping', 'continue'];
+    if (!validTypes.includes(name)) {
+        alert('过滤器类型只能是: sensitive(敏感词)、priority(优先级)、stopping(停止词)、continue(继续词)');
+        return;
+    }
+
+    const filter = {
+        name: name,
+        rules: rules || null
+    };
+
+    const groups = [];
+    $('.group-level').each(function() {
+        const level = $(this).val().trim();
+        // 找到当前分组容器中的规则输入框
+        const rulesText = $(this).closest('.group-container').find('.group-rules').val().trim();
+        if (level && rulesText) {
+            groups.push({
+                level: level,
+                rules: rulesText
+            });
+        }
+    });
+
+    if (groups.length > 0) {
+        filter.groups = groups;
+    }
+
+    const url = currentEditIndex >= 0 ? 'filterConfig/update' : 'filterConfig/add';
+    const method = 'POST';
+    const isEdit = currentEditIndex >= 0;
+
+    $.ajax({
+        type: method,
+        contentType: "application/json;charset=utf-8",
+        url: url,
+        data: JSON.stringify(filter),
+        success: function(response) {
+            if (response && response.code === 0) {
+                hideFilterModal();
+                loadFilterConfigs();
+                alert(isEdit ? '编辑成功' : '保存成功');
+            } else {
+                alert('保存失败: ' + (response && response.message ? response.message : '未知错误'));
+            }
+        },
+        error: function(xhr, status, error) {
+            let errorMsg = '保存失败';
+            if (xhr.responseJSON && xhr.responseJSON.message) {
+                errorMsg += ': ' + xhr.responseJSON.message;
+            } else if (xhr.responseText) {
+                try {
+                    const errorJson = JSON.parse(xhr.responseText);
+                    if (errorJson.message) {
+                        errorMsg += ': ' + errorJson.message;
+                    }
+                } catch (e) {
+                    errorMsg += ': ' + xhr.responseText.substring(0, 200);
+                }
+            }
+            alert(errorMsg);
+            console.error('保存过滤器配置失败:', xhr, status, error);
+        }
+    });
+}
+
+let deleteConfirmName = null;
+
+function deleteFilterConfig(name) {
+    // 显示自定义确认对话框
+    deleteConfirmName = name;
+    $('#deleteConfirmMessage').text('确定要删除过滤器 "' + name + '" 吗？此操作不可恢复。');
+    $('#deleteConfirmModal').css('display', 'flex');
+
+    // 清除之前的回调，避免重复绑定
+    $('#deleteConfirmCancel').off('click');
+    $('#deleteConfirmOk').off('click');
+
+    // 取消按钮：隐藏对话框，不执行删除
+    $('#deleteConfirmCancel').on('click', function() {
+        $('#deleteConfirmModal').css('display', 'none');
+        deleteConfirmName = null;
+    });
+
+    // 确认按钮：执行删除操作
+    $('#deleteConfirmOk').on('click', function() {
+        const nameToDelete = deleteConfirmName;
+        $('#deleteConfirmModal').css('display', 'none');
+        deleteConfirmName = null;
+
+        // 执行删除操作
+        if (nameToDelete) {
+            performDelete(nameToDelete);
+        }
+    });
+}
+
+function performDelete(name) {
+    $.ajax({
+        type: "POST",
+        contentType: "application/json;charset=utf-8",
+        url: "filterConfig/delete",
+        data: JSON.stringify({name: name}),
+        success: function(response) {
+            if (response.code === 0) {
+                loadFilterConfigs();
+                alert('删除成功');
+            } else {
+                alert('删除失败: ' + (response.message || '未知错误'));
+            }
+        },
+        error: function(xhr, status, error) {
+            let errorMsg = '删除失败';
+            if (xhr.responseJSON && xhr.responseJSON.message) {
+                errorMsg += ': ' + xhr.responseJSON.message;
+            } else if (xhr.responseText) {
+                try {
+                    const errorJson = JSON.parse(xhr.responseText);
+                    if (errorJson.message) {
+                        errorMsg += ': ' + errorJson.message;
+                    }
+                } catch (e) {
+                    errorMsg += ': ' + xhr.responseText.substring(0, 200);
+                }
+            }
+            alert(errorMsg);
+            console.error('删除过滤器配置失败:', xhr, status, error);
+        }
+    });
+}
+

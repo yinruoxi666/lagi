@@ -182,25 +182,55 @@ public class GlobalConfigurations extends AbstractConfiguration {
 
 
     private void push2wordRule(FilterConfig filter) {
+        if (filter.getGroups() == null || filter.getGroups().isEmpty()) {
+            org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(GlobalConfigurations.class);
+            log.warn("FilterConfig groups 为空，无法加载敏感词规则: {}", filter.getName());
+            return;
+        }
+        
         List<WordRule> rules = filter.getGroups().stream()
-                                .flatMap(group->
-                                        convert2ListRules(group.getRules()).stream()
+                                .flatMap(group-> {
+                                        if (group.getRules() == null || group.getRules().trim().isEmpty()) {
+                                            return java.util.stream.Stream.empty();
+                                        }
+                                        return convert2ListRules(group.getRules()).stream()
                                                 .map(rule -> {
                                                         String level = group.getLevel();
                                                         String mask = group.getMask();
                                                         int levelInt = 0;
-                                                        if ("erase".equals(level)) {
-                                                            levelInt = 3;
-                                                        } else if ("block".equals(level)) {
-                                                            levelInt = 1;
-                                                        } else if ("mask".equals(level)) {
-                                                            levelInt = 2;
+                                                        
+                                                        // 支持数字字符串和单词两种格式
+                                                        if (level != null) {
+                                                            if ("erase".equalsIgnoreCase(level) || "3".equals(level)) {
+                                                                levelInt = 3;
+                                                            } else if ("block".equalsIgnoreCase(level) || "1".equals(level)) {
+                                                                levelInt = 1;
+                                                            } else if ("mask".equalsIgnoreCase(level) || "2".equals(level)) {
+                                                                levelInt = 2;
+                                                            } else {
+                                                                // 尝试解析为整数
+                                                                try {
+                                                                    levelInt = Integer.parseInt(level);
+                                                                    if (levelInt < 1 || levelInt > 3) {
+                                                                        levelInt = 2; // 默认使用掩码
+                                                                    }
+                                                                } catch (NumberFormatException e) {
+                                                                    levelInt = 2; // 默认使用掩码
+                                                                }
+                                                            }
+                                                        } else {
+                                                            levelInt = 2; // 默认使用掩码
                                                         }
+                                                        
                                                         rule = rule.trim();
                                                         return WordRule.builder().level(levelInt).mask(mask).rule(rule).build();
-                                                })
-                                .collect(Collectors.toList()).stream())
+                                                });
+                                    })
                                 .collect(Collectors.toList());
+        
+        org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(GlobalConfigurations.class);
+        log.info("从 FilterConfig 加载敏感词规则: 分组数量={}, 规则数量={}", filter.getGroups().size(), rules.size());
+        
         WordRules wordRules = WordRules.builder()
                 .rules(rules)
                 .build();

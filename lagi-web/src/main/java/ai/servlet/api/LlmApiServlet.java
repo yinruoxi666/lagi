@@ -409,7 +409,7 @@ public class LlmApiServlet extends BaseServlet {
         observable.subscribe(
                 data -> {
                     lastResult[0] = data;
-                    ChatCompletionResult filter = SensitiveWordUtil.filter(data);
+                    ChatCompletionResult filter = SensitiveWordUtil.filter(data, true);
                     if (filter == null) {
                         return;
                     }
