@@ -959,8 +959,10 @@ public class VectorStoreService {
             List<IndexSearchData> childIndexList = getChildIndex(chunkData.getId(), updateChunkEmbedding.getCategory());
             vectorCache.removeFromAllCache(chunkData.getId());
             vectorCache.removeFromAllCache(parentIndex.getId());
-            for (IndexSearchData indexSearchData : childIndexList) {
-                vectorCache.removeFromAllCache(indexSearchData.getId());
+            if (childIndexList != null && !childIndexList.isEmpty()) {
+                for (IndexSearchData indexSearchData : childIndexList) {
+                    vectorCache.removeFromAllCache(indexSearchData.getId());
+                }
             }
         }
         return updateDataList;
