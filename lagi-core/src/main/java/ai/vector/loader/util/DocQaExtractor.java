@@ -9,9 +9,11 @@ import ai.openai.pojo.ChatCompletionResult;
 import ai.openai.pojo.ChatMessage;
 import ai.utils.JsonExtractor;
 import ai.utils.LagiGlobal;
+import ai.utils.ResourceUtil;
 import ai.utils.qa.ChatCompletionUtil;
 import ai.vector.QaChunkCallback;
 import ai.vector.VectorStoreConstant;
+import cn.hutool.core.util.StrUtil;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -31,36 +33,11 @@ public class DocQaExtractor {
     private static final Backend text2qaBackend = ContextLoader.configuration.getFunctions().getText2qa();
     private static final int THREAD_COUNT = 20;
 
-    private static final String PROMPT_TEMPLATE = "请将提供的长文本拆分成多个较小的段落，以便更好地管理和处理，同时保持内容的连贯性和上下文完整性。\n" +
-            "将拆分后的文本转化为多个“问答对”，并以指定的 JSON 格式输出。\n" +
-            "\n" +
-            "**严格要求：**\n" +
-            "\n" +
-            "1. 仅输出 JSON 格式内容，不要附加任何解释、说明或多余文字。\n" +
-            "2. 输出内容必须完整、符合 JSON 语法且可解析。\n" +
-            "3. 拆分时应尽可能保留原文的语义与细节。\n" +
-            "4. 每个“instruction”字段应是一个有意义的自然语言问题，不能只是词语或短语。\n" +
-            "5. “output”字段应是对应问题的回答内容。\n" +
-            "6. 对应问题的回答内容必须可以在原始文本找到。\n" +
-            "6. “instruction”和“output”字段都是字符串，不要设置为其它类型。\n" +
-            "7. 对应问题的回答内容必须可以在原始文本找到。\n" +
-            "\n" +
-            "**输出格式：**\n" +
-            "\n" +
-            "```json\n" +
-            "[\n" +
-            "  {\n" +
-            "    \"instruction\": \"问题\",\n" +
-            "    \"output\": \"答案\"\n" +
-            "  },\n" +
-            "  {\n" +
-            "    \"instruction\": \"问题\",\n" +
-            "    \"output\": \"答案\"\n" +
-            "  }\n" +
-            "]\n" +
-            "```\n" +
-            "\n" +
-            "**待处理内容：**\n%s";
+    private static final String PROMPT_TEMPLATE;
+
+    static {
+        PROMPT_TEMPLATE = ResourceUtil.loadAsString("/prompts/doc_qa_extractor.md");
+    }
 
     private final static CompletionsService completionService = new CompletionsService();
 

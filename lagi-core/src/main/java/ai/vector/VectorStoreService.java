@@ -121,7 +121,7 @@ public class VectorStoreService {
         String fileName = file.getName();
 
         boolean enableExcelToMd = (fileName.endsWith(".xls") || fileName.endsWith(".xlsx")) && VectorStoreConstant.ENABLE_EXCEL_TO_MD;
-        
+
         if (fileName.endsWith(".docx") || fileName.endsWith(".doc") || fileName.endsWith(".txt") || fileName.endsWith(".pdf") || enableExcelToMd) {
             docs = DocQaExtractor.parseText(docs);
         }

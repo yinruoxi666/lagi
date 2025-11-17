@@ -433,17 +433,7 @@ public class LlmApiServlet extends BaseServlet {
                     }
                 },
                 e -> {
-                    if (e instanceof com.alibaba.dashscope.exception.ApiException) {
-                        com.alibaba.dashscope.exception.ApiException apiException = (com.alibaba.dashscope.exception.ApiException) e;
-                        String errorMsg = apiException.getMessage();
-                        if (errorMsg != null && errorMsg.contains("DataInspectionFailed")) {
-                            logger.warn("Content inspection failed: {}", errorMsg);
-                        } else {
-                            logger.error("API error in stream completion", e);
-                        }
-                    } else {
-                        logger.error("Error in stream completion", e);
-                    }
+                    logger.error("Error in stream completion", e);
                     try {
                         if (medusaMonitor != null) {
                             medusaMonitor.finish(key);

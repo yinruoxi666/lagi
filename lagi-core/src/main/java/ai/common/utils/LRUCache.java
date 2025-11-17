@@ -125,4 +125,14 @@ public class LRUCache<K, V> {
             executorService.shutdown();
         }
     }
+
+    public void clear() {
+        lock.lock();
+        try {
+            map.clear();
+            timestampMap.clear();
+        } finally {
+            lock.unlock();
+        }
+    }
 }
