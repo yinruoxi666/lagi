@@ -23,4 +23,6 @@ public class RAGFunction {
     private Boolean preloadCache;
     @JsonProperty("preload_cache_category")
     private String preloadCacheCategory;
+    @JsonProperty("enable_excel_to_md")
+    private boolean enableExcelToMd = false;
 }

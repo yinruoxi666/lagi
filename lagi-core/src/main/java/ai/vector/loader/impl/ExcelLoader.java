@@ -3,6 +3,7 @@ package ai.vector.loader.impl;
 import ai.common.pojo.FileChunkResponse;
 import ai.utils.EasyExcelUtil;
 import ai.utils.ExcelSqlUtil;
+import ai.vector.VectorStoreConstant;
 import ai.vector.loader.DocumentLoader;
 import ai.vector.loader.pojo.SplitConfig;
 import lombok.extern.slf4j.Slf4j;
@@ -29,10 +30,14 @@ public class ExcelLoader implements DocumentLoader {
                 }
             }
         } else {
-            try {
-                return EasyExcelUtil.getChunkDocumentExcel(file, splitConfig.getChunkSizeForText());
-            } catch (Exception e) {
-                log.error("load excel file error", e);
+            if (VectorStoreConstant.ENABLE_EXCEL_TO_MD) {
+
+            } else {
+                try {
+                    return EasyExcelUtil.getChunkDocumentExcel(file, splitConfig.getChunkSizeForText());
+                } catch (Exception e) {
+                    log.error("load excel file error", e);
+                }
             }
         }
         return Collections.emptyList();

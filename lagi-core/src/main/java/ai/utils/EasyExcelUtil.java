@@ -20,6 +20,9 @@ import java.util.*;
  */
 public class EasyExcelUtil {
 
+    // Minimum column length threshold for merging columns
+    private static final int MIN_COLUMN_LENGTH_FOR_MERGE = 10;
+
     //用于标记是否为合并单元格
     private static Map<Integer, Boolean> mergedCellFlags = new HashMap<>();
     //用于记录上一行内容
@@ -385,9 +388,33 @@ public class EasyExcelUtil {
                 for (JSONObject cell : headerRow) {
                     headers.add(cell.getStr("cellValue"));
                 }
+                
+                // Calculate maximum length for each column
+                int maxColumnCount = 0;
+                for (List<JSONObject> row : rowJsons) {
+                    maxColumnCount = Math.max(maxColumnCount, row.size());
+                }
+                int[] columnMaxLengths = new int[maxColumnCount];
+                for (int col = 0; col < maxColumnCount; col++) {
+                    int maxLength = 0;
+                    for (int row = 1; row < rowJsons.size(); row++) {
+                        if (col < rowJsons.get(row).size()) {
+                            JSONObject cell = rowJsons.get(row).get(col);
+                            String cellValue = cell.getStr("cellValue");
+                            if (cellValue != null) {
+                                maxLength = Math.max(maxLength, cellValue.length());
+                            }
+                        }
+                    }
+                    columnMaxLengths[col] = maxLength;
+                }
+                
+                // Calculate merge strategy: which columns should be merged together
+                Map<Integer, Integer> mergeMap = calculateMergeStrategy(columnMaxLengths, rowJsons);
+                
                 for (int j = 1; j < rowJsons.size(); j++) {
                     List<JSONObject> rowJson = rowJsons.get(j);
-                    List<FileChunkResponse.Document> docs = mergeExcelColumn(rowJson, headers, visited);
+                    List<FileChunkResponse.Document> docs = mergeExcelColumn(rowJson, headers, visited, mergeMap);
                     if (docs.isEmpty()) {
                         continue;
                     }
@@ -400,22 +427,119 @@ public class EasyExcelUtil {
         return result;
     }
 
-    private static List<FileChunkResponse.Document> mergeExcelColumn(List<JSONObject> rowJson, List<String> headers, Set<List<FileChunkResponse.Document>> visited) {
-        List<FileChunkResponse.Document> docs = new ArrayList<>();
-        for (int k = 0; k < rowJson.size(); k++) {
-            JSONObject cell = rowJson.get(k);
-            String cellValue = cell.getStr("cellValue");
-            if (cellValue == null || cellValue.isEmpty()) {
-                continue;
+    /**
+     * Calculate merge strategy based on column maximum lengths
+     * Returns a map where key is column index, value is the starting column index of the merge group
+     */
+    private static Map<Integer, Integer> calculateMergeStrategy(int[] columnMaxLengths, List<List<JSONObject>> rowJsons) {
+        Map<Integer, Integer> mergeMap = new HashMap<>();
+        int colCount = columnMaxLengths.length;
+        
+        for (int i = 0; i < colCount; i++) {
+            if (mergeMap.containsKey(i)) {
+                continue; // Already processed as part of a merge group
             }
-            String header = "";
-            FileChunkResponse.Document doc = new FileChunkResponse.Document();
-            if (k < headers.size() && !headers.get(k).isEmpty()) {
-                header = headers.get(k) + ": ";
+            
+            int currentMaxLength = columnMaxLengths[i];
+            if (currentMaxLength < MIN_COLUMN_LENGTH_FOR_MERGE) {
+                // Need to merge with right adjacent columns
+                int mergeStart = i;
+                int mergeEnd = i;
+                int mergedMaxLength = currentMaxLength;
+                
+                // Keep merging with right columns until merged length >= MIN_COLUMN_LENGTH_FOR_MERGE
+                while (mergedMaxLength < MIN_COLUMN_LENGTH_FOR_MERGE && mergeEnd + 1 < colCount) {
+                    mergeEnd++;
+                    // Calculate the maximum length of merged columns across all rows
+                    int maxMergedLength = 0;
+                    for (int row = 1; row < rowJsons.size(); row++) {
+                        StringBuilder mergedValue = new StringBuilder();
+                        for (int col = mergeStart; col <= mergeEnd; col++) {
+                            if (col < rowJsons.get(row).size()) {
+                                JSONObject cell = rowJsons.get(row).get(col);
+                                String cellValue = cell.getStr("cellValue");
+                                if (cellValue != null) {
+                                    mergedValue.append(cellValue);
+                                }
+                            }
+                        }
+                        maxMergedLength = Math.max(maxMergedLength, mergedValue.length());
+                    }
+                    mergedMaxLength = maxMergedLength;
+                }
+                
+                // Mark all columns in this merge group
+                for (int col = mergeStart; col <= mergeEnd; col++) {
+                    mergeMap.put(col, mergeStart);
+                }
+            } else {
+                // No merge needed, column stands alone
+                mergeMap.put(i, i);
             }
-            doc.setText(header + cellValue + "\n");
-            docs.add(doc);
         }
+        
+        return mergeMap;
+    }
+
+    private static List<FileChunkResponse.Document> mergeExcelColumn(List<JSONObject> rowJson, List<String> headers, 
+                                                                      Set<List<FileChunkResponse.Document>> visited, 
+                                                                      Map<Integer, Integer> mergeMap) {
+        List<FileChunkResponse.Document> docs = new ArrayList<>();
+        Set<Integer> processedColumns = new HashSet<>();
+        
+        for (int k = 0; k < rowJson.size(); k++) {
+            if (processedColumns.contains(k)) {
+                continue; // Already processed as part of a merge group
+            }
+            
+            Integer mergeStart = mergeMap.get(k);
+            if (mergeStart == null) {
+                mergeStart = k;
+            }
+            
+            // Collect all columns in this merge group
+            List<Integer> mergeGroup = new ArrayList<>();
+            for (Map.Entry<Integer, Integer> entry : mergeMap.entrySet()) {
+                if (entry.getValue().equals(mergeStart)) {
+                    mergeGroup.add(entry.getKey());
+                }
+            }
+            mergeGroup.sort(Integer::compareTo);
+            
+            // Merge values from all columns in the group
+            StringBuilder mergedValue = new StringBuilder();
+            StringBuilder mergedHeader = new StringBuilder();
+            boolean hasValue = false;
+            
+            for (Integer colIndex : mergeGroup) {
+                if (colIndex < rowJson.size()) {
+                    JSONObject cell = rowJson.get(colIndex);
+                    String cellValue = cell.getStr("cellValue");
+                    if (cellValue != null && !cellValue.isEmpty()) {
+                        mergedValue.append(cellValue);
+                        hasValue = true;
+                    }
+                }
+                
+                // Build header from all columns in merge group
+                if (colIndex < headers.size() && !headers.get(colIndex).isEmpty()) {
+                    if (mergedHeader.length() > 0) {
+                        mergedHeader.append(" ");
+                    }
+                    mergedHeader.append(headers.get(colIndex));
+                }
+                
+                processedColumns.add(colIndex);
+            }
+            
+            if (hasValue) {
+                String header = mergedHeader.length() > 0 ? mergedHeader.toString() + ": " : "";
+                FileChunkResponse.Document doc = new FileChunkResponse.Document();
+                doc.setText(header + mergedValue.toString() + "\n");
+                docs.add(doc);
+            }
+        }
+        
         if (docs.isEmpty() || visited.contains(docs)) {
             return Collections.emptyList();
         }
