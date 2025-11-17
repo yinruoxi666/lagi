@@ -238,7 +238,7 @@ public class EasyExcelUtil {
                     rowData.add(cellValue);
                 }
             }
-            text += "| " + String.join(" | ", rowData) + " |</br>";
+            text += "| " + String.join(" | ", rowData) + " |\n";
             msgList.add(text);
         }
         for (String row : msgList) {
@@ -327,13 +327,13 @@ public class EasyExcelUtil {
     public static <T> List<FileChunkResponse.Document> mergePages1(List<Page<T>> pages, String sheet, String header) {
         List<FileChunkResponse.Document> result = new ArrayList<>();
         for (Page<T> page : pages) {
-            String text = "sheet工作表名：" + sheet + "/n";
-            text += header;
+            StringBuilder text = new StringBuilder();
+            text.append(header);
             for (T item : page.getItems()) {
-                text += item;
+                text.append(item);
             }
             FileChunkResponse.Document doc = new FileChunkResponse.Document();
-            doc.setText(text);
+            doc.setText(text.toString());
             result.add(doc);
         }
         return result;
@@ -546,15 +546,16 @@ public class EasyExcelUtil {
      * @param file
      * @return
      */
-    public static List<FileChunkResponse.Document> getChunkMarkdownExcel(File file, Integer pageSize) {
-        List<FileChunkResponse.Document> resultDocument = new ArrayList<>();
+    public static List<List<FileChunkResponse.Document>> getChunkMarkdownExcel(File file, Integer pageSize) {
+        List<List<FileChunkResponse.Document>> finalResult = new ArrayList<>();
         try {
             ExcelReader reader = ExcelUtil.getReader(file);
             List<String> sheetNames = reader.getSheetNames();
             for (int i = 0; i < sheetNames.size(); i++) {
+                List<FileChunkResponse.Document> resultDocument = new ArrayList<>();
                 List<List<JSONObject>> result = readMergeExcel(file.getPath(), i, 0, 0);
                 StringBuilder separator = new StringBuilder();
-                if (result.size() <= 0) {
+                if (result.isEmpty()) {
                     break;
                 }
                 // 获取表头
@@ -563,18 +564,19 @@ public class EasyExcelUtil {
                 for (JSONObject cell : headerRow) {
                     headers.add(cell.getStr("cellValue"));
                 }
-                separator.append("| " + String.join(" | ", headers) + " |</br>");
+                separator.append("| ").append(String.join(" | ", headers)).append(" |\n");
                 for (int j = 0; j < headers.size(); j++) {
                     separator.append("| --- ");
                 }
-                separator.append("|</br>");
+                separator.append("|\n");
                 List<Page<List<Object>>> pages = paginate1(result, pageSize);
                 resultDocument.addAll(mergePages1(pages, sheetNames.get(i), separator.toString()));
+                finalResult.add(resultDocument);
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
-        return resultDocument;
+        return finalResult;
     }
 
     public static List<List<FileChunkResponse.Document>> getChunkDocumentCsv(File file) {

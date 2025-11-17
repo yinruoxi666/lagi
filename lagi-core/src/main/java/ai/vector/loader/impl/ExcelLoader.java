@@ -31,10 +31,10 @@ public class ExcelLoader implements DocumentLoader {
             }
         } else {
             if (VectorStoreConstant.ENABLE_EXCEL_TO_MD) {
-
+                return EasyExcelUtil.getChunkMarkdownExcel(file, splitConfig.getChunkSizeForTable());
             } else {
                 try {
-                    return EasyExcelUtil.getChunkDocumentExcel(file, splitConfig.getChunkSizeForText());
+                    return EasyExcelUtil.getChunkDocumentExcel(file, splitConfig.getChunkSizeForTable());
                 } catch (Exception e) {
                     log.error("load excel file error", e);
                 }
