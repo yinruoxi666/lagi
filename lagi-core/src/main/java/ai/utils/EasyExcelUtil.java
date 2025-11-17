@@ -508,36 +508,25 @@ public class EasyExcelUtil {
             
             // Merge values from all columns in the group
             StringBuilder mergedValue = new StringBuilder();
-            StringBuilder mergedHeader = new StringBuilder();
-            boolean hasValue = false;
-            
+
             for (Integer colIndex : mergeGroup) {
+                String cellValue = null;
                 if (colIndex < rowJson.size()) {
                     JSONObject cell = rowJson.get(colIndex);
-                    String cellValue = cell.getStr("cellValue");
-                    if (cellValue != null && !cellValue.isEmpty()) {
-                        mergedValue.append(cellValue);
-                        hasValue = true;
-                    }
+                    cellValue = cell.getStr("cellValue");
                 }
-                
-                // Build header from all columns in merge group
+                String header = "";
                 if (colIndex < headers.size() && !headers.get(colIndex).isEmpty()) {
-                    if (mergedHeader.length() > 0) {
-                        mergedHeader.append(" ");
-                    }
-                    mergedHeader.append(headers.get(colIndex));
+                    header = headers.get(colIndex) + ": ";
                 }
-                
+                if (cellValue != null && !cellValue.isEmpty()) {
+                    mergedValue.append(header).append(cellValue).append("\n");
+                }
                 processedColumns.add(colIndex);
             }
-            
-            if (hasValue) {
-                String header = mergedHeader.length() > 0 ? mergedHeader.toString() + ": " : "";
-                FileChunkResponse.Document doc = new FileChunkResponse.Document();
-                doc.setText(header + mergedValue.toString() + "\n");
-                docs.add(doc);
-            }
+            FileChunkResponse.Document doc = new FileChunkResponse.Document();
+            doc.setText(mergedValue.toString());
+            docs.add(doc);
         }
         
         if (docs.isEmpty() || visited.contains(docs)) {
