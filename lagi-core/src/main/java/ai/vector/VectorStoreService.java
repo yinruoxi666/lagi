@@ -26,6 +26,9 @@ import ai.vector.loader.util.DocQaExtractor;
 import ai.vector.pojo.*;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -240,6 +243,10 @@ public class VectorStoreService {
         }).whenComplete((r, ex) -> {
             if (listener != null && ex != null) listener.onError(fileId, ex);
         });
+    }
+
+    public List<String> addSingleDocumentVectors(String fileId, String category) {
+        return null;
     }
 
     private List<FileInfo> getFileInfoList(Map<String, Object> metadatas, List<FileChunkResponse.Document> docList) {
@@ -527,6 +534,11 @@ public class VectorStoreService {
         }
         log.info("VectorStoreService search | question: {}, category: {}, where: {}, after es filter result size: {}",
                 question, category, where, indexSearchDataList.size());
+        // 打印检索结果中的text和distance
+        indexSearchDataList.forEach(indexSearchData -> {
+            log.info("VectorStoreService search result | id: {}, distance: {}, text: {}",
+                    indexSearchData.getId(), indexSearchData.getDistance(), indexSearchData.getText());
+        });
         return processFutureResults(indexSearchDataList, category);
     }
 
@@ -614,6 +626,8 @@ public class VectorStoreService {
             extendedList = extendText(indexSearchData, category);
             vectorCache.putToVectorLinkCache(indexSearchData.getId(), extendedList);
         }
+        // 将距离赋值给所有扩展的数据
+        extendedList.get(0).setDistance(indexSearchData.getDistance());
         log.info("extendIndexSearchData | id: {}, extended size: {}", indexSearchData.getId(), extendedList.size());
         return extendedList;
     }
@@ -631,6 +645,8 @@ public class VectorStoreService {
             if (indexRecord.getDistance() > similarity_cutoff) {
                 continue;
             }
+            log.info("打印匹配到向量 | 文本: {}, 距离: {}",
+                    indexRecord.getDocument(), indexRecord.getDistance());
             IndexSearchData indexSearchData = toIndexSearchData(indexRecord);
             if (indexSearchData != null) {
                 result.add(indexSearchData);
@@ -777,7 +793,9 @@ public class VectorStoreService {
         for (IndexSearchData indexSearchData : resultList) {
             IndexSearchData indexSearchDataCopy = new IndexSearchData();
             BeanUtil.copyProperties(indexSearchData, indexSearchDataCopy);
-            BeanUtil.copyProperties(data, indexSearchDataCopy, "text","image");
+            BeanUtil.copyProperties(data, indexSearchDataCopy, "text","image","distance");
+            log.info("打印原数据text内容{},distance距离：{}",data.getText(),data.getDistance());
+            log.info("打印复制后text内容{},distance距离：{}",indexSearchDataCopy.getText(),indexSearchDataCopy.getDistance());
             copyList.add(indexSearchDataCopy);
         }
         return copyList;
@@ -823,9 +841,9 @@ public class VectorStoreService {
         this.vectorStore.delete(deleteEmbedding);
     }
 
-    public void chunkAdd(AddChunkEmbedding addChunkEmbedding) {
+    public AddEmbedding chunkAdd(AddChunkEmbedding addChunkEmbedding) {
         if (addChunkEmbedding == null || addChunkEmbedding.getData() == null || addChunkEmbedding.getData().isEmpty()) {
-            return;
+            return null;
         }
         String category = addChunkEmbedding.getCategory();
         if (category == null) {
@@ -840,6 +858,8 @@ public class VectorStoreService {
                 .data(addDataList)
                 .build();
         this.add(addEmbedding);
+        extractQuestionsFromDocument(addDataList,category);
+        return addEmbedding;
     }
 
     private List<AddEmbedding.AddEmbeddingData> getAddEmbeddingData(AddChunkEmbedding addChunkEmbedding) {
@@ -1078,6 +1098,44 @@ public class VectorStoreService {
             log.error("Failed to delete child nodes with source {} for parent {}",
                     VectorStoreConstant.FileChunkSource.FILE_CHUNK_SOURCE_LLM, parentId, e);
             throw new RuntimeException("Failed to delete child nodes", e);
+        }
+    }
+    private void extractQuestionsFromDocument(List<AddEmbedding.AddEmbeddingData> addDataList, String category) {
+        //        // 生成扩展相关问题
+        for (AddEmbedding.AddEmbeddingData addData : addDataList) {
+            String json = DocQaExtractor.extractDocument(addData.getDocument());
+            if (json == null) {
+                log.warn("Failed to extract JSON from LLM response for document {}. Using original document.", addData.getDocument());
+                continue;
+            }
+            List<FileChunkResponse.Document> qaDocs = new ArrayList<>();
+            ObjectMapper objectMapper = new ObjectMapper();
+            try {
+                List<Map<String, String>> dataList = objectMapper.readValue(json, new TypeReference<List<Map<String, String>>>() {
+                });
+
+                List<FileInfo> fileList = new ArrayList<>();
+                for (Map<String, String> map : dataList) {
+                    String instruction = map.get("instruction");
+                    if (instruction != null && !instruction.trim().isEmpty()) {
+                        FileInfo fileInfo = new FileInfo();
+                        String embeddingId = UUID.randomUUID().toString().replace("-", "");
+                        fileInfo.setEmbedding_id(embeddingId);
+                        fileInfo.setText(instruction);
+                        Map<String, Object> tmpMetadatas = new HashMap<>(addData.getMetadata());
+                        tmpMetadatas.put("reference_document_id", addData.getId());
+                        tmpMetadatas.put("parent_id", addData.getId());
+                        tmpMetadatas.put("source", FILE_CHUNK_SOURCE_LLM);
+                        fileInfo.setMetadatas(tmpMetadatas);
+                        fileList.add(fileInfo);
+                    }
+                }
+                upsertFileVectors(fileList, category);
+            } catch (JsonProcessingException e) {
+                log.error("JSON parsing error for document {}: {}", addData.getDocument(), e.getMessage());
+            } catch (IOException e) {
+                log.error("Error processing document chunk", e);
+            }
         }
     }
 }

@@ -33,7 +33,7 @@ public class ExcelSqlUtil {
     private static MysqlAdapter mysqlAdapter;
     private static SqliteAdapter sqliteAdapter;
     private static final Logger log = LoggerFactory.getLogger(ExcelSqlUtil.class);
-    private static boolean isSwitch = false;
+    private static boolean isSwitch = true;
 
     static {
         //        ContextLoader.loadContext();

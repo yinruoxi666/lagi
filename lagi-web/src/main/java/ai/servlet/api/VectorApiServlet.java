@@ -140,9 +140,10 @@ public class VectorApiServlet extends BaseServlet {
         resp.setContentType("application/json;charset=utf-8");
         String json = requestToJson(req);
         AddChunkEmbedding addChunkEmbedding = objectMapper.readValue(json, AddChunkEmbedding.class);
-        vectorStoreService.chunkAdd(addChunkEmbedding);
+        AddEmbedding addEmbedding = vectorStoreService.chunkAdd(addChunkEmbedding);
         Map<String, Object> result = new HashMap<>();
         result.put("status", "success");
+        result.put("data", addEmbedding);
         responsePrint(resp, toJson(result));
     }
 

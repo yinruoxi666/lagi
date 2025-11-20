@@ -38,7 +38,7 @@ models:
     enable: true
     driver: ai.llm.adapter.impl.GPTAzureAdapter
     endpoint: https://dgman-north-central-us-gpt4.openai.azure.com/
-    api_key: 56cac597a3c1477da3b83a60f67c6507
+    api_key:
 
   - name: chatgpt-azure-east-us
     type: Microsoft
@@ -46,7 +46,7 @@ models:
     enable: true
     driver: ai.llm.adapter.impl.GPTAzureAdapter
     endpoint: https://dgman-east-us-assistant.openai.azure.com/
-    api_key: 4d528a5378334237b76f95fdcf378e1e
+    api_key:
 
   - name: chatgpt-azure-east-us-mini
     type: Microsoft
@@ -54,7 +54,7 @@ models:
     enable: true
     driver: ai.llm.adapter.impl.GPTAzureAdapter
     endpoint: https://dgman-east-us-assistant.openai.azure.com/
-    api_key: 4d528a5378334237b76f95fdcf378e1e
+    api_key:
 
   - name: chatgpt-azure-admin-m231f9dc-eastus2
     type: Microsoft
@@ -62,7 +62,7 @@ models:
     enable: true
     driver: ai.llm.adapter.impl.GPTAzureAdapter
     endpoint: https://admin-m231f9dc-eastus2.openai.azure.com/
-    api_key: d71aad316d69427e91b659dd19b95edc
+    api_key:
 
   # qwen (TongyiQianwen) is an advanced large-scale language model developed by Alibaba Cloud
   - name: qwen
@@ -76,9 +76,9 @@ models:
     # Options for default, llm, voice, vision and ocr, line by line above.
     driver: ai.wrapper.impl.AlibabaAdapter
     # help document https://help.aliyun.com/document_detail/2712195.html?spm=a2c4g.2712576.0.0.733b3374np40s0
-    api_key: sk-f4f5565da70f49228a8f3fc2d231a543 # url address  https://bailian.console.aliyun.com/#/home
-    access_key_id: LTAI5tRdxsnKjJyyS5yyGsc6
-    access_key_secret: al7cQPa6KvH8svcZ8Z3n1lAeE07ImS
+    api_key:  # url address  https://bailian.console.aliyun.com/#/home
+    access_key_id:
+    access_key_secret:
 
   # ERNIE Bot (WenxinYiyan) is an advanced large-scale language model developed by Baidu
   - name: ernie
@@ -104,7 +104,7 @@ models:
     enable: true
     model: glm-3-turbo,glm-4, glm-4v, glm-4-alltools
     driver: ai.llm.adapter.impl.ZhipuAdapter
-    api_key: 35b7042a1699fc7c9d9d22c078f39423.mRQcEhtKzmYyCPqJ #  url address https://open.bigmodel.cn/usercenter/apikeys
+    api_key:  #  url address https://open.bigmodel.cn/usercenter/apikeys
 
   # Kimi is an intelligent assistant product developed by Moonshot AI.
   - name: kimi
@@ -112,7 +112,7 @@ models:
     enable: true
     model: moonshot-v1-8k,moonshot-v1-32k,moonshot-v1-128k
     driver: ai.llm.adapter.impl.MoonshotAdapter
-    api_key: sk-8awyNSqv7us7Rg3o5Z567aS2iyw7q2Es66J6xGGaG8hgUAwJ  #  url address https://platform.moonshot.cn/console/api-keys
+    api_key:   #  url address https://platform.moonshot.cn/console/api-keys
 
   # Baichuan is a new generation of open source large language model launched by Baichuan AI
   - name: baichuan
@@ -128,7 +128,7 @@ models:
     model: psychology-base-v1
     driver: ai.llm.adapter.impl.PsychologyBaseAdapter
     api_key: lk-Yr5fKpz9LbX2cD7RnAmQwVj3sGt6HxJkZ8FdN1eUo4iT0qWvMuIhPcS2
-    api_address: https://kcld-temp-api.dbxiao.cn/phoenix/psychologybaseMgr/api/v1/ai/assistant/iot/chat/completions
+    api_address: https://psy-prod-api.kcldai.com/phoenix/psychologybaseMgr/api/v1/ai/assistant/iot/chat/completions
     app_id: 30000
 
   # iFLYTEK Spark is an AI cognitive model developed by iFLYTEK, aiming to provide natural language interaction and generation capabilities
@@ -142,8 +142,8 @@ models:
     driver: ai.wrapper.impl.FlytekAdapter
     app_id: 948cf4b6
     #    api_key: 54f6e81f40a31d66d976496de895a7a4  # https://console.xfyun.cn/
-    api_key: cvUdhNJQEFXOOHfDFtPx:wDeBmrxvJfwdyjFsIzQz  # https://console.xfyun.cn/
-    secret_key: ZDYyMjNmMTlkYTE0YWRmOWUwZTYxNjYz   # https://console.xfyun.cn/
+    api_key:   # https://console.xfyun.cn/
+    secret_key:    # https://console.xfyun.cn/
 
   - name: zhishu
     type: Zhishu-ds
@@ -159,7 +159,7 @@ models:
     model:  qwen2.5-72b-instruct
     driver: ai.llm.adapter.impl.OpenAIStandardAdapter
     api_address: https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
-    api_key: sk-f4f5565da70f49228a8f3fc2d231a543
+    api_key:
 
   # ChatGPT is a state-of-the-art language model developed by OpenAI
   - name: ayenaspring
@@ -167,7 +167,7 @@ models:
     enable: true
     model: ayenaspring-advanced-001
     driver: ai.llm.adapter.impl.AyenaAdapter
-    api_key: sk-4a78244e7fab4af9ba2a3bf8eb3cacb4ldiehkid4h6tjkx2 # https://platform.openai.com/
+    api_key:  # https://platform.openai.com/
     api_address: https://www.ayenaspring.com:8081/v2/chat/completions
 
   # SenseChat(RiRiXin) is a large language model developed by SenseTime
@@ -196,10 +196,10 @@ models:
       openspeech
     # Options for default, llm and voice, line by line above.
     driver: ai.wrapper.impl.ByteDanceAdapter
-    api_key: your-api-key
+    api_key:
     app_id: your-app-id
     access_token: your-access-token
-    alias: doubao-pro-4k=your_endpoint_id,doubao-pro-32k=your_endpoint_id
+    alias: doubao-pro-4k=your_endpoint_id,doubao-pro-32k=doubao-1-5-pro-32k-250115
 
   # DeepSeek is an open source large language model launched by DeepSeek.
   - name: deepseek
@@ -212,7 +212,7 @@ models:
       # https://dashscope.aliyuncs.com/compatible-mode/v1
       # https://qianfan.baidubce.com/v2/chat/completions
     # https://api.lkeap.cloud.tencent.com/v1
-    api_key: sk-8f41405229de4c8b8269fd4d18dcb29e # url address https://platform.deepseek.com/api_keys
+    api_key:  # url address https://platform.deepseek.com/api_keys
 
 include_models: model.yml
 
@@ -229,7 +229,7 @@ stores:
       similarity_cutoff: 0.6
       parent_depth: 1
       child_depth: 1
-      url: http://test.digimeta.com.cn:16990
+      url: http://47.94.3.24:16990
 
   rag: # RAG enhances large language models by integrating external knowledge retrieval.
     vector: chroma
@@ -268,10 +268,10 @@ include_stores: store.yml
 
 functions:
   embedding:
-    - backend: qwen
-      type: Qwen
-      api_key: sk-f4f5565da70f49228a8f3fc2d231a543
-
+    - backend: vicuna
+      type: Vicuna
+      api_key:
+      api_endpoint: http://192.168.88.242:8001/v1/embeddings
   chat:
     context_length: 147072
     route: best((chatgpt-azure,chatgpt-azure-east-us))
@@ -347,6 +347,12 @@ functions:
 
       - backend: yitu
         model: qwen2.5-72b-instruct
+        enable: true
+        stream: true
+        priority: 80
+
+      - backend: doubao
+        model: doubao-pro-32k
         enable: true
         stream: true
         priority: 80

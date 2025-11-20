@@ -136,6 +136,11 @@ public class DocQaExtractor {
         }
     }
 
+    public static String extractDocument(String document) {
+        String prompt = String.format(PROMPT_TEMPLATE, document);
+        return extract(prompt);
+    }
+
     public static String extract(String prompt) {
         String model = text2qaBackend.getModel();
         ChatCompletionRequest chatCompletionRequest = getCompletionRequest(model, prompt);

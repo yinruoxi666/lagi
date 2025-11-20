@@ -5,6 +5,8 @@
 			</pattern>
 		</encoder>
 	</appender>
+	<logger name="com.zaxxer.hikari" level="DEBUG"/>
+	<logger name="org.sqlite" level="DEBUG"/>
 	<root level="info">
 		<appender-ref ref="STDOUT" />
 	</root>
