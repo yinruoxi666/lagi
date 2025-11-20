@@ -1,10 +1,19 @@
 package ai.vector;
 
+import ai.config.ContextLoader;
+import ai.config.pojo.RAGFunction;
+
 public class VectorStoreConstant {
     public static final String VECTOR_STORE_CHROMA = "Chroma";
     public static final String VECTOR_STORE_PINECONE = "Pinecone";
     public static final String VECTOR_METRIC_COSINE = "cosine";
     public static final int VECTOR_CACHE_SIZE = 10000;
+    public static final boolean ENABLE_EXCEL_TO_MD;
+
+    static {
+        RAGFunction ragConfig = ContextLoader.configuration.getStores().getRag();
+        ENABLE_EXCEL_TO_MD = ragConfig != null && ragConfig.isEnableExcelToMd();
+    }
 
     public static class FileChunkSource {
         public static final String FILE_CHUNK_SOURCE_LLM = "llm";

@@ -10,15 +10,29 @@ import java.util.stream.Collectors;
 
 public class PriorityWordUtil  {
 
-    private static final AhoCorasick ahoCorasick = new AhoCorasick();
+    private static AhoCorasick ahoCorasick = new AhoCorasick();
+    private static final List<String> wordList = new java.util.ArrayList<>();
 
     static {
-        List<String> wordList = JsonFileLoadUtil.readWordListJson("/priority_word.json");
-        addWords(wordList);
+        List<String> words = JsonFileLoadUtil.readWordListJson("/priority_word.json");
+        addWords(words);
     }
 
-    public static void addWords(List<String> wordList) {
-        ahoCorasick.addWords(wordList);
+    public static void addWords(List<String> words) {
+        if (words != null && !words.isEmpty()) {
+            wordList.addAll(words);
+            ahoCorasick.addWords(words);
+        }
+    }
+
+    public static void clearWords() {
+        wordList.clear();
+        ahoCorasick = new AhoCorasick();
+    }
+
+    public static void reloadWords(List<String> words) {
+        clearWords();
+        addWords(words);
     }
 
     public static List<ChatCompletionChoice> sortByPriorityWord(ChatCompletionResult chatCompletionResult) {
@@ -37,10 +51,12 @@ public class PriorityWordUtil  {
     }
 
     public static boolean containPriorityWord(String message) {
-        if (ahoCorasick.containsAny(message.toLowerCase())) {
-            return true;
+        boolean result = ahoCorasick.containsAny(message.toLowerCase());
+        if (result) {
+            FilterMonitorUtil.recordFilterAction("priority", "match", 
+                "匹配优先级词, 内容: " + (message.length() > 500 ? message.substring(0, 500) : message));
         }
-        return false;
+        return result;
     }
 
 

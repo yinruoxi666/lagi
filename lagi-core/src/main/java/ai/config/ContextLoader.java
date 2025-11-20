@@ -8,6 +8,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
@@ -21,10 +23,12 @@ public class ContextLoader {
         ObjectMapper mapper = new YAMLMapper();
         mapper.setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
         try {
-            configuration = mapper.readValue(inputStream, GlobalConfigurations.class);
+            InputStreamReader reader = new InputStreamReader(inputStream, StandardCharsets.UTF_8);
+            configuration = mapper.readValue(reader, GlobalConfigurations.class);
             configuration.init();
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            log.error("从 InputStream 加载配置失败", e);
+            throw new RuntimeException("加载配置失败", e);
         }
     }
 
@@ -35,10 +39,37 @@ public class ContextLoader {
 
     public static void loadContextByFilePath(String filePath) {
         try {
-            InputStream resourceAsStream = Files.newInputStream(Paths.get(filePath));
-            loadContextByInputStream(resourceAsStream);
+            String encoding = detectEncoding(filePath);
+            if (encoding == null) {
+                encoding = "UTF-8";
+            }
+            InputStreamReader reader = new InputStreamReader(
+                Files.newInputStream(Paths.get(filePath)),
+                java.nio.charset.Charset.forName(encoding)
+            );
+            ObjectMapper mapper = new YAMLMapper();
+            mapper.setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
+            try {
+                configuration = mapper.readValue(reader, GlobalConfigurations.class);
+                configuration.init();
+                reader.close();
+            } catch (IOException e) {
+                reader.close();
+                log.error("加载配置文件失败: {}", filePath, e);
+                throw new RuntimeException("加载配置文件失败: " + filePath, e);
+            }
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            log.error("打开配置文件失败: {}", filePath, e);
+            throw new RuntimeException("打开配置文件失败: " + filePath, e);
+        }
+    }
+
+    private static String detectEncoding(String filePath) {
+        try {
+            return ai.utils.EncodingDetector.detectEncoding(filePath);
+        } catch (Exception e) {
+            log.warn("检测文件编码失败，使用默认 UTF-8: {}", filePath, e);
+            return "UTF-8";
         }
     }
 

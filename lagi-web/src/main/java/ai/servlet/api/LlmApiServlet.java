@@ -409,8 +409,11 @@ public class LlmApiServlet extends BaseServlet {
         observable.subscribe(
                 data -> {
                     lastResult[0] = data;
-                    ChatCompletionResult filter = SensitiveWordUtil.filter(data);
-                    if (filter != null && filter.getChoices() != null && !filter.getChoices().isEmpty() && filter.getChoices().get(0).getFinish_reason() != null ) {
+                    ChatCompletionResult filter = SensitiveWordUtil.filter(data, true);
+                    if (filter == null) {
+                        return;
+                    }
+                    if (filter.getChoices() != null && !filter.getChoices().isEmpty() && filter.getChoices().get(0).getFinish_reason() != null ) {
                         ChatCompletionChoice chatCompletionChoice = filter.getChoices().get(0);
                         String finishReason = chatCompletionChoice.getFinish_reason();
                         chatCompletionChoice.setFinish_reason(null);
@@ -425,13 +428,36 @@ public class LlmApiServlet extends BaseServlet {
                         String msg = gson.toJson(filter);
                         outputChunk(out, msg);
                     }
-                    if (medusaMonitor != null && promptInput != null && filter != null) {
+                    if (medusaMonitor != null && promptInput != null) {
                         medusaMonitor.put(key, new CacheItem(promptInput, filter));
                     }
                 },
                 e -> {
-                    logger.error("", e);
-                    medusaMonitor.finish(key);
+                    if (e instanceof com.alibaba.dashscope.exception.ApiException) {
+                        com.alibaba.dashscope.exception.ApiException apiException = (com.alibaba.dashscope.exception.ApiException) e;
+                        String errorMsg = apiException.getMessage();
+                        if (errorMsg != null && errorMsg.contains("DataInspectionFailed")) {
+                            logger.warn("Content inspection failed: {}", errorMsg);
+                        } else {
+                            logger.error("API error in stream completion", e);
+                        }
+                    } else {
+                        logger.error("Error in stream completion", e);
+                    }
+                    try {
+                        if (medusaMonitor != null) {
+                            medusaMonitor.finish(key);
+                        }
+                    } catch (Exception ex) {
+                        logger.error("Error in medusaMonitor.finish", ex);
+                    }
+                    try {
+                        out.print("data: " + "[DONE]" + "\n\n");
+                        out.flush();
+                        out.close();
+                    } catch (Exception ex) {
+                        logger.error("Error closing stream", ex);
+                    }
                 },
                 () -> {
                     if(lastResult[0] == null) {

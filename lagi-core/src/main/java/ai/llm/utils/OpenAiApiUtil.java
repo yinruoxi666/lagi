@@ -165,7 +165,7 @@ public class OpenAiApiUtil {
         factory.newEventSource(request, new EventSourceListener() {
             @Override
             public void onOpen(@NotNull EventSource eventSource, @NotNull Response response) {
-                log.info("ServerSentEventUtil streamCompletions onOpen: response = {}", response);
+//                log.info("ServerSentEventUtil streamCompletions onOpen: response = {}", response);
                 int code = response.code();
                 try {
                     String bodyStr = response.body().string();
@@ -183,7 +183,7 @@ public class OpenAiApiUtil {
             }
             @Override
             public void onEvent(@NotNull EventSource eventSource, @Nullable String id, @Nullable String type, @NotNull String data) {
-                log.info("ServerSentEventUtil streamCompletions onEvent: data = {}" , data);
+//                log.info("ServerSentEventUtil streamCompletions onEvent: data = {}" , data);
                 ChatCompletionResult chatCompletionResult = convertResponseFunc.apply(data);
                 if (chatCompletionResult != null) {
                     res.add(chatCompletionResult);

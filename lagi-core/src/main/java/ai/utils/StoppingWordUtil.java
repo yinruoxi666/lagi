@@ -13,7 +13,7 @@ import java.util.stream.IntStream;
 
 public class StoppingWordUtil {
 
-    private static final AhoCorasick ahoCorasick = new AhoCorasick();
+    private static AhoCorasick ahoCorasick = new AhoCorasick();
     private static final List<String> patterns = new ArrayList<>();
 
     static {
@@ -29,11 +29,23 @@ public class StoppingWordUtil {
         patterns.addAll(wordList);
     }
 
+    public static void clearWords() {
+        patterns.clear();
+        ahoCorasick = new AhoCorasick();
+    }
+
+    public static void reloadWords(List<String> words) {
+        clearWords();
+        addWords(words);
+    }
+
     public static boolean containsStoppingWorlds(String msg) {
         for(String pattern : patterns) {
             Pattern p = Pattern.compile(pattern);
             Matcher matcher = p.matcher(msg);
             if(matcher.find()) {
+                FilterMonitorUtil.recordFilterAction("stopping", "match", 
+                    "匹配停止词规则: " + pattern + ", 内容: " + (msg.length() > 500 ? msg.substring(0, 500) : msg));
                 return true;
             }
         }

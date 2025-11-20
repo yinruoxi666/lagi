@@ -337,5 +337,7 @@
 <script src="js/self.js?ver=${initParam.version}"></script>
 <script src="js/query.js?ver=${initParam.version}"></script>
 <script src="js/ball.js?ver=${initParam.version}"></script>
+<script src="js/fence.js?ver=${initParam.version}"></script>
+<script src="js/filterConfig.js?ver=${initParam.version}"></script>
 </body>
 </html>

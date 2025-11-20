@@ -291,6 +291,22 @@ let promptNavs = [
                 prompt: '该功能通过接入社交软件，通过RPA和大模型技术自动化社交软件的相关操作。',
                 operation: '在输入框内输入您的需求（机器人、定时器、烽火台、引流涨粉），然后按照提示完成相关操作。',
                 // group: 2
+            },
+            {
+                id: 15, key: 'fence', title: '电子围栏', exampleImgSrc: '',
+                icon1: '<svg t="1752031805579" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="77259" width="16" height="16"><path d="M128 256h768v64H128z" fill="#2c2c2c"></path><path d="M192 256v512h64V256zM384 256v512h64V256zM576 256v512h64V256zM768 256v512h64V256z" fill="#2c2c2c"></path><path d="M160 320l32-32 32 32-32 32zM352 320l32-32 32 32-32 32zM544 320l32-32 32 32-32 32zM736 320l32-32 32 32-32 32z" fill="#2c2c2c"></path><path d="M128 704h768v64H128z" fill="#2c2c2c"></path></svg>',
+                icon2: '<svg t="1752031805579" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="77259" width="16" height="16"><path d="M128 256h768v64H128z" fill="#1296db"></path><path d="M192 256v512h64V256zM384 256v512h64V256zM576 256v512h64V256zM768 256v512h64V256z" fill="#1296db"></path><path d="M160 320l32-32 32 32-32 32zM352 320l32-32 32 32-32 32zM544 320l32-32 32 32-32 32zM736 320l32-32 32 32-32 32z" fill="#1296db"></path><path d="M128 704h768v64H128z" fill="#1296db"></path></svg>',
+                exampleVedioSrc: '',
+                prompt: '该功能用于监控与filters相关的安全数据。',
+                operation: '点击进入查看详细的监控信息。',
+            },
+            {
+                id: 16, key: 'filterConfig', title: '安全配置', exampleImgSrc: '',
+                icon1: '<svg t="1752031805579" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="77259" width="16" height="16"><path d="M512 128L256 256v256c0 128 128 256 256 256s256-128 256-256V256L512 128z" fill="#2c2c2c"></path><path d="M416 384h192v192H416z" fill="#2c2c2c"></path><path d="M512 384v64h64v-64z" fill="#ffffff"></path></svg>',
+                icon2: '<svg t="1752031805579" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="77259" width="16" height="16"><path d="M512 128L256 256v256c0 128 128 256 256 256s256-128 256-256V256L512 128z" fill="#1296db"></path><path d="M416 384h192v192H416z" fill="#1296db"></path><path d="M512 384v64h64v-64z" fill="#ffffff"></path></svg>',
+                exampleVedioSrc: '',
+                prompt: '该功能用于可视化管理lagi.yml中的filters配置项。',
+                operation: '点击进入进行增删改查操作。',
             }
         ]
     },
@@ -732,11 +748,19 @@ function backToChat() {
     $('#conTab').show();
     $('#mytab').hide();
     $('#queryBox').show();
+    $('#footer-info').show();
     $('#introduces').show();
     $('#topTitle').show();
     $('#item-content').show();
+    // 重置 item-content 的样式，清除可能被特殊页面修改的样式
+    $('#item-content').css({
+        'height': 'auto',
+        'overflow-y': 'auto'
+    });
     const formElement = document.querySelector('#not-content form');
-    formElement.style.visibility = 'visible';
+    if (formElement) {
+        formElement.style.visibility = 'visible';
+    }
     const activeListItems = document.querySelectorAll('#conversationsNav a.active');
     console.log(activeListItems);
     activeListItems.forEach(a => {
@@ -746,6 +770,10 @@ function backToChat() {
     showBallDiv();
     $('#model-selects').empty();
     $('#model-prefences').hide();
+    
+    // 清除可能存在的特殊页面容器
+    $('#fence-container').remove();
+    $('#filter-config-container').remove();
 }
 
 function hideBallDiv() {
@@ -756,12 +784,36 @@ function hideBallDiv() {
 }
 
 function getPromptDialog(id, subId) {
-    // debugger
+    // 检查当前是否在电子围栏或安全配置页面
+    const isFencePage = $('#fence-container').length > 0;
+    const isFilterConfigPage = $('#filter-config-container').length > 0;
+    
+    // 如果当前在特殊页面，且要切换到其他子菜单，先重置状态
+    if ((isFencePage || isFilterConfigPage) && subId !== 15 && subId !== 16) {
+        // 清空特殊页面状态
+        $('#item-content').empty();
+        // 重置所有可能被隐藏/修改的元素
+        backToChat();
+        // 确保清空所有内容，避免重叠
+        $('#item-content').html('');
+        $('#item-content').show();
+    }
+    
+    $('#item-content').empty();
+    $('#footer-info').show();
+    
+    if (subId === 15) {
+        loadFencePage();
+        return;
+    }
+    if (subId === 16) {
+        loadFilterConfigPage();
+        return;
+    }
+    
     let nav = null;
     let parentNav = null
-    // 查找包含指定ID的一级导航项
     nav =  getSubNav(id, subId);
-    // 如果未找到指定ID的导航项
     if (nav == null) {
         alert("找不到对应的信息");
         return;
@@ -776,7 +828,6 @@ function getPromptDialog(id, subId) {
     let answer = buildPromptDialogContent(nav);
     let answerJq = newRobotStartDialog('');
 
-    // 播放视频（如果存在）
     let vedioHtml = '';
     if (nav.exampleVedioSrc) {
         vedioHtml = `
@@ -786,13 +837,10 @@ function getPromptDialog(id, subId) {
         `;
     }
 
-    // 重置计时器
     clearTimeout(timer);
 
-    // 更新当前的提示框
     currentPromptDialog = nav;
     console.log("nav", nav)
-    // 开始打字效果
     typing(0, answer, answerJq, addRobotDialog, vedioHtml);
 }
 

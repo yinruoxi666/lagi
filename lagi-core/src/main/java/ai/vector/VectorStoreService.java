@@ -127,7 +127,10 @@ public class VectorStoreService {
         DocumentLoader documentLoader = loaderMap.getOrDefault(suffix, loaderMap.get("common"));
         List<List<FileChunkResponse.Document>> docs = documentLoader.load(file.getPath(), new SplitConfig(wenben_type, tuwen_type, biaoge_type, category, metadatas));
         String fileName = file.getName();
-        if (fileName.endsWith(".docx") || fileName.endsWith(".doc") || fileName.endsWith(".txt") || fileName.endsWith(".pdf")) {
+
+        boolean enableExcelToMd = (fileName.endsWith(".xls") || fileName.endsWith(".xlsx")) && VectorStoreConstant.ENABLE_EXCEL_TO_MD;
+        
+        if (fileName.endsWith(".docx") || fileName.endsWith(".doc") || fileName.endsWith(".txt") || fileName.endsWith(".pdf") || enableExcelToMd) {
             docs = DocQaExtractor.parseText(docs);
         }
         List<Future<?>> futures = new ArrayList<>();
