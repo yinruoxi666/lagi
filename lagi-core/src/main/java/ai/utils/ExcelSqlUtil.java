@@ -48,14 +48,14 @@ public class ExcelSqlUtil {
                     if (new MysqlAdapter(sqlJdbc.getName()).selectCount("SELECT 1")>0){
                         isSwitch =initTextToSqlSearch();
                         if (!isSwitch){
-                            log.info("mysql初始化失败！---智能问数模式已关闭！");
+                            log.info("MySQL initialization failed! --- Intelligent query mode has been disabled!");
                         }
                     }
                 }else {
                     sqliteAdapter = new SqliteAdapter();
                 }
             }catch (Exception e){
-                log.error("初始化失败,智能问数模式已关闭！");
+                log.error("Initialization failed, intelligent query mode has been disabled!");
             }
         }
     }
@@ -97,10 +97,10 @@ public class ExcelSqlUtil {
                     }
                     double percentage = ((double) numericCells / totalCells) * 100;
                     flag = totalCells>0? (percentage > 50):flag;
-                    System.out.printf("Percentage of numeric data in CSV: %.2f%%\n", percentage);
+                    log.debug("Percentage of numeric data in CSV: {:.2f}%", String.format("%.2f", percentage));
                     break;
                 } catch (IOException e) {
-                    System.out.println(e);
+                    log.error("Error reading CSV file", e);
                     return false;
                 }
             }
@@ -137,12 +137,12 @@ public class ExcelSqlUtil {
                     }
                 }
                 double percentage = (totalCells == 0) ? 0 : (double) numberCells / totalCells * 100;
-                System.out.println("数字类型数据的百分比: " + percentage + "%");
+                log.debug("Percentage of numeric data: {}%", percentage);
                 workbook.close();
                 fis.close();
                 flag = totalCells>0? (percentage > 40):flag;
             }catch (Exception e){
-                System.out.println(e);
+                log.error("Error processing Excel file", e);
                 return false;
             }
         }
@@ -358,7 +358,7 @@ public class ExcelSqlUtil {
                 ismysql = sqliteAdapter.executeUpdate(sql.toString()) <= 0;
             }
             if (ismysql) {
-                throw new RuntimeException("插入数据失败");
+                throw new RuntimeException("Failed to insert data");
             }
         }
     }
@@ -456,7 +456,7 @@ public class ExcelSqlUtil {
                 " \n ”。用户需求:“" + demand+"”。" );
         chatCompletionRequest.setMessages(Lists.newArrayList(message));
         chatCompletionRequest.setStream(false);
-        System.out.println(message.getContent());
+        log.debug("Message content: {}", message.getContent());
         chatCompletionRequest.setModel(mysqlAdapter.model);
         CompletionsService completionsService = new CompletionsService();
         ChatCompletionResult result = completionsService.completions(chatCompletionRequest);
@@ -648,49 +648,22 @@ public class ExcelSqlUtil {
                 if (stmt != null) stmt.close();
                 if (conn != null) conn.close();
             } catch (SQLException e) {
-                e.printStackTrace();
+                log.error("Error closing database resources", e);
             }
         }
     }
 
-    @Test
-    public void text(){
-        String demand = "高三三班学生各科成绩都大于60分的人有那些，总分分别是多少。";
-        String sql1 = WorkflowsToSql(demand);
-//        System.out.println("生成的sql是:\n"+sql1);
-        String sql = toSql(sql1,demand);
-//        System.out.println("生成的sql是:\n"+sql);
-        String out = toText(sql,demand, sql1);
-        System.out.println(out);
-    }
-
-    @Test
-    public void text1(){
-        SqliteAdapter mysqlAdapter = new SqliteAdapter();
-        List<Map<String, Object>> list = new ArrayList<>();
-        //SELECT id, table_name, description FROM table_info
-        list = mysqlAdapter.sqlToValue("SELECT id, table_name, description FROM table_info");
-        System.out.println(list);
-    }
-
-    @Test
-    public void text2(){
-
-        System.out.println(isConnect());
-    }
-
-
     public static void main(String[] args) {
         try {
             String excelFilePath = "C:\\Users\\ruiqing.luo\\Desktop\\rag调优\\节点分类-测试用.csv";
-            System.out.println("是否走sql:"+isSql(excelFilePath));
+            log.debug("Should use SQL: {}", isSql(excelFilePath));
             String tableName = "detailed_data";
             List<List<String>> result =  EasyExcelUtil.readCsv(excelFilePath).get("data");
             for (List<String> list : result) {
-                System.out.println(list);
+                log.debug("CSV data row: {}", list);
             }
         }catch (Exception e){
-            System.out.println(e);
+            log.error("Error in main method", e);
         }
     }
 }

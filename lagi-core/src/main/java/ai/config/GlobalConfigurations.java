@@ -183,8 +183,6 @@ public class GlobalConfigurations extends AbstractConfiguration {
 
     private void push2wordRule(FilterConfig filter) {
         if (filter.getGroups() == null || filter.getGroups().isEmpty()) {
-            org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(GlobalConfigurations.class);
-            log.warn("FilterConfig groups 为空，无法加载敏感词规则: {}", filter.getName());
             return;
         }
         
@@ -227,9 +225,6 @@ public class GlobalConfigurations extends AbstractConfiguration {
                                                 });
                                     })
                                 .collect(Collectors.toList());
-        
-        org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(GlobalConfigurations.class);
-        log.info("从 FilterConfig 加载敏感词规则: 分组数量={}, 规则数量={}", filter.getGroups().size(), rules.size());
         
         WordRules wordRules = WordRules.builder()
                 .rules(rules)
