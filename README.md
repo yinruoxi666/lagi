@@ -262,8 +262,8 @@ For API references, see [API Documentation](docs/API_en.md).
 Thank you for your support of LinkMind ! To help you get started quickly and easily, we have provided a pre-packaged LinkMind application that is ready for immediate use.
 
 - **Jar File**: The core dependency library of LinkMind.
-  - File Name: lagi-core-1.0.6-jar-with-dependencies.jar
-  - Download Link: [Click here to download](https://downloads.landingbj.com/lagi/lagi-core-1.0.6-jar-with-dependencies.jar)
+  - File Name: lagi-core-1.1.0-jar-with-dependencies.jar
+  - Download Link: [Click here to download](https://downloads.landingbj.com/lagi/lagi-core-1.1.0-jar-with-dependencies.jar)
 
 - **War File**: The Web application of LinkMind, which can be directly deployed to a web container.
   - File Name: lagi-web.war
