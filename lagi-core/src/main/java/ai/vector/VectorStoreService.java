@@ -511,7 +511,8 @@ public class VectorStoreService {
         if (question == null) {
             question = ChatCompletionUtil.getLastMessage(request);
         }
-        return search(question, request.getCategory());
+        // fix invalid conditional query
+        return search(question, where, request.getCategory());
     }
 
     public List<IndexSearchData> search(String question, String category) {
