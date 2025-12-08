@@ -190,8 +190,9 @@ public class VectorStoreService {
         CompletableFuture<List<List<FileChunkResponse.Document>>> qaFuture =
                 splitFuture.thenCompose(docs -> {
                     String name = file.getName().toLowerCase();
+                    boolean enableExcelToMd = (name.endsWith(".xls") || name.endsWith(".xlsx")) && VectorStoreConstant.ENABLE_EXCEL_TO_MD;
                     if (name.endsWith(".docx") || name.endsWith(".doc")
-                            || name.endsWith(".txt") || name.endsWith(".pdf")) {
+                            || name.endsWith(".txt") || name.endsWith(".pdf") || enableExcelToMd) {
                         return DocQaExtractor.parseTextAsync(
                                 docs, executor,
                                 (gIdx, cIdx, block) -> {
@@ -751,7 +752,12 @@ public class VectorStoreService {
 
         if (FILE_CHUNK_SOURCE_LLM.equals(data.getSource())) {
             originalDocData = getParentIndex(parentId, category);
-            parentId = originalDocData.getParentId();
+            if (originalDocData != null) {
+                parentId = originalDocData.getParentId();
+            }
+            else {
+                originalDocData = data;
+            }
         }
 
         List<IndexSearchData> parentNodes = new ArrayList<>();

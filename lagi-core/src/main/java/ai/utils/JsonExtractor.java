@@ -18,6 +18,8 @@ public class JsonExtractor {
             return new ArrayList<>();
         }
 
+        input = normalizeModelArtifacts(input);
+
         List<String> jsonStrings = new ArrayList<>();
         
         // Use a more robust approach to avoid regex backtracking issues
@@ -45,6 +47,7 @@ public class JsonExtractor {
         if (input == null || input.isEmpty()) {
             return new ArrayList<>();
         }
+        input = normalizeModelArtifacts(input);
         List<String> jsonStrings = new ArrayList<>();
         
         // Use a more robust approach to avoid regex backtracking issues
@@ -143,6 +146,23 @@ public class JsonExtractor {
         }
         
         return results;
+    }
+
+    /**
+     * Large models sometimes wrap responses with artifacts such as "json\n" or ``` fences.
+     * Strip those markers so downstream parsing only sees valid JSON.
+     */
+    private static String normalizeModelArtifacts(String input) {
+        if (input == null || input.isEmpty()) {
+            return input;
+        }
+        String normalized = input
+                .replace("json\r\n", "")
+                .replace("json\n", "")
+                .replace("```json", "")
+                .replace("```JSON", "")
+                .replace("```", "");
+        return normalized.trim();
     }
 
     // Example usage

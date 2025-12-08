@@ -679,6 +679,7 @@ public class UploadFileServlet extends HttpServlet {
                         t.markSuccess(file.getName(), fileId, allVectorIds);
                     }
                     else {
+                        log.error("Error adding vectors for file: " + file.getName(), ex);
                         t.markFailed(file.getName(), ex.getMessage());
                     }
                 }

@@ -64,6 +64,7 @@ public class DoubaoAdapter  extends ModelService implements ILlmAdapter {
         com.volcengine.ark.runtime.model.completion.chat.ChatCompletionRequest streamChatCompletionRequest = com.volcengine.ark.runtime.model.completion.chat.ChatCompletionRequest.builder()
                 .model(getModelEndpoint(model))
                 .messages(messages)
+                .streamOptions(com.volcengine.ark.runtime.model.completion.chat.ChatCompletionRequest.ChatCompletionRequestStreamOptions.of(true))
                 .build();
 
         Flowable<ChatCompletionChunk> flowable = service.streamChatCompletion(streamChatCompletionRequest);
