@@ -64,7 +64,7 @@ public class PdfLoader implements DocumentLoader {
                         .replaceAll("(\r?\n){2,}", "\n")
                         .replaceAll("(?<=\r?\n)\\s*", "")
                         .replaceAll("(?<![.!?;:。！？；：\\s\\d])\r?\n", "");
-                if (StrUtil.isBlank(content)) {
+                if (StrUtil.isNotBlank(content)) {
                     content = FileService.removeDirectory(content);
                 } else {
                     return FileService.getChunkDocumentScannedPDF(file, splitConfig.getChunkSizeForMixUp());
@@ -82,7 +82,7 @@ public class PdfLoader implements DocumentLoader {
             } else if (OrdinanceExtractorUtil.isOrdinanceDocument(content)) {
                 return OrdinanceExtractorUtil.getChunkDocument(content, splitConfig.getChunkSizeForText());
             } else {
-                return FileService.splitContentChunks(splitConfig.getChunkSizeForText(), content);
+                return fileService.splitContentChunks(splitConfig.getChunkSizeForText(), content);
             }
         } catch (Exception e) {
             log.error("load pdf file error", e);
