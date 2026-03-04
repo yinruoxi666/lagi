@@ -49,7 +49,7 @@ public class AyenaAdapter extends ModelService implements ILlmAdapter {
         headers.put("Authorization", "Bearer " + getApiKey());
         String jsonResult = null;
         chatCompletionRequest.setCategory(null);
-        chatCompletionRequest.setStream(true);
+        chatCompletionRequest.setStream(false);
         try {
             jsonResult = HttpUtil.httpPost(getApiAddress(), headers, chatCompletionRequest, HTTP_TIMEOUT);
         } catch (IOException e) {

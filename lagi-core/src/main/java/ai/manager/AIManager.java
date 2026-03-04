@@ -1,6 +1,7 @@
 package ai.manager;
 
 import ai.common.ModelService;
+import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -13,6 +14,7 @@ public class AIManager<T> {
 
     private final Logger log = LoggerFactory.getLogger(AIManager.class);
 
+    @Getter
     protected final Map<String, T> aiMap = new ConcurrentHashMap<>();
 
 

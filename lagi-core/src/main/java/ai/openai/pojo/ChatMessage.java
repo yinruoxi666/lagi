@@ -16,6 +16,7 @@ import java.util.List;
 @NoArgsConstructor
 public class ChatMessage implements Serializable {
     private String role;
+    private String name;
     @JsonSerialize(using = ContentSerializer.class)
     @JsonDeserialize(using = ContentDeserializer.class)
     private String content;

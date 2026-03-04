@@ -7,12 +7,12 @@ import ai.llm.adapter.ILlmAdapter;
 import ai.llm.utils.convert.DouBaoConvert;
 import ai.openai.pojo.ChatCompletionRequest;
 import ai.openai.pojo.ChatCompletionResult;
+import ai.openai.pojo.Tool;
+import ai.openai.pojo.ToolCall;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.json.JSONUtil;
 import com.volcengine.ark.runtime.exception.ArkHttpException;
-import com.volcengine.ark.runtime.model.completion.chat.ChatCompletionChunk;
-import com.volcengine.ark.runtime.model.completion.chat.ChatMessage;
-import com.volcengine.ark.runtime.model.completion.chat.ChatMessageRole;
+import com.volcengine.ark.runtime.model.completion.chat.*;
 import com.volcengine.ark.runtime.service.ArkService;
 import io.reactivex.Flowable;
 import io.reactivex.Observable;
@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-@LLM(modelNames = {"doubao-pro-32k,doubao-pro-4k"})
+@LLM(modelNames = {"doubao-pro-32k,doubao-pro-4k","doubao-seed"})
 public class DoubaoAdapter  extends ModelService implements ILlmAdapter {
 
 
@@ -40,14 +40,33 @@ public class DoubaoAdapter  extends ModelService implements ILlmAdapter {
     public ChatCompletionResult completions(ChatCompletionRequest request) {
         ArkService service = ArkService.builder().apiKey(apiKey).baseUrl("https://ark.cn-beijing.volces.com/api/v3/").build();
         List<ChatMessage> messages = convertChatMessageList(request);
+        com.volcengine.ark.runtime.model.completion.chat.ChatCompletionRequest.ChatCompletionRequestThinking thinking = new com.volcengine.ark.runtime.model.completion.chat.ChatCompletionRequest.ChatCompletionRequestThinking("disabled");
         com.volcengine.ark.runtime.model.completion.chat.ChatCompletionRequest chatCompletionRequest = com.volcengine.ark.runtime.model.completion.chat.ChatCompletionRequest.builder()
                 .model(getModelEndpoint(model))
                 .messages(messages)
+                .thinking(thinking)
+                .tools(request.getTools()!= null && !request.getTools().isEmpty() ? convertChatToolList(request) : null)
                 .build();
         try {
             com.volcengine.ark.runtime.model.completion.chat.ChatCompletionResult chatCompletion = service.createChatCompletion(chatCompletionRequest);
             ChatCompletionResult result = new ChatCompletionResult();
             BeanUtil.copyProperties(chatCompletion, result);
+            // 将toolCall复制过来
+            if (result.getChoices() != null && !result.getChoices().isEmpty()) {
+                for (int i = 0; i < result.getChoices().size(); i++) {
+                    if (chatCompletion.getChoices().get(i).getFinishReason().equals("tool_calls")){
+                        result.getChoices().get(i).setFinish_reason("tool_calls");
+                        result.getChoices().get(i).getMessage().setTool_calls(new ArrayList<>());
+                        for (ChatToolCall tool: chatCompletion.getChoices().get(i).getMessage().getToolCalls()) {
+                            ToolCall toolCall = new ToolCall();
+                            BeanUtil.copyProperties(tool, toolCall);
+                            result.getChoices().get(i).getMessage().getTool_calls().add(toolCall);
+                        }
+                        result.getChoices().get(i).getMessage().setTool_call_id(chatCompletion.getChoices().get(i).getMessage().getToolCallId());
+                    }
+                }
+            }
+
             return result;
         } catch (ArkHttpException e) {
             log.error(e.toString());
@@ -65,6 +84,7 @@ public class DoubaoAdapter  extends ModelService implements ILlmAdapter {
                 .model(getModelEndpoint(model))
                 .messages(messages)
                 .streamOptions(com.volcengine.ark.runtime.model.completion.chat.ChatCompletionRequest.ChatCompletionRequestStreamOptions.of(true))
+                .tools(request.getTools()!= null && !request.getTools().isEmpty() ? convertChatToolList(request) : null)
                 .build();
 
         Flowable<ChatCompletionChunk> flowable = service.streamChatCompletion(streamChatCompletionRequest);
@@ -101,6 +121,18 @@ public class DoubaoAdapter  extends ModelService implements ILlmAdapter {
         messages.add(systemMessage);
         messages.addAll(chatMessages);
         return messages;
+    }
+    private static @NotNull List<ChatTool> convertChatToolList(ChatCompletionRequest request) {
+        return request.getTools().stream().map(tool -> {
+            ChatTool chatTool = new ChatTool();
+            chatTool.setType(tool.getType());
+            chatTool.setFunction(new ChatFunction.Builder()
+                    .name(tool.getFunction().getName())
+                    .description(tool.getFunction().getDescription())
+                    .parameters(tool.getFunction().getParameters())
+                    .build());
+            return chatTool;
+        }).collect(Collectors.toList());
     }
 
     private ChatCompletionResult convertResponse(ChatCompletionChunk chatCompletionChunk) {

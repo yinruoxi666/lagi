@@ -27,10 +27,13 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 @Slf4j
-@LLM(modelNames = {"qwen-turbo","qwen-plus","qwen-max","qwen-max-1201","qwen-max-longcontext"})
+@LLM(modelNames = {"qwen-turbo","qwen-plus","qwen-max","qwen-max-1201","qwen-max-longcontext","qwen3-max"})
 public class QwenAdapter extends ModelService implements ILlmAdapter {
 
 
@@ -51,6 +54,11 @@ public class QwenAdapter extends ModelService implements ILlmAdapter {
 
     @Override
     public Observable<ChatCompletionResult> streamCompletions(ChatCompletionRequest chatCompletionRequest) {
+        long startNs = System.nanoTime();
+        String model = Optional.ofNullable(chatCompletionRequest.getModel()).orElse(getModel());
+        int messageCount = chatCompletionRequest.getMessages() == null ? 0 : chatCompletionRequest.getMessages().size();
+        log.info("[QWEN_STREAM_START] model={} messages={}", model, messageCount);
+
         Generation gen = new Generation();
         GenerationParam param = convertRequest(chatCompletionRequest);
         Flowable<GenerationResult> result = null;
@@ -59,16 +67,45 @@ public class QwenAdapter extends ModelService implements ILlmAdapter {
         } catch (NoApiKeyException | InputRequiredException e) {
             throw new RuntimeException(e);
         }
+
         Iterable<GenerationResult> resultIterable = result.blockingIterable();
+        java.util.Iterator<GenerationResult> iterator = resultIterable.iterator();
+
+        String requestId = null;
+        ChatCompletionResult firstChunk = null;
         try {
-            boolean b = resultIterable.iterator().hasNext();
+            if (iterator.hasNext()) {
+                GenerationResult firstResult = iterator.next();
+                requestId = firstResult.getRequestId();
+                firstChunk = convertResponse(firstResult);
+                long firstChunkMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNs);
+                log.info("[QWEN_STREAM_FIRST_CHUNK] requestId={} model={} firstChunkMs={}", requestId, model, firstChunkMs);
+            }
         } catch (ApiException e) {
             RRException exception = QwenConvert.convert2RRexception(e);
             log.error("qwen  stream  api code {} error {}", exception.getCode(), exception.getMsg());
             throw exception;
         }
-        Iterable<ChatCompletionResult> iterable = new MappingIterable<>(resultIterable, this::convertResponse);
-        return Observable.fromIterable(iterable);
+
+        Iterable<GenerationResult> singleUseIterable = () -> iterator;
+        Iterable<ChatCompletionResult> iterable = new MappingIterable<>(singleUseIterable, this::convertResponse);
+
+        AtomicBoolean completed = new AtomicBoolean(false);
+        AtomicReference<Throwable> terminalError = new AtomicReference<>();
+
+        Observable<ChatCompletionResult> tail = Observable.fromIterable(iterable);
+        Observable<ChatCompletionResult> stream = firstChunk == null ? tail : Observable.just(firstChunk).concatWith(tail);
+
+        String finalRequestId = requestId;
+        return stream
+                .doOnComplete(() -> completed.set(true))
+                .doOnError(terminalError::set)
+                .doFinally(() -> {
+                    long totalMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNs);
+                    Throwable error = terminalError.get();
+                    String status = completed.get() ? "complete" : (error == null ? "disposed" : "error");
+                    log.info("[QWEN_STREAM_TOTAL] requestId={} model={} totalMs={} status={}", finalRequestId, model, totalMs, status);
+                });
     }
 
     private GenerationParam convertRequest(ChatCompletionRequest request) {

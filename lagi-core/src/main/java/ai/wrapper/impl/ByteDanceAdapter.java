@@ -14,6 +14,7 @@ public class ByteDanceAdapter extends CommonAdapter implements IWrapper {
         modelDriverMap.put("doubao-pro-4k", "ai.llm.adapter.impl.DoubaoAdapter");
         modelDriverMap.put("doubao-pro-32k", "ai.llm.adapter.impl.DoubaoAdapter");
         modelDriverMap.put("doubao-seed-translation-250915", "ai.llm.adapter.impl.DoubaoAdapter");
+        modelDriverMap.put("doubao-seed", "ai.llm.adapter.impl.DoubaoAdapter");
         modelDriverMap.put("openspeech", "ai.audio.adapter.impl.VolcEngineAudioAdapter");
         return modelDriverMap;
     }

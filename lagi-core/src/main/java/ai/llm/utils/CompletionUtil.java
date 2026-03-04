@@ -4,6 +4,7 @@ import ai.common.pojo.IndexSearchData;
 import ai.config.ContextLoader;
 import ai.openai.pojo.*;
 import ai.utils.LagiGlobal;
+import ai.utils.StrUtil;
 import ai.utils.qa.ChatCompletionUtil;
 import ai.vector.VectorStoreService;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -92,7 +93,7 @@ public class CompletionUtil {
             int lastIndex = chatMessages.size() - 1;
             for (int i = chatMessages.size() - 2; i >= 0; i--) {
                 ChatMessage chatMessage = chatMessages.get(i);
-                length += chatMessage.getContent().length();
+                length += StrUtil.isNullorEmpty(chatMessage.getContent()) ? 0: chatMessage.getContent().length();
                 if (length > userMaxLength) {
                     break;
                 }

@@ -148,6 +148,16 @@ public class DocQaExtractor {
             BiConsumer<Integer, List<FileChunkResponse.Document>> onGroupReady
     ) {
         if (text2qaBackend == null || !text2qaBackend.getEnable()) {
+            // 设置docs order
+            if (docs !=null && !docs.isEmpty()){
+                for (List<FileChunkResponse.Document> doc : docs) {
+                    if (doc != null && !doc.isEmpty()){
+                        for (int i = 0; i < doc.size(); i++) {
+                            doc.get(i).setOrder(i + 1);
+                        }
+                    }
+                }
+            }
             // 兼容：不开启时直接同步包一层 future
             return CompletableFuture.completedFuture(docs);
         }
@@ -170,6 +180,7 @@ public class DocQaExtractor {
                             inner.add(CompletableFuture.runAsync(() -> {
                                 String prompt = String.format(PROMPT_TEMPLATE, original.getText());
                                 String json = extract(prompt);
+                                log.info(json);
                                 List<FileChunkResponse.Document> block = new ArrayList<>();
                                 try {
                                     if (json != null) {
