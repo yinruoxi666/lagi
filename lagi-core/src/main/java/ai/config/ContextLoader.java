@@ -79,21 +79,21 @@ public class ContextLoader {
                 loadContextByResource("lagi.yml");
             }
         } catch (Exception e) {
-            log.warn(e.getMessage());
+            log.warn("loadContextByResource failed", e);
         }
         if(configuration == null) {
             try {
 
                 loadContextByFilePath("lagi-web/src/main/resources/lagi.yml");
             } catch (Exception e) {
-                log.warn(e.getMessage());
+                log.warn("loadContextByFilePath failed: lagi-web/src/main/resources/lagi.yml", e);
             }
         }
         if(configuration == null) {
             try {
                 loadContextByFilePath("../lagi-web/src/main/resources/lagi.yml");
             } catch (Exception e) {
-                log.warn(e.getMessage());
+                log.warn("loadContextByFilePath failed: ../lagi-web/src/main/resources/lagi.yml", e);
             }
         }
     }

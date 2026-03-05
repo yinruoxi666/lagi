@@ -7,10 +7,12 @@ import ai.vector.pojo.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.google.gson.internal.LinkedTreeMap;
-import org.apache.commons.collections4.CollectionUtils;
 import tech.amikos.chromadb.Client;
+import tech.amikos.chromadb.ChromaException;
 import tech.amikos.chromadb.Collection;
-import tech.amikos.chromadb.EmbeddingFunction;
+import tech.amikos.chromadb.EFException;
+import tech.amikos.chromadb.Embedding;
+import tech.amikos.chromadb.embeddings.EmbeddingFunction;
 import tech.amikos.chromadb.handler.ApiException;
 
 import java.io.IOException;
@@ -18,6 +20,9 @@ import java.util.*;
 
 import static com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL;
 
+/**
+ * Legacy Chroma implementation for v1 API endpoints.
+ */
 public class ChromaVectorStore extends BaseVectorStore {
     private static final int TIMEOUT = 60 * 3;
     private final CustomEmbeddingFunction embeddingFunction;
@@ -37,14 +42,43 @@ public class ChromaVectorStore extends BaseVectorStore {
         }
 
         @Override
+        public Embedding embedQuery(String query) throws EFException {
+            try {
+                return new Embedding(this.ef.createEmbedding(query));
+            } catch (Exception e) {
+                throw new EFException("Failed to embed query", e);
+            }
+        }
+
+        @Override
+        public List<Embedding> embedDocuments(List<String> documents) throws EFException {
+            try {
+                List<List<Float>> vectors = this.ef.createEmbedding(documents);
+                List<Embedding> embeddings = new ArrayList<>();
+                if (vectors != null) {
+                    for (List<Float> vector : vectors) {
+                        embeddings.add(new Embedding(vector));
+                    }
+                }
+                return embeddings;
+            } catch (Exception e) {
+                throw new EFException("Failed to embed documents", e);
+            }
+        }
+
+        @Override
+        public List<Embedding> embedDocuments(String[] documents) throws EFException {
+            return embedDocuments(Arrays.asList(documents));
+        }
+
         public List<List<Float>> createEmbedding(List<String> list) {
             return this.ef.createEmbedding(list);
         }
 
-        @Override
-        public List<List<Float>> createEmbedding(List<String> list, String s) {
-            return null;
+        public List<Float> createEmbedding(String doc) {
+            return this.ef.createEmbedding(doc);
         }
+
     }
 
     public ChromaVectorStore(VectorStoreConfig config, Embeddings embeddingFunction) {
@@ -85,11 +119,16 @@ public class ChromaVectorStore extends BaseVectorStore {
             metadatas.add(upsertRecord.getMetadata());
             ids.add(upsertRecord.getId());
         }
-        List<List<Float>> embeddings = this.embeddingFunction.createEmbedding(documents);
+        List<Embedding> embeddings;
+        try {
+            embeddings = this.embeddingFunction.embedDocuments(documents);
+        } catch (EFException e) {
+            throw new RuntimeException(e);
+        }
         Collection collection = getCollection(category);
         try {
             collection.upsert(embeddings, metadatas, documents, ids);
-        } catch (ApiException e) {
+        } catch (ChromaException e) {
             throw new RuntimeException(e);
         }
     }
@@ -240,7 +279,9 @@ public class ChromaVectorStore extends BaseVectorStore {
         Collection collection = getCollection(category);
         try {
             for (Map<String, String> where : whereList) {
-                collection.deleteWhere(where);
+                Map<String, Object> whereObject = new HashMap<>();
+                whereObject.putAll(where);
+                collection.deleteWhere(whereObject);
             }
         } catch (ApiException e) {
             throw new RuntimeException(e);
