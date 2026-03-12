@@ -389,4 +389,19 @@ public class CompletionsService implements ChatCompletion {
         chatCompletionRequest.setCategory(category);
         return chatCompletionRequest;
     }
+
+
+    public static void main(String[] args) {
+        ContextLoader.loadContext();
+        CompletionsService completionsService = new CompletionsService();
+        ChatCompletionRequest request = completionsService.getCompletionsRequest("千问,介绍一下你自己");
+//        completionsService.completions(request);
+
+        request.setStream(true);
+        Observable<ChatCompletionResult> chatCompletionResultObservable = completionsService.streamCompletions(request);
+        chatCompletionResultObservable.subscribe(result -> {
+            System.out.println(result.getChoices().get(0).getMessage().getContent());
+        });
+
+    }
 }

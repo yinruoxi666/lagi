@@ -62,6 +62,74 @@ public class SensitiveWordUtil {
         }
     }
 
+
+    public static String filter(String message) {
+        return filter(message, Integer.MAX_VALUE);
+    }
+
+    public static String filter(String message, int times) {
+        int count = 0;
+        Set<String> rules = ruleMap.keySet();
+        for (String rule : rules) {
+            Pattern p = getCompiledPattern(rule);
+            Matcher matcher = p.matcher(message);
+            if (matcher.find()) {
+                log.info("sensitive message: {} match group: {}", message, matcher.group());
+                WordRule wordRule = ruleMap.get(rule);
+                if (wordRule != null) {
+                    String filterContent = "匹配规则: " + rule + ", 原始内容: " + (message.length() > 500 ? message.substring(0, 500) : message);
+                    if (wordRule.getLevel() == 1) {
+                        message = "";
+                        FilterMonitorUtil.recordFilterAction("sensitive", "block", filterContent);
+                        break;
+                    } else if (wordRule.getLevel() == 2) {
+                        message = message.replaceAll(rule, wordRule.getMask());
+                        FilterMonitorUtil.recordFilterAction("sensitive", "mask", filterContent);
+                    } else if (wordRule.getLevel() == 3) {
+                        message = message.replaceAll(rule, "");
+                        FilterMonitorUtil.recordFilterAction("sensitive", "erase", filterContent);
+                    }
+                    count++;
+                }
+                if(count >= times) {
+                    break;
+                }
+            }
+        }
+        return message;
+    }
+
+
+    public static String getNullOrReplaceContent(String message){
+        Set<String> rules = ruleMap.keySet();
+        for (String rule : rules) {
+            Pattern p = getCompiledPattern(rule);
+            Matcher matcher = p.matcher(message);
+            if (matcher.find()) {
+                WordRule wordRule = ruleMap.get(rule);
+                if (wordRule != null) {
+                    if(wordRule.getLevel() == 1) {
+                        return "";
+                    } else if(wordRule.getLevel() == 2) {
+                        return wordRule.getMask();
+                    } else if(wordRule.getLevel() == 3) {
+                        return "";
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+
+
+    public static ChatCompletionResult filter4ChatCompletionResult(ChatCompletionResult chatCompletionResult) {
+        String message = chatCompletionResult.getChoices().get(0).getMessage().getContent();
+        message = filter(message);
+        chatCompletionResult.getChoices().get(0).getMessage().setContent(message);
+        return chatCompletionResult;
+    }
+
     private static Pattern getCompiledPattern(String rule) {
         return patternCache.computeIfAbsent(rule, Pattern::compile);
     }
