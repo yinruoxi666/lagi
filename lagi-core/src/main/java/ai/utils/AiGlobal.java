@@ -23,4 +23,5 @@ public class AiGlobal {
     public static final String DUPLICATE_TOKEN_RANDOM = "r";
     public static String DIR_TEMP = "/WEB-INF/temp";
     public static final String SAAS_URL = "https://saas.landingbj.com";
+    public static final String DEFAULT_DB = "saas";
 }

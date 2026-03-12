@@ -1,7 +1,7 @@
 package ai.migrate.dao;
 
 import ai.dto.ModelPreferenceDto;
-import ai.migrate.db.Conn;
+import ai.common.db.Conn;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

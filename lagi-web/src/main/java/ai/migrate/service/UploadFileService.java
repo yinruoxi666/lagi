@@ -6,7 +6,7 @@ import java.util.List;
 
 import ai.common.pojo.UserRagSetting;
 import ai.migrate.dao.UploadFileDao;
-import ai.migrate.db.Conn;
+import ai.common.db.Conn;
 import ai.common.pojo.UploadFile;
 
 public class UploadFileService {

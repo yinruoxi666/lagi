@@ -49,6 +49,4 @@ public class MigrateGlobal {
     public static final String INSTRUCTION_TYPE_SVD = "svd";
     public static final String INSTRUCTION_TYPE_SVD_BY_TEXT = "svd_by_text";
     public static final String INSTRUCTION_TYPE_ESRGAN = "esrgan";
-    public static final String DEFAULT_DB = "saas";
-    public static final int _DEBUG_LEVEL = 1;
 }

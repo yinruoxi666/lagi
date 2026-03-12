@@ -3,7 +3,7 @@ package ai.migrate.dao;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import ai.index.BaseIndex;
-import ai.migrate.db.Conn;
+import ai.common.db.Conn;
 import ai.common.pojo.UserEntity;
 
 public class UserDao {
