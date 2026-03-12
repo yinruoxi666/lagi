@@ -12,7 +12,7 @@ import java.util.List;
 
 @Order
 @Component
-public class InputCompression implements BeforeModel {
+public class InputCompressionImpl implements BeforeModel {
 
     private final SampleIntentServiceImpl intentService = new SampleIntentServiceImpl();
 

@@ -19,7 +19,7 @@ public class SecurityFilterImpl implements BeforeModel, AfterModel {
         if (request.getMessages() == null || request.getMessages().isEmpty()) return request;
         ChatMessage last = request.getMessages().get(request.getMessages().size() - 1);
         String raw = last.getContent();
-        String filter = SensitiveWordUtil.filter(raw);
+        String filter = SensitiveWordUtil.filter(raw, SensitiveWordUtil.INPUT_RULE_TYPE);
         last.setContent(filter);
         return request;
     }

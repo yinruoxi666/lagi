@@ -22,16 +22,22 @@ import java.util.regex.Pattern;
 @Slf4j
 public class SensitiveWordUtil {
     private static final Map<String, WordRule> ruleMap = new HashMap<>();
+    private static final Map<String, WordRule> inputRuleMap = new HashMap<>();
     private static final Map<String, Pattern> patternCache = new HashMap<>();
     private static final List<FilterConfig> filterConfigs = ContextLoader.configuration.getFilters();
     private static int filterWindowLength = -1;
+
+    public static final String INPUT_RULE_TYPE = "input";
+    public static final String OUTPUT_RULE_TYPE = "output";
 
     private static final LRUCache<String, String> filterSlidingWindow = new LRUCache<>(10000, 30, TimeUnit.MINUTES);
     private static final LRUCache<String, Boolean> blockMap = new LRUCache<>(10000, 30, TimeUnit.MINUTES);
 
     static {
         WordRules wordRules = JsonFileLoadUtil.readWordLRulesList("/sensitive_word.json", WordRules.class);
-        pushWordRule(wordRules);
+        WordRules inputWordRules = JsonFileLoadUtil.readWordLRulesList("/sensitive_input.json", WordRules.class);
+        pushWordRule(ruleMap,wordRules);
+        pushWordRule(inputRuleMap,inputWordRules);
         if (filterConfigs != null) {
             for (FilterConfig filter : filterConfigs) {
                 if (filter.getName().equals("sensitive")) {
@@ -41,13 +47,28 @@ public class SensitiveWordUtil {
         }
     }
 
-    public static void pushWordRule(WordRules wordRules) {
+    public static void pushOutputRule( WordRules wordRules) {
+        pushWordRule(ruleMap,wordRules);
+    }
+
+    public static void pushInputRule( WordRules wordRules) {
+        pushWordRule(inputRuleMap,wordRules);
+    }
+
+    private static Map<String, WordRule> getRuleMap(String  type) {
+        if(INPUT_RULE_TYPE.equalsIgnoreCase(type)) {
+            return inputRuleMap;
+        } else {
+            return ruleMap;
+        }
+    }
+
+    public static void pushWordRule(Map<String,WordRule> ruleMap,  WordRules wordRules) {
         if (wordRules != null) {
             if (wordRules.getRules() != null) {
                 wordRules.getRules().stream()
                         .filter(r -> StrUtil.isNotBlank(r.getRule()))
                         .peek(r -> {
-                            r.setRule(r.getRule().toLowerCase());
                             if (r.getMask() == null) {
                                 r.setMask(wordRules.getMask());
                             }
@@ -63,19 +84,19 @@ public class SensitiveWordUtil {
     }
 
 
-    public static String filter(String message) {
-        return filter(message, Integer.MAX_VALUE);
+    public static String filter(String message, String ruleType) {
+        return filter(message, Integer.MAX_VALUE, ruleType);
     }
 
-    public static String filter(String message, int times) {
+    public static String filter(String message, int times, String ruleType) {
         int count = 0;
-        Set<String> rules = ruleMap.keySet();
+        Set<String> rules = getRuleMap(ruleType).keySet();
         for (String rule : rules) {
             Pattern p = getCompiledPattern(rule);
             Matcher matcher = p.matcher(message);
             if (matcher.find()) {
                 log.info("sensitive message: {} match group: {}", message, matcher.group());
-                WordRule wordRule = ruleMap.get(rule);
+                WordRule wordRule = getRuleMap(ruleType).get(rule);
                 if (wordRule != null) {
                     String filterContent = "匹配规则: " + rule + ", 原始内容: " + (message.length() > 500 ? message.substring(0, 500) : message);
                     if (wordRule.getLevel() == 1) {
@@ -125,7 +146,7 @@ public class SensitiveWordUtil {
 
     public static ChatCompletionResult filter4ChatCompletionResult(ChatCompletionResult chatCompletionResult) {
         String message = chatCompletionResult.getChoices().get(0).getMessage().getContent();
-        message = filter(message);
+        message = filter(message, Integer.MAX_VALUE, OUTPUT_RULE_TYPE);
         chatCompletionResult.getChoices().get(0).getMessage().setContent(message);
         return chatCompletionResult;
     }
