@@ -2,6 +2,7 @@ package ai.llm.hook.impl;
 
 import ai.annotation.Component;
 import ai.annotation.Order;
+import ai.annotation.Value;
 import ai.llm.hook.AfterModel;
 import ai.llm.hook.BeforeModel;
 import ai.openai.pojo.ChatCompletionRequest;
@@ -19,7 +20,8 @@ import java.util.concurrent.ArrayBlockingQueue;
 @Component
 public class SecurityFilterImpl implements BeforeModel, AfterModel {
 
-    private static final int QUEUE_CAPACITY = 3;
+    @Value("${filters[0].filter_window_length:3}")
+    private Integer queueCapacity;
 
     @Override
     public ChatCompletionRequest beforeModel(ChatCompletionRequest request) {
@@ -40,8 +42,8 @@ public class SecurityFilterImpl implements BeforeModel, AfterModel {
     public Observable<ChatCompletionResult> stream(Observable<ChatCompletionResult> source) {
         Observable<ChatCompletionResult> processedSource = source.filter(result -> true);
         return Observable.create(emitter -> {
-            Queue<ChatCompletionResult> cacheQueue = new ArrayBlockingQueue<>(QUEUE_CAPACITY);
-            List<String> contents = new Vector<>(QUEUE_CAPACITY);
+            Queue<ChatCompletionResult> cacheQueue = new ArrayBlockingQueue<>(queueCapacity);
+            List<String> contents = new Vector<>(queueCapacity);
             processedSource.subscribe(
                     chunk -> {
                         try {
@@ -53,7 +55,7 @@ public class SecurityFilterImpl implements BeforeModel, AfterModel {
                                 int size = cacheQueue.size();
                                 for (int i = 0; i < size; i++) {
                                     ChatCompletionResult temp = cacheQueue.poll();
-                                    if (temp != null) {
+                                    if (temp != null && i != 0) {
                                         temp.getChoices().get(0).getMessage().setContent(nullOrReplaceContent);
                                     }
                                     cacheQueue.offer(temp);
@@ -63,7 +65,7 @@ public class SecurityFilterImpl implements BeforeModel, AfterModel {
                                 }
                                 chunk.getChoices().get(0).getMessage().setContent(nullOrReplaceContent);
                             }
-                            if(cacheQueue.size() < QUEUE_CAPACITY) {
+                            if(cacheQueue.size() < queueCapacity) {
                                 cacheQueue.offer(chunk);
                             } else {
                                 ChatCompletionResult toEmit = cacheQueue.poll();

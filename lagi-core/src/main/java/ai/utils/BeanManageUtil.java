@@ -1,11 +1,15 @@
 package ai.utils;
 
 import ai.annotation.Component;
+import ai.annotation.Value;
+import ai.config.ContextLoader;
+import cn.hutool.core.convert.Convert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.net.JarURLConnection;
 import java.net.URL;
 import java.net.URLDecoder;
@@ -23,14 +27,17 @@ public class BeanManageUtil {
     public static Map<Class<?>, Object> beanMaps = new ConcurrentHashMap<>();
 
     static {
+        ContextLoader.loadContext();
         String[] packages = new String[] {
                 "ai.llm.hook.impl",
         };
-        for (String packageName : packages) {
-            try {
-                Set<Object> objects = scanAndCreateObjects(packageName);
-                objects.forEach(object -> beanMaps.put(object.getClass(), object));
-            } catch (Exception ignored) {
+        if(ContextLoader.configuration != null) {
+            for (String packageName : packages) {
+                try {
+                    Set<Object> objects = scanAndCreateObjects(packageName);
+                    objects.forEach(object -> beanMaps.put(object.getClass(), object));
+                } catch (Exception ignored) {
+                }
             }
         }
     }
@@ -61,7 +68,7 @@ public class BeanManageUtil {
                     ai.annotation.Order order = clazz.getAnnotation(ai.annotation.Order.class);
                     return order.value();
                 }
-                return 2; // 默认值为 2
+                return 2; // default value 2
             }
         }).collect(Collectors.toList());
     }
@@ -84,12 +91,29 @@ public class BeanManageUtil {
                     continue;
                 }
                 Object instance = clazz.getConstructor().newInstance();
+                injectionProperties(clazz, instance);
                 objectSet.add(instance);
             } catch (Exception e) {
                 log.error("Failed to create instance for class: " + clazz.getName(), e);
             }
         }
         return objectSet;
+    }
+
+    private static void injectionProperties(Class<?> clazz, Object instance) throws IllegalAccessException {
+        Field[] fields = clazz.getDeclaredFields();
+        for (Field field : fields) {
+            Value value = field.getAnnotation(Value.class);
+            if (value != null) {
+                String expression = value.value();
+                String configValue = ExpressionParser.parse(expression);
+                Object bean = Convert.convert(field.getType(), configValue);
+                System.out.println(bean);
+                field.setAccessible(true);
+                field.set(instance, bean);
+                System.out.println("Injected value: " + configValue + " into field: " + field.getName());
+            }
+        }
     }
 
     /**
