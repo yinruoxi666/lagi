@@ -110,6 +110,7 @@ public class QwenAdapter extends ModelService implements ILlmAdapter {
         }
         return GenerationParam.builder()
                 .apiKey(getApiKey())
+                .incrementalOutput(true)
                 .model(model)
                 .messages(messages)
                 .resultFormat(GenerationParam.ResultFormat.MESSAGE)
