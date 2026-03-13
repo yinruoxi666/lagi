@@ -56,7 +56,7 @@ public class LlmRouteService {
             ChatCompletionRequest copy = new ChatCompletionRequest();
             BeanUtil.copyProperties(chatCompletionRequest, copy);
             try {
-                ChatCompletionResult result = SensitiveWordUtil.filter(adapter.completions(copy));
+                ChatCompletionResult result = adapter.completions(copy);
                 FreezingService.unfreezeAdapter(adapter);
                 return result;
             } catch (RRException e) {
@@ -100,7 +100,7 @@ public class LlmRouteService {
             List<ChatCompletionResult> resultMatrix = (List<ChatCompletionResult>) contain.Init().running();
             if (resultMatrix.get(0) != null) {
                 answer = resultMatrix.get(0);
-                answer = SensitiveWordUtil.filter(answer);
+//                answer = SensitiveWordUtil.filter(answer);
             } else {
                 throw contain.getException();
             }
@@ -122,7 +122,7 @@ public class LlmRouteService {
                     ChatCompletionRequest copy = new ChatCompletionRequest();
                     BeanUtil.copyProperties(chatCompletionRequest, copy);
                     try {
-                        ChatCompletionResult result = SensitiveWordUtil.filter(adapter.completions(copy));
+                        ChatCompletionResult result = adapter.completions(copy);
                         FreezingService.unfreezeAdapter(adapter);
                         return result;
                     } catch (RRException e) {
@@ -144,7 +144,7 @@ public class LlmRouteService {
                     ChatCompletionRequest copy = new ChatCompletionRequest();
                     BeanUtil.copyProperties(chatCompletionRequest, copy);
                     try {
-                        ChatCompletionResult result = SensitiveWordUtil.filter(appointAdapter.completions(copy));
+                        ChatCompletionResult result = appointAdapter.completions(copy);
                         FreezingService.unfreezeAdapter(appointAdapter);
                         return result;
                     } catch (RRException e) {

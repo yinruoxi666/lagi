@@ -81,7 +81,7 @@ public class CompletionsService implements ChatCompletion {
             ILlmAdapter appointAdapter = llmAdapterAIManager.getAdapter(chatCompletionRequest.getModel());
             if (appointAdapter != null && notFreezingAdapter(appointAdapter)) {
                 try {
-                    ChatCompletionResult result = SensitiveWordUtil.filter(appointAdapter.completions(chatCompletionRequest));
+                    ChatCompletionResult result = appointAdapter.completions(chatCompletionRequest);
                     unfreezeAdapter(appointAdapter);
                     return result;
                 } catch (RRException e) {

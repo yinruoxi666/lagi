@@ -176,8 +176,7 @@ public class LlmApiServlet extends BaseServlet {
             try {
                 String substring = firstAnswer.substring(i, end);
                 ChatCompletionResult result = convertResponse(substring);
-                ChatCompletionResult filter = SensitiveWordUtil.filter(result);
-                String msg = gson.toJson(filter);
+                String msg = gson.toJson(result);
                 out.print("data: " + msg + "\n\n");
                 out.flush();
             } catch (Exception e) {
@@ -409,7 +408,9 @@ public class LlmApiServlet extends BaseServlet {
         observable.subscribe(
                 data -> {
                     lastResult[0] = data;
-                    ChatCompletionResult filter = SensitiveWordUtil.filter(data, true);
+//                    ChatCompletionResult filter = SensitiveWordUtil.filter(data, true);
+//                    SecurityFilterImpl had filter
+                    ChatCompletionResult filter = data;
                     if (filter == null) {
                         return;
                     }
