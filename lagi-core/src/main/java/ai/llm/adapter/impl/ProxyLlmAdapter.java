@@ -39,7 +39,11 @@ public class ProxyLlmAdapter extends ModelService implements ILlmAdapter {
 
     @Override
     public ChatCompletionResult completions(ChatCompletionRequest request) {
-        request = hookService.beforeModel(request);
+        // Prevent stack overflow caused by calling large models within the hook function
+        if(!Boolean.TRUE.equals(request.getEnableHook())) {
+            request.setEnableHook(true);
+            request = hookService.beforeModel(request);
+        }
         if(!(request instanceof EnhanceChatCompletionRequest)) {
             ChatCompletionResult completions = llmAdapter.completions(request);
             return hookService.AfterModel(completions);
@@ -72,7 +76,11 @@ public class ProxyLlmAdapter extends ModelService implements ILlmAdapter {
 
     @Override
     public Observable<ChatCompletionResult> streamCompletions(ChatCompletionRequest chatCompletionRequest) {
-        chatCompletionRequest = hookService.beforeModel(chatCompletionRequest);
+        // Prevent stack overflow caused by calling large models within the hook function
+        if(!Boolean.TRUE.equals(chatCompletionRequest.getEnableHook())) {
+            chatCompletionRequest.setEnableHook(true);
+            chatCompletionRequest = hookService.beforeModel(chatCompletionRequest);
+        }
         if(!(chatCompletionRequest instanceof EnhanceChatCompletionRequest)) {
             Observable<ChatCompletionResult> chatCompletionResultObservable = llmAdapter.streamCompletions(chatCompletionRequest);
             return hookService.streamApply(chatCompletionResultObservable);

@@ -7,7 +7,9 @@ import ai.intent.pojo.IntentResult;
 import ai.llm.hook.BeforeModel;
 import ai.openai.pojo.ChatCompletionRequest;
 import ai.openai.pojo.ChatMessage;
+import ai.utils.LagiGlobal;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Order
@@ -18,13 +20,24 @@ public class InputCompressionImpl implements BeforeModel {
 
     @Override
     public ChatCompletionRequest beforeModel(ChatCompletionRequest request) {
-        IntentResult intentResult = intentService.detectIntent(request);
+        IntentResult intentResult = intentService.detectSegmentationBoundary(request);
         Integer continuedIndex = intentResult.getContinuedIndex();
-        if(continuedIndex != null) {
-            List<ChatMessage> chatMessages = request.getMessages();
-            chatMessages.subList(continuedIndex, chatMessages.size());
-            request.setMessages(chatMessages);
+        List<ChatMessage> chatMessages = request.getMessages();
+        if(chatMessages.isEmpty()) {
+            return request;
         }
+        boolean hasSystem = LagiGlobal.LLM_ROLE_SYSTEM.equals(chatMessages.get(0).getRole());
+        List<ChatMessage> newChatMessages = new ArrayList<>();
+        if(hasSystem) {
+            newChatMessages.add(chatMessages.get(0));
+        }
+        if(continuedIndex != null) {
+            newChatMessages.addAll(chatMessages.subList(continuedIndex, chatMessages.size()));
+        } else {
+            newChatMessages.addAll(chatMessages.subList(chatMessages.size() - 1, chatMessages.size()));
+        }
+        request.setMessages(newChatMessages);
+        System.out.println(newChatMessages);
         return request;
     }
 
