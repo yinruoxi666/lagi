@@ -108,10 +108,8 @@ public class BeanManageUtil {
                 String expression = value.value();
                 String configValue = ExpressionParser.parse(expression);
                 Object bean = Convert.convert(field.getType(), configValue);
-                System.out.println(bean);
                 field.setAccessible(true);
                 field.set(instance, bean);
-                System.out.println("Injected value: " + configValue + " into field: " + field.getName());
             }
         }
     }

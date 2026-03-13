@@ -21,13 +21,9 @@ public class SqliteAdapter {
     }
 
     private void init() {
-        String dbPath = System.getProperty("linkmind.sqlite");
-        if (dbPath == null || dbPath.trim().isEmpty()) {
-            String tomcatPath = System.getProperty("user.dir");
-            dbPath = tomcatPath + "/saas.db";
-        }
+        String tomcatPath = System.getProperty("user.dir");
+        String dbPath = tomcatPath + "/saas.db";
         url = "jdbc:sqlite:" + dbPath;
-        log.info("SQLite database path: {}", dbPath);
         Connection conn = null;
         Statement stmt = null;
         try {

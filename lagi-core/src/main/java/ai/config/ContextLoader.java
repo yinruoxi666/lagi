@@ -131,7 +131,6 @@ public class ContextLoader {
             }
         }
 
-        // 默认搜索逻辑：classpath resource > 文件路径 fallback
         try {
             if(configuration == null) {
                 loadContextByResource("lagi.yml");
@@ -156,11 +155,7 @@ public class ContextLoader {
         }
     }
 
-
-
-
     public static void main(String[] args) {
-
         ContextLoader.loadContext();
         System.out.println(ContextLoader.configuration);;
     }
