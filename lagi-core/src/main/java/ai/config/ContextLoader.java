@@ -74,6 +74,20 @@ public class ContextLoader {
     }
 
     public static void loadContext() {
+        String configPath = System.getProperty("linkmind.config");
+        if (configPath != null && !configPath.trim().isEmpty()) {
+            try {
+                loadContextByFilePath(configPath.trim());
+                if (configuration != null) {
+                    log.info("Loaded configuration from command line: {}", configPath);
+                    return;
+                }
+            } catch (Exception e) {
+                log.error("Failed to load configuration from command line path: {}", configPath, e);
+            }
+        }
+
+        // 默认搜索逻辑：classpath resource > 文件路径 fallback
         try {
             if(configuration == null) {
                 loadContextByResource("lagi.yml");
