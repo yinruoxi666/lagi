@@ -1,9 +1,13 @@
 package ai.intent.impl;
 
 
+import ai.common.pojo.EmbeddingConfig;
 import ai.common.pojo.IndexSearchData;
 import ai.common.pojo.VectorStoreConfig;
 import ai.common.utils.ThreadPoolManager;
+import ai.config.ContextLoader;
+import ai.embedding.EmbeddingFactory;
+import ai.embedding.Embeddings;
 import ai.intent.IntentService;
 import ai.intent.enums.IntentStatusEnum;
 import ai.intent.enums.IntentTypeEnum;
@@ -11,6 +15,7 @@ import ai.intent.pojo.IntentResult;
 import ai.medusa.utils.PromptCacheTrigger;
 import ai.openai.pojo.ChatCompletionRequest;
 import ai.utils.ContinueWordUtil;
+import ai.utils.EmbeddingSimilarityCalculator;
 import ai.utils.StoppingWordUtil;
 import ai.utils.StrFilterUtil;
 import ai.utils.qa.ChatCompletionUtil;
@@ -18,13 +23,13 @@ import ai.vector.VectorStoreService;
 import ai.vector.pojo.MultiQueryCondition;
 import cn.hutool.core.util.StrUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
 
@@ -82,6 +87,51 @@ public class SampleIntentServiceImpl implements IntentService {
             return intentResult;
         }
         setIntentByVector(chatCompletionRequest, lIndex, lastQ, intentResult, where);
+        return intentResult;
+    }
+
+
+    public IntentResult detectSegmentationBoundary(ChatCompletionRequest chatCompletionRequest) {
+        IntentTypeEnum intentTypeEnum = detectType(chatCompletionRequest);
+        IntentResult intentResult = new IntentResult();
+        intentResult.setType(intentTypeEnum.getName());
+        intentResult.setStatus(IntentStatusEnum.COMPLETION.getName());
+        List<Integer> res = PromptCacheTrigger.analyzeChatBoundariesForIntent(chatCompletionRequest);
+        if (res.size() == 1) {
+            intentResult.setContinuedIndex(0);
+            return intentResult;
+        }
+        String lastQ = ChatCompletionUtil.getLastMessage(chatCompletionRequest);
+        boolean isStop = StoppingWordUtil.containsStoppingWorlds(lastQ);
+        if (isStop) {
+            intentResult.setContinuedIndex(chatCompletionRequest.getMessages().size()-1);
+            return intentResult;
+        }
+        Integer lIndex = res.get(0);
+        boolean isContinue = ContinueWordUtil.containsStoppingWorlds(lastQ);
+        if (isContinue) {
+            intentResult.setStatus(IntentStatusEnum.CONTINUE.getName());
+            intentResult.setContinuedIndex(lIndex);
+            return intentResult;
+        }
+        if(ContextLoader.configuration != null
+                && ContextLoader.configuration.getFunctions().getEmbedding() != null
+                && !ContextLoader.configuration.getFunctions().getEmbedding().isEmpty()) {
+            List<EmbeddingConfig> embedding = ContextLoader.configuration.getFunctions().getEmbedding();
+            EmbeddingConfig config = embedding.get(0);
+            Embeddings embeddings = EmbeddingFactory.getEmbedding(config);
+            String q1 = chatCompletionRequest.getMessages().get(res.get(0)).getContent();
+            String q2 = chatCompletionRequest.getMessages().get(res.get(1)).getContent();
+            List<List<Float>> embeddingDataList = embeddings.createEmbedding(Lists.newArrayList(q1+"\n"+q2, q1));
+            double similarity = EmbeddingSimilarityCalculator.calculateCosineSimilarity(embeddingDataList.get(0), embeddingDataList.get(1));
+            if(similarity > 0.91) {
+                intentResult.setStatus(IntentStatusEnum.CONTINUE.getName());
+                intentResult.setContinuedIndex(res.get(0));
+            } else {
+                intentResult.setStatus(IntentStatusEnum.COMPLETION.getName());
+                intentResult.setContinuedIndex(res.get(1));
+            }
+        }
         return intentResult;
     }
 
