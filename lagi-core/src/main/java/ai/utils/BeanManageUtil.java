@@ -27,7 +27,7 @@ public class BeanManageUtil {
     public static Map<Class<?>, Object> beanMaps = new ConcurrentHashMap<>();
 
     static {
-        ContextLoader.loadContext();
+//        ContextLoader.loadContext();
         String[] packages = new String[] {
                 "ai.llm.hook.impl",
         };
