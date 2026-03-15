@@ -117,7 +117,9 @@ public class ContextLoader {
         }
     }
 
-    public static void loadContext() {
+    public static synchronized void loadContext() {
+        if (configuration != null) return;
+
         String configPath = System.getProperty("linkmind.config");
         if (configPath != null && !configPath.trim().isEmpty()) {
             try {
@@ -140,7 +142,6 @@ public class ContextLoader {
         }
         if(configuration == null) {
             try {
-
                 loadContextByFilePath("lagi-web/src/main/resources/lagi.yml");
             } catch (Exception e) {
                 log.warn(e.getMessage());
