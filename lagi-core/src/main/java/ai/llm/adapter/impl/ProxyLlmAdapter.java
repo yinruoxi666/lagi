@@ -37,25 +37,34 @@ public class ProxyLlmAdapter extends ModelService implements ILlmAdapter {
 
 
 
+    private Observable<ChatCompletionResult> applyStreamHook(Observable<ChatCompletionResult> observable) {
+        return hookService != null ? hookService.streamApply(observable) : observable;
+    }
+
     @Override
     public ChatCompletionResult completions(ChatCompletionRequest request) {
         // Prevent stack overflow caused by calling large models within the hook function
         if(!Boolean.TRUE.equals(request.getEnableHook())) {
             request.setEnableHook(true);
-            request = hookService.beforeModel(request);
+            if (hookService != null) {
+                ChatCompletionRequest afterHook = hookService.beforeModel(request);
+                if (afterHook != null) {
+                    request = afterHook;
+                }
+            }
         }
         if(!(request instanceof EnhanceChatCompletionRequest)) {
             ChatCompletionResult completions = llmAdapter.completions(request);
-            return hookService.AfterModel(completions);
+            return hookService != null ? hookService.AfterModel(completions) : completions;
         }
         if(this.priorityLock == null) {
             ChatCompletionResult completions = llmAdapter.completions(request);
-            return hookService.AfterModel(completions);
+            return hookService != null ? hookService.AfterModel(completions) : completions;
         }
         Integer priority = ((EnhanceChatCompletionRequest) request).getPriority();
         if(priority == null) {
             ChatCompletionResult completions = llmAdapter.completions(request);
-            return hookService.AfterModel(completions);
+            return hookService != null ? hookService.AfterModel(completions) : completions;
         }
         try {
 //            log.info("locking priority {}", priority);
@@ -63,7 +72,7 @@ public class ProxyLlmAdapter extends ModelService implements ILlmAdapter {
 //            log.info("get lock priority {}", priority);
             ((EnhanceChatCompletionRequest) request).setPriority(null);
             ChatCompletionResult completions = llmAdapter.completions(request);
-            completions = hookService.AfterModel(completions);
+            completions = hookService != null ? hookService.AfterModel(completions) : completions;
             return completions;
         } finally {
 //            log.info("Unlocking priority {}", priority);
@@ -79,20 +88,25 @@ public class ProxyLlmAdapter extends ModelService implements ILlmAdapter {
         // Prevent stack overflow caused by calling large models within the hook function
         if(!Boolean.TRUE.equals(chatCompletionRequest.getEnableHook())) {
             chatCompletionRequest.setEnableHook(true);
-            chatCompletionRequest = hookService.beforeModel(chatCompletionRequest);
+            if (hookService != null) {
+                ChatCompletionRequest afterHook = hookService.beforeModel(chatCompletionRequest);
+                if (afterHook != null) {
+                    chatCompletionRequest = afterHook;
+                }
+            }
         }
         if(!(chatCompletionRequest instanceof EnhanceChatCompletionRequest)) {
             Observable<ChatCompletionResult> chatCompletionResultObservable = llmAdapter.streamCompletions(chatCompletionRequest);
-            return hookService.streamApply(chatCompletionResultObservable);
+            return applyStreamHook(chatCompletionResultObservable);
         }
         if(this.priorityLock == null) {
             Observable<ChatCompletionResult> chatCompletionResultObservable = llmAdapter.streamCompletions(chatCompletionRequest);
-            return hookService.streamApply(chatCompletionResultObservable);
+            return applyStreamHook(chatCompletionResultObservable);
         }
         Integer priority = ((EnhanceChatCompletionRequest) chatCompletionRequest).getPriority();
         if(priority == null) {
             Observable<ChatCompletionResult> chatCompletionResultObservable = llmAdapter.streamCompletions(chatCompletionRequest);
-            return hookService.streamApply(chatCompletionResultObservable);
+            return applyStreamHook(chatCompletionResultObservable);
         }
         Observable<ChatCompletionResult> completions = null;
         try {
@@ -101,7 +115,7 @@ public class ProxyLlmAdapter extends ModelService implements ILlmAdapter {
 //            log.info("stream get lock priority {}", priority);
             ((EnhanceChatCompletionRequest) chatCompletionRequest).setPriority(null);
             completions = llmAdapter.streamCompletions(chatCompletionRequest);
-            completions = hookService.streamApply(completions);
+            completions = applyStreamHook(completions);
             if(completions != null) {
                 return completions.doFinally(() -> {
 //                    log.info("stream Unlocking priority {}", priority);

@@ -8,14 +8,20 @@ import ai.vector.pojo.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
 public class SqliteVectorStore extends BaseVectorStore {
     private static final Logger logger = LoggerFactory.getLogger(SqliteVectorStore.class);
+
+    private static final String SQLITE_VEC_RESOURCE_DIR = "sqlite/sqlite-vec";
 
     private final Embeddings embeddingFunction;
     private final String connName;
@@ -26,7 +32,94 @@ public class SqliteVectorStore extends BaseVectorStore {
         this.config = config;
         this.embeddingFunction = embeddingFunction;
         this.connName = AiGlobal.DEFAULT_DB;
-        this.extensionPath = "E:/Downloads/vec0.dll";
+        this.extensionPath = resolveSqliteVecExtensionPath();
+    }
+
+    /**
+     * Returns the relative path under sqlite-vec for the current OS and arch.
+     * Structure: {os}/{arch}/vec0.{ext}, e.g. windows/x86_64/vec0.dll, linux/aarch64/vec0.so.
+     */
+    private static String getSqliteVecResourcePath() {
+        String os = getNormalizedOs();
+        String arch = getNormalizedArch();
+        String ext = os.equals("windows") ? ".dll" : (os.equals("macos") ? ".dylib" : ".so");
+        return os + "/" + arch + "/vec0" + ext;
+    }
+
+    private static String getNormalizedOs() {
+        String name = System.getProperty("os.name", "").toLowerCase();
+        if (name.contains("win")) {
+            return "windows";
+        }
+        if (name.contains("mac")) {
+            return "macos";
+        }
+        return "linux";
+    }
+
+    private static String getNormalizedArch() {
+        String arch = System.getProperty("os.arch", "").toLowerCase();
+        if (arch.equals("amd64") || arch.equals("x86_64")) {
+            return "x86_64";
+        }
+        if (arch.equals("aarch64") || arch.equals("arm64")) {
+            return "aarch64";
+        }
+        return "x86_64";
+    }
+
+    /**
+     * Resolves the sqlite-vec extension to a file path, loading from classpath
+     * (sqlite/sqlite-vec/{os}/{arch}/vec0.{ext}). Extracts to a temp file when loaded from a JAR.
+     */
+    private static String resolveSqliteVecExtensionPath() {
+        String relativePath = getSqliteVecResourcePath();
+        String resourcePath = SQLITE_VEC_RESOURCE_DIR + "/" + relativePath;
+        String simpleFilename = "vec0" + relativePath.substring(relativePath.lastIndexOf('.'));
+        ClassLoader cl = SqliteVectorStore.class.getClassLoader();
+        if (cl == null) {
+            cl = ClassLoader.getSystemClassLoader();
+        }
+        java.net.URL url = cl.getResource(resourcePath);
+        if (url == null && Thread.currentThread().getContextClassLoader() != null) {
+            ClassLoader ctx = Thread.currentThread().getContextClassLoader();
+            url = ctx.getResource(resourcePath);
+            if (url != null) {
+                cl = ctx;
+            }
+        }
+        if (url == null) {
+            logger.warn("sqlite-vec extension not found: {} (os={}, arch={}). Ensure {} is on the classpath.",
+                    resourcePath, getNormalizedOs(), getNormalizedArch(), SQLITE_VEC_RESOURCE_DIR);
+            return "vec0";
+        }
+        try {
+            if ("file".equals(url.getProtocol())) {
+                String path = java.net.URLDecoder.decode(url.getPath(), "UTF-8");
+                if (getNormalizedOs().equals("windows") && path.length() > 2 && path.startsWith("/") && path.charAt(2) == ':') {
+                    path = path.substring(1);
+                }
+                return Paths.get(path).normalize().toAbsolutePath().toString();
+            }
+            Path tempDir = Files.createTempDirectory("sqlite-vec");
+            tempDir.toFile().deleteOnExit();
+            Path temp = tempDir.resolve(simpleFilename);
+            try (InputStream in = cl.getResourceAsStream(resourcePath)) {
+                if (in != null) {
+                    Files.copy(in, temp, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    temp.toFile().deleteOnExit();
+                    return temp.toAbsolutePath().normalize().toString();
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Failed to resolve sqlite-vec extension path for {}: {}", resourcePath, e.getMessage());
+        }
+        return "vec0";
+    }
+
+    private static String escapeExtensionPathForSql(String path) {
+        if (path == null) return "";
+        return path.replace("'", "''");
     }
 
     // ==================== Connection & Extension ====================
@@ -44,12 +137,13 @@ public class SqliteVectorStore extends BaseVectorStore {
             if (loadedConnections.containsKey(rawConn)) {
                 return;
             }
+            String pathForSql = escapeExtensionPathForSql(extensionPath);
             try (Statement stmt = conn.createStatement()) {
-                stmt.execute("SELECT load_extension('" + extensionPath + "')");
+                stmt.execute("SELECT load_extension('" + pathForSql + "')");
             }
             loadedConnections.put(rawConn, Boolean.TRUE);
         } catch (SQLException e) {
-            logger.error("Failed to load extension: {}", e.getMessage());
+            logger.error("Failed to load extension (path={}): {}", extensionPath, e.getMessage());
         }
     }
 

@@ -26,9 +26,15 @@ public class HookService {
     }
 
     public ChatCompletionRequest beforeModel(ChatCompletionRequest request) {
+        if (request == null || beforeModels == null) {
+            return request;
+        }
         for (BeforeModel beforeModel : beforeModels) {
             try {
-                request =  beforeModel.beforeModel(request);
+                ChatCompletionRequest next = beforeModel.beforeModel(request);
+                if (next != null) {
+                    request = next;
+                }
             } catch (Exception e) {
                 log.error("", e);
             }
@@ -37,9 +43,15 @@ public class HookService {
     }
 
     public ChatCompletionResult AfterModel(ChatCompletionResult result) {
+        if (result == null || afterModels == null) {
+            return result;
+        }
         for (AfterModel afterModel : afterModels) {
             try {
-                result = afterModel.apply(result);
+                ChatCompletionResult next = afterModel.apply(result);
+                if (next != null) {
+                    result = next;
+                }
             } catch (Exception e) {
                 log.error("HookService afterModel error", e);
             }
@@ -48,9 +60,15 @@ public class HookService {
     }
 
     public Observable<ChatCompletionResult> streamApply(Observable<ChatCompletionResult> result) {
+        if (result == null || afterModels == null) {
+            return result;
+        }
         for (AfterModel afterModel : afterModels) {
             try {
-                result = afterModel.stream(result);
+                Observable<ChatCompletionResult> next = afterModel.stream(result);
+                if (next != null) {
+                    result = next;
+                }
             } catch (Exception e) {
                 log.error("HookService afterModel error", e);
             }
