@@ -5,10 +5,7 @@ import ai.common.ModelService;
 import ai.common.utils.MappingIterable;
 import ai.llm.adapter.ILlmAdapter;
 import ai.llm.utils.convert.ZhiPuConvert;
-import ai.openai.pojo.ChatCompletionChoice;
-import ai.openai.pojo.ChatCompletionRequest;
-import ai.openai.pojo.ChatCompletionResult;
-import ai.openai.pojo.ChatMessage;
+import ai.openai.pojo.*;
 import cn.hutool.core.bean.BeanUtil;
 import com.zhipu.oapi.ClientV4;
 import com.zhipu.oapi.Constants;
@@ -109,6 +106,13 @@ public class ZhipuAdapter extends ModelService implements ILlmAdapter {
             choice.setIndex(i);
             choice.setMessage(chatMessage);
             choices.add(choice);
+        }
+        if(modelData.getUsage() != null) {
+            int promptTokens = modelData.getUsage().getPromptTokens();
+            int completionTokens = modelData.getUsage().getCompletionTokens();
+            int totalTokens = modelData.getUsage().getTotalTokens();
+            Usage usage = Usage.builder().prompt_tokens(promptTokens).completion_tokens(completionTokens).total_tokens(totalTokens).build();
+            result.setUsage(usage);
         }
         result.setChoices(choices);
         return result;

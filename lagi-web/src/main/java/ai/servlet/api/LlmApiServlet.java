@@ -241,7 +241,7 @@ public class LlmApiServlet extends BaseServlet {
                 medusaService.triggerCachePutAndDiversify(promptInput, true);
             }
         }
-        boolean hasTruncate = false;
+//        boolean hasTruncate = false;
         GetRagContext context = null;
         if (!isMultiModal) {
             if (chatCompletionRequest.getCategory() != null && Boolean.TRUE.equals(RAG_ENABLE)) {
@@ -261,15 +261,15 @@ public class LlmApiServlet extends BaseServlet {
                     completionsService.addVectorDBContext(chatCompletionRequest, contextStr);
                     ChatMessage chatMessage = chatCompletionRequest.getMessages().get(chatCompletionRequest.getMessages().size() - 1);
                     chatCompletionRequest.setMessages(Lists.newArrayList(chatMessage));
-                    hasTruncate = true;
+//                    hasTruncate = true;
                 }
             } else {
                 indexSearchDataList = null;
             }
-            if(!hasTruncate) {
-                List<ChatMessage> chatMessages = CompletionUtil.truncateChatMessages(chatCompletionRequest.getMessages());
-                chatCompletionRequest.setMessages(chatMessages);
-            }
+//            if(!hasTruncate) {
+//                List<ChatMessage> chatMessages = CompletionUtil.truncateChatMessages(chatCompletionRequest.getMessages());
+//                chatCompletionRequest.setMessages(chatMessages);
+//            }
         }
 
         EnhanceChatCompletionRequest enhance = EnhanceChatCompletionRequest.builder()

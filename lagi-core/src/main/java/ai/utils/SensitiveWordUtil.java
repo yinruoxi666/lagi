@@ -89,7 +89,7 @@ public class SensitiveWordUtil {
             Pattern p = getCompiledPattern(rule);
             Matcher matcher = p.matcher(message);
             if (matcher.find()) {
-                log.info("sensitive message: {} match group: {}", message, matcher.group());
+                log.info("sensitive message: {} match group: {} \t rule:{}", message, matcher.group(), rule);
                 WordRule wordRule = getRuleMap(ruleType).get(rule);
                 if (wordRule != null) {
                     String filterContent = "匹配规则: " + rule + ", 原始内容: " + (message.length() > 500 ? message.substring(0, 500) : message);

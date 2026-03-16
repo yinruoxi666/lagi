@@ -98,7 +98,7 @@ public class SampleIntentServiceImpl implements IntentService {
         intentResult.setStatus(IntentStatusEnum.COMPLETION.getName());
         List<Integer> res = PromptCacheTrigger.analyzeChatBoundariesForIntent(chatCompletionRequest);
         if (res.size() == 1) {
-            intentResult.setContinuedIndex(0);
+            intentResult.setContinuedIndex(res.get(0));
             return intentResult;
         }
         String lastQ = ChatCompletionUtil.getLastMessage(chatCompletionRequest);
@@ -122,6 +122,8 @@ public class SampleIntentServiceImpl implements IntentService {
             Embeddings embeddings = EmbeddingFactory.getEmbedding(config);
             String q1 = chatCompletionRequest.getMessages().get(res.get(0)).getContent();
             String q2 = chatCompletionRequest.getMessages().get(res.get(1)).getContent();
+            q1 = q1.substring(0, Math.min(q1.length(), 1000));
+            q2 = q2.substring(0, Math.min(q2.length(), 1000));
             List<List<Float>> embeddingDataList = embeddings.createEmbedding(Lists.newArrayList(q1+"\n"+q2, q1));
             double similarity = EmbeddingSimilarityCalculator.calculateCosineSimilarity(embeddingDataList.get(0), embeddingDataList.get(1));
             if(similarity > 0.91) {

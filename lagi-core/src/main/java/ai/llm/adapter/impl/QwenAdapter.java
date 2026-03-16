@@ -19,6 +19,7 @@ import cn.hutool.core.bean.BeanUtil;
 import com.alibaba.dashscope.aigc.generation.Generation;
 import com.alibaba.dashscope.aigc.generation.GenerationParam;
 import com.alibaba.dashscope.aigc.generation.GenerationResult;
+import com.alibaba.dashscope.aigc.generation.GenerationUsage;
 import com.alibaba.dashscope.common.Message;
 import com.alibaba.dashscope.exception.ApiException;
 import com.alibaba.dashscope.exception.InputRequiredException;
@@ -146,10 +147,7 @@ public class QwenAdapter extends ModelService implements ILlmAdapter {
         boolean stream = Optional.ofNullable(request.getStream()).orElse(false);
         String model = Optional.ofNullable(request.getModel()).orElse(getModel());
 
-        int maxTokens = request.getMax_tokens();
-        if (request.getMax_tokens() >= 2000) {
-            maxTokens = 2000;
-        }
+        int maxTokens = Math.max(Optional.ofNullable(request.getMax_tokens()).orElse(2000), 2000);
 
         List<Tool> tools = request.getTools();
         List<ToolBase> toolFunctions = null;
@@ -192,7 +190,16 @@ public class QwenAdapter extends ModelService implements ILlmAdapter {
         }
         chatMessage.setTool_calls(toolCallList);
         choice.setMessage(chatMessage);
+        choice.setDelta(chatMessage);
         choice.setFinish_reason(response.getOutput().getFinishReason());
+        GenerationUsage oriUsage = response.getUsage();
+        if(oriUsage != null) {
+            Usage usage = Usage.builder()
+                    .prompt_tokens(oriUsage.getInputTokens())
+                    .completion_tokens(oriUsage.getOutputTokens())
+                    .total_tokens(oriUsage.getTotalTokens()).build();
+            result.setUsage(usage);
+        }
         List<ChatCompletionChoice> choices = new ArrayList<>();
         choices.add(choice);
         result.setChoices(choices);

@@ -1,10 +1,14 @@
 package ai.openai.pojo;
 
-import lombok.Data;
+import lombok.*;
 
 import java.io.Serializable;
 
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@ToString
 public class Usage  implements Serializable {
     private long prompt_tokens;
     private long completion_tokens;

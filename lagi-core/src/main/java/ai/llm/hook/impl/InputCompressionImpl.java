@@ -20,6 +20,8 @@ public class InputCompressionImpl implements BeforeModel {
 
     @Override
     public ChatCompletionRequest beforeModel(ChatCompletionRequest request) {
+        List<ChatMessage> merge = mergeConsecutiveMessages(request.getMessages());
+        request.setMessages(merge);
         IntentResult intentResult = intentService.detectSegmentationBoundary(request);
         Integer continuedIndex = intentResult.getContinuedIndex();
         List<ChatMessage> chatMessages = request.getMessages();
@@ -38,6 +40,31 @@ public class InputCompressionImpl implements BeforeModel {
         }
         request.setMessages(newChatMessages);
         return request;
+    }
+
+    private List<ChatMessage> mergeConsecutiveMessages(List<ChatMessage> messages) {
+        List<ChatMessage> mergedList = new ArrayList<>();
+        if (messages.isEmpty()) {
+            return mergedList;
+        }
+
+        ChatMessage current = messages.get(0);
+        mergedList.add(current);
+
+        for (int i = 1; i < messages.size(); i++) {
+            ChatMessage next = messages.get(i);
+            ChatMessage lastMerged = mergedList.get(mergedList.size() - 1);
+
+            if (lastMerged.getRole().equals(next.getRole())
+                    && (LagiGlobal.LLM_ROLE_USER.equals(next.getRole())
+                    || LagiGlobal.LLM_ROLE_ASSISTANT.equals(next.getRole()))) {
+                String mergedContent = lastMerged.getContent() + "\n" + next.getContent();
+                lastMerged.setContent(mergedContent);
+            } else {
+                mergedList.add(next);
+            }
+        }
+        return mergedList;
     }
 
 }

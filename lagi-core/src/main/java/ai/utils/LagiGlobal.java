@@ -69,6 +69,7 @@ public class LagiGlobal {
     public static final String LLM_ROLE_USER = "user";
     public static final String LLM_ROLE_ASSISTANT = "assistant";
     public static final String LLM_ROLE_SYSTEM = "system";
+    public static final String LLM_ROLE_TOOL = "tool";
 
     public static final boolean IMAGE_EXTRACT_ENABLE = true;
     public static final String CHAT_COMPLETION_REQUEST = "ChatCompletionRequest";
