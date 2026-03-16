@@ -30,9 +30,10 @@ public class Application {
         File jarFile = getJarFile();
         applyConfigAndDataDir(args, jarFile);
 
+        OpenClawUtil.sync();
+
         SLF4JBridgeHandler.removeHandlersForRootLogger();
         SLF4JBridgeHandler.install();
-
         int port = resolvePort(args);
         Path webappDir = TomcatUtil.resolveWebappDir(Application.class);
         boolean devMode = jarFile == null;
@@ -83,8 +84,8 @@ public class Application {
 
         System.setProperty(CONFIG_FILE_PROPERTY, configDir.resolve(LAGI_YML).toString());
         System.setProperty(ai.common.db.HikariDS.DATA_DIR_PROPERTY, dataDir.toString());
-        log.info("Config: {} (lagi.yml)", configDir);
-        log.info("Data dir: {} (saas.db)", dataDir);
+        log.debug("Config: {} (lagi.yml)", configDir);
+        log.debug("Data dir: {} (saas.db)", dataDir);
     }
 
     private static String parseArg(String[] args, String prefix) {
