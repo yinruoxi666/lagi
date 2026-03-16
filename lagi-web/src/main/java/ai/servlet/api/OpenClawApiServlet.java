@@ -15,15 +15,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * LinkMind Context Compression API
+ * OpenClaw Context Compression API
  *
  * Endpoints:
- *   POST /v1/linkmind/compress   — compress conversation history
+ *   POST /v1/openclaw/compress   — compress conversation history
  */
-public class LinkMindApiServlet extends BaseServlet {
+public class OpenClawApiServlet extends BaseServlet {
 
     private static final long serialVersionUID = 1L;
-    private static final Logger logger = LoggerFactory.getLogger(LinkMindApiServlet.class);
+    private static final Logger logger = LoggerFactory.getLogger(OpenClawApiServlet.class);
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
@@ -43,7 +43,7 @@ public class LinkMindApiServlet extends BaseServlet {
     }
 
     /**
-     * POST /v1/linkmind/compress
+     * POST /v1/openclaw/compress
      *
      * Accepts the full conversation history from the OpenClaw plugin and returns
      * a compressed version. The compression logic is intentionally left as a stub
@@ -61,11 +61,11 @@ public class LinkMindApiServlet extends BaseServlet {
         }
 
         // --- 2. Log the incoming data so we can inspect the real message format ---
-        logger.info("[LinkMind] /compress called");
-        logger.info("[LinkMind] sessionId      = {}", request.getSessionId());
-        logger.info("[LinkMind] tokenBudget    = {}", request.getTokenBudget());
-        logger.info("[LinkMind] currentTokens  = {}", request.getCurrentTokenCount());
-        logger.info("[LinkMind] messageCount   = {}", request.getMessages().size());
+        logger.info("[OpenClaw] /compress called");
+        logger.info("[OpenClaw] sessionId      = {}", request.getSessionId());
+        logger.info("[OpenClaw] tokenBudget    = {}", request.getTokenBudget());
+        logger.info("[OpenClaw] currentTokens  = {}", request.getCurrentTokenCount());
+        logger.info("[OpenClaw] messageCount   = {}", request.getMessages().size());
 
         List<CompressMessage> messages = request.getMessages();
         for (int i = 0; i < messages.size(); i++) {
@@ -77,7 +77,7 @@ public class LinkMindApiServlet extends BaseServlet {
             if (contentPreview.length() > 200) {
                 contentPreview = contentPreview.substring(0, 200) + "... [truncated]";
             }
-            logger.info("[LinkMind] message[{}] role={} content={}", i, msg.getRole(), contentPreview);
+            logger.info("[OpenClaw] message[{}] role={} content={}", i, msg.getRole(), contentPreview);
         }
 
         // --- 3. Stub: return original messages unchanged ---

@@ -375,11 +375,11 @@
     </servlet-mapping>
 
     <servlet>
-        <servlet-name>linkMind</servlet-name>
-        <servlet-class>ai.servlet.api.LinkMindApiServlet</servlet-class>
+        <servlet-name>OpenClawApiServlet</servlet-name>
+        <servlet-class>ai.servlet.api.OpenClawApiServlet</servlet-class>
     </servlet>
     <servlet-mapping>
-        <servlet-name>linkMind</servlet-name>
-        <url-pattern>/v1/linkmind/*</url-pattern>
+        <servlet-name>OpenClawApiServlet</servlet-name>
+        <url-pattern>/v1/openclaw/*</url-pattern>
     </servlet-mapping>
 </web-app>

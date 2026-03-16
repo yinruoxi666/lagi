@@ -182,6 +182,14 @@ To help you efficiently become familiar with and utilize LinkMind, we have prepa
 
 The LinkMind project also provides multiple RESTful API interfaces, facilitating users to integrate AI services into their own applications. We have prepared detailed [API documentation](docs/API_en.md) for developers, which you can refer to understand how to use these APIs to enrich your application features.
 
+### OpenClaw API
+
+The OpenClaw context compression API is available at the following endpoint:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/v1/openclaw/compress` | Compress conversation history to reduce token usage |
+
 ## Integration
 
 In order to help you better understand and use LinkMind, we provide you with detailed [Guide documentation](docs/guide_en.md). You can refer to this document to understand the structure and content of the project, so that you can quickly invoke relevant features and develop large model applications efficiently. It helps you understand and use a variety of AI features provided in the project. With this guide, you can easily integrate AI features such as text conversation, speech recognition, text-to-speech, and image generation into your applications, achieving a more intelligent and user-friendly interaction experience.

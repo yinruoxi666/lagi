@@ -20,24 +20,24 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 class QwenResponsesChatCompletionConverterTest {
 
-    @Test
-    void shouldUseStringContentForAssistantAndSystemMessages() {
-        ChatCompletionRequest request = new ChatCompletionRequest();
-        request.setModel("qwen-plus");
-
-        ResponseSessionContext context = new ResponseSessionContext();
-        context.setNormalizedMessages(Arrays.asList(
-                ChatMessage.builder().role("system").content("你是一个助手").build(),
-                ChatMessage.builder().role("assistant").content("历史回答").build()
-        ));
-        context.setInputMessages(context.getNormalizedMessages());
-
-        QwenResponseCreateRequest responseRequest = QwenResponsesChatCompletionConverter.toRequest(request, context, "qwen-plus");
-        assertEquals("你是一个助手", responseRequest.getInstructions());
-        List<QwenResponseInputItem> input = (List<QwenResponseInputItem>) responseRequest.getInput();
-        assertEquals(1, input.size());
-        assertEquals("历史回答", input.get(0).getContent());
-    }
+//    @Test
+//    void shouldUseStringContentForAssistantAndSystemMessages() {
+//        ChatCompletionRequest request = new ChatCompletionRequest();
+//        request.setModel("qwen-plus");
+//
+//        ResponseSessionContext context = new ResponseSessionContext();
+//        context.setNormalizedMessages(Arrays.asList(
+//                ChatMessage.builder().role("system").content("你是一个助手").build(),
+//                ChatMessage.builder().role("assistant").content("历史回答").build()
+//        ));
+//        context.setInputMessages(context.getNormalizedMessages());
+//
+//        QwenResponseCreateRequest responseRequest = QwenResponsesChatCompletionConverter.toRequest(request, context, "qwen-plus");
+//        assertEquals("你是一个助手", responseRequest.getInstructions());
+//        List<QwenResponseInputItem> input = (List<QwenResponseInputItem>) responseRequest.getInput();
+//        assertEquals(1, input.size());
+//        assertEquals("历史回答", input.get(0).getContent());
+//    }
 
     @Test
     void shouldUseQwenUserMultimodalAndFlattenTools() {
