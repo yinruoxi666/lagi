@@ -260,6 +260,13 @@ public class OpenClawUtil {
      */
     private static void appendModelConfig(StringBuilder sb, String providerName, String modelId,
                                           String baseUrl, String apiKey) {
+        String driverClass = resolveDriverClass(providerName);
+        if (driverClass == null) {
+            // 这里直接返回，相当于“这一条数据都不会写进 yml 中”
+            log.warn("Skip model {} of provider {} because no valid driver class found", modelId, providerName);
+            return;
+        }
+
         // Generate normalized model name (lower case, spaces -> '-')
         String modelName = (providerName + "-" + modelId)
                 .toLowerCase()
@@ -272,11 +279,8 @@ public class OpenClawUtil {
         sb.append(YAML_INDENT).append(YAML_INDENT).append("type: ").append(providerName).append(System.lineSeparator());
         sb.append(YAML_INDENT).append(YAML_INDENT).append("enable: true").append(System.lineSeparator());
 
-        // Append driver field to keep consistent with OpenClawUtil
-        String driverClass = resolveDriverClass(providerName);
-        if (driverClass != null) {
-            sb.append(YAML_INDENT).append(YAML_INDENT).append("driver: ").append(driverClass).append(System.lineSeparator());
-        }
+        // 此时 driverClass 一定非空，且类真实存在
+        sb.append(YAML_INDENT).append(YAML_INDENT).append("driver: ").append(driverClass).append(System.lineSeparator());
 
         sb.append(YAML_INDENT).append(YAML_INDENT).append("model: ").append(modelId).append(System.lineSeparator());
 
@@ -336,6 +340,39 @@ public class OpenClawUtil {
         }
         className.append("Adapter");
 
-        return "ai.llm.adapter.impl." + className;
+        String defaultDriver = "ai.llm.adapter.impl." + className;
+
+        String wrapperDriver = null;
+        String lowerName = providerName.toLowerCase();
+        if (lowerName.contains("alibaba") || lowerName.contains("ali-baba")) {
+            wrapperDriver = "ai.wrapper.impl.AlibabaAdapter";
+        }
+
+        String resolved = tryLoadClass(wrapperDriver);
+        if (resolved != null) {
+            return resolved;
+        }
+
+        resolved = tryLoadClass(defaultDriver);
+        if (resolved != null) {
+            return resolved;
+        }
+
+        log.warn("No valid driver class found for provider: {}, tried wrapperDriver={} and defaultDriver={}",
+                providerName, wrapperDriver, defaultDriver);
+        return null;
+    }
+
+    private static String tryLoadClass(String className) {
+        if (className == null || className.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            Class.forName(className);
+            return className;
+        } catch (ClassNotFoundException e) {
+            return null;
+        }
     }
 }
+
