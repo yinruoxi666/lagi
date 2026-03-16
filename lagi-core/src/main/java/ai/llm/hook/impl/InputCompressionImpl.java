@@ -37,7 +37,6 @@ public class InputCompressionImpl implements BeforeModel {
             newChatMessages.addAll(chatMessages.subList(chatMessages.size() - 1, chatMessages.size()));
         }
         request.setMessages(newChatMessages);
-        System.out.println(newChatMessages);
         return request;
     }
 

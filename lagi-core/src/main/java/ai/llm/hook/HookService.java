@@ -8,28 +8,21 @@ import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.List;
-
 public class HookService {
 
     private static final Logger log = LoggerFactory.getLogger(HookService.class);
-
-    private final List<BeforeModel> beforeModels;
-    private final List<AfterModel> afterModels;
 
     @Getter
     private static final HookService instance = new HookService();
 
     private HookService() {
-        beforeModels = BeanManageUtil.getBeansByType(BeforeModel.class);
-        afterModels = BeanManageUtil.getBeansByType(AfterModel.class);
     }
 
     public ChatCompletionRequest beforeModel(ChatCompletionRequest request) {
-        if (request == null || beforeModels == null) {
+        if (request == null || BeanManageUtil.getBeansByType(BeforeModel.class) == null) {
             return request;
         }
-        for (BeforeModel beforeModel : beforeModels) {
+        for (BeforeModel beforeModel : BeanManageUtil.getBeansByType(BeforeModel.class)) {
             try {
                 ChatCompletionRequest next = beforeModel.beforeModel(request);
                 if (next != null) {
@@ -43,10 +36,10 @@ public class HookService {
     }
 
     public ChatCompletionResult AfterModel(ChatCompletionResult result) {
-        if (result == null || afterModels == null) {
+        if (result == null || BeanManageUtil.getBeansByType(AfterModel.class) == null) {
             return result;
         }
-        for (AfterModel afterModel : afterModels) {
+        for (AfterModel afterModel : BeanManageUtil.getBeansByType(AfterModel.class)) {
             try {
                 ChatCompletionResult next = afterModel.apply(result);
                 if (next != null) {
@@ -60,10 +53,10 @@ public class HookService {
     }
 
     public Observable<ChatCompletionResult> streamApply(Observable<ChatCompletionResult> result) {
-        if (result == null || afterModels == null) {
+        if (result == null || BeanManageUtil.getBeansByType(AfterModel.class) == null) {
             return result;
         }
-        for (AfterModel afterModel : afterModels) {
+        for (AfterModel afterModel : BeanManageUtil.getBeansByType(AfterModel.class)) {
             try {
                 Observable<ChatCompletionResult> next = afterModel.stream(result);
                 if (next != null) {

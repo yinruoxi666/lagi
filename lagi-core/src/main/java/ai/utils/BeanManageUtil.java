@@ -2,7 +2,6 @@ package ai.utils;
 
 import ai.annotation.Component;
 import ai.annotation.Value;
-import ai.config.ContextLoader;
 import cn.hutool.core.convert.Convert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,23 +24,19 @@ public class BeanManageUtil {
 
     private static final Logger log = LoggerFactory.getLogger(BeanManageUtil.class);
     public static Map<Class<?>, Object> beanMaps = new ConcurrentHashMap<>();
+    private static final String[] PACKAGES = new String[] {
+            "ai.llm.hook.impl",
+    };
 
-    static {
-//        ContextLoader.loadContext();
-        String[] packages = new String[] {
-                "ai.llm.hook.impl",
-        };
-        if(ContextLoader.configuration != null) {
-            for (String packageName : packages) {
-                try {
-                    Set<Object> objects = scanAndCreateObjects(packageName);
-                    objects.forEach(object -> beanMaps.put(object.getClass(), object));
-                } catch (Exception ignored) {
-                }
+    public static void initBeans() {
+        for (String packageName : PACKAGES) {
+            try {
+                Set<Object> objects = scanAndCreateObjects(packageName);
+                objects.forEach(object -> beanMaps.put(object.getClass(), object));
+            } catch (Exception ignored) {
             }
         }
     }
-
 
     public static <T> List<T> getBeansByType(Class<T> type) {
         List<T> result = new ArrayList<>();

@@ -1,5 +1,6 @@
 package ai.config;
 
+import ai.utils.BeanManageUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
@@ -37,6 +38,7 @@ public class ContextLoader {
             GlobalConfigurations loadedConfiguration = mapper.readValue(reader, GlobalConfigurations.class);
             loadedConfiguration.init();
             configuration = loadedConfiguration;
+            BeanManageUtil.initBeans();
         } catch (Exception e) {
             configuration = null;
             log.error("从 InputStream 加载配置失败", e);
@@ -102,6 +104,7 @@ public class ContextLoader {
                 GlobalConfigurations loadedConfiguration = mapper.readValue(reader, GlobalConfigurations.class);
                 loadedConfiguration.init();
                 configuration = loadedConfiguration;
+                BeanManageUtil.initBeans();
                 reader.close();
             } catch (Exception e) {
                 configuration = null;
