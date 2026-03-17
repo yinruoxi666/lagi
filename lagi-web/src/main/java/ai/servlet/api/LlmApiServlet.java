@@ -205,6 +205,10 @@ public class LlmApiServlet extends BaseServlet {
         }
         ChatCompletionRequest chatCompletionRequest = setCustomerModel(req, session);
 
+        if (chatCompletionRequest == null) {
+            return;
+        }
+
         boolean isMultiModal = CompletionUtil.isMultiModal(chatCompletionRequest);
 
         ChatCompletionResult chatCompletionResult = null;
@@ -376,13 +380,18 @@ public class LlmApiServlet extends BaseServlet {
 
     private ChatCompletionRequest setCustomerModel(HttpServletRequest req, HttpSession session) throws IOException {
         ModelPreferenceDto preference = JSONUtil.toBean((String) session.getAttribute("preference"), ModelPreferenceDto.class) ;
-        ChatCompletionRequest chatCompletionRequest = objectMapper.readValue(requestToJson(req), ChatCompletionRequest.class);
-        if(chatCompletionRequest.getModel() == null
-                && preference != null
-                && preference.getLlm() != null) {
-            chatCompletionRequest.setModel(preference.getLlm());
-        }
-        return chatCompletionRequest;
+        String json = requestToJson(req);
+
+        System.out.println("ChatCompletionRequest json: " + json);
+        return null;
+
+//        ChatCompletionRequest chatCompletionRequest = objectMapper.readValue(json, ChatCompletionRequest.class);
+//        if(chatCompletionRequest.getModel() == null
+//                && preference != null
+//                && preference.getLlm() != null) {
+//            chatCompletionRequest.setModel(preference.getLlm());
+//        }
+//        return chatCompletionRequest;
     }
 
     private static ChatCompletionRequest getCompletionRequest(ChatCompletionRequest chatCompletionRequest) {

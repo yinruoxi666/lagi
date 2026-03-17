@@ -30,11 +30,12 @@ public class Application {
         File jarFile = getJarFile();
         applyConfigAndDataDir(args, jarFile);
 
-        OpenClawUtil.sync();
-
         SLF4JBridgeHandler.removeHandlersForRootLogger();
         SLF4JBridgeHandler.install();
         int port = resolvePort(args);
+
+        OpenClawUtil.sync(port);
+
         Path webappDir = TomcatUtil.resolveWebappDir(Application.class);
         boolean devMode = jarFile == null;
 
