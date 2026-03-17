@@ -16,18 +16,18 @@ import java.util.*;
 
 @Slf4j
 public class OpenClawUtil {
-
     private static final String OPEN_CLAW_DIR_NAME = ".openclaw";
     private static final String[] MODELS_JSON_PATH_SEGMENTS = {"agents", "main", "agent", "models.json"};
     private static final String CONFIG_FILE_PROPERTY = Application.CONFIG_FILE_PROPERTY;
     private static final String YAML_INDENT = "  ";
-    private static final String YAML_COMMENT_PREFIX = "#";
+    private static final String[] RESPONSE_SUPPORTED_BACKENDS = {"qwen", "openai"};
+    private static final Set<String> RESPONSE_BACKENDS_SET = new HashSet<>(Arrays.asList(RESPONSE_SUPPORTED_BACKENDS));
 
     private static final Yaml SNAKE_YAML = createSnakeYaml();
 
 
     public static void sync(int port) {
-//        syncToOpenClaw(port);
+        syncToOpenClaw(port);
         syncToLinkMind();
     }
 
@@ -114,22 +114,36 @@ public class OpenClawUtil {
         return value.isEmpty() ? null : value;
     }
 
+    private static final String OPENAI_COMPLETIONS_API = "openai-completions";
+
     /**
-     * Maps openclaw provider key to lagi.yml model name (backend name).
+     * Reads openclaw.json from configDir and returns models.providers.{provider}.api for the given provider.
      */
-    private static String providerToBackendName(String provider) {
-        if (provider == null || provider.trim().isEmpty()) return null;
-        switch (provider.toLowerCase()) {
-            case "moonshot": return "kimi";
-            case "zai": return "chatglm";
-            case "qwen-portal": return "qwen";
-            case "linkmind": return "linkmind";
-            default: return null;
+    private static String readOpenclawProviderApi(Path configDir, String provider) throws IOException {
+        if (configDir == null || !Files.isDirectory(configDir) || provider == null || provider.trim().isEmpty()) {
+            return null;
         }
+        Path openclawPath = configDir.resolve(OPENCLAW_JSON);
+        if (!Files.exists(openclawPath)) {
+            return null;
+        }
+        String content = readFileContent(openclawPath);
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode root = mapper.readTree(content);
+        JsonNode models = root != null ? root.get("models") : null;
+        JsonNode providers = models != null && models.isObject() ? models.get("providers") : null;
+        JsonNode providerNode = providers != null && providers.isObject() ? providers.get(provider) : null;
+        JsonNode apiNode = providerNode != null && providerNode.isObject() ? providerNode.get("api") : null;
+        if (apiNode == null || apiNode.isNull() || !apiNode.isTextual()) {
+            return null;
+        }
+        String value = apiNode.asText().trim();
+        return value.isEmpty() ? null : value;
     }
 
     /**
      * Resolves openclaw primary "provider/modelId" to (backendName, modelId) if that backend exists in lagi.yml models.
+     * If no match but the primary's provider has api "openai-completions", returns backend "custom" with the modelId.
      */
     @SuppressWarnings("unchecked")
     private static PrimaryBackend resolvePrimaryBackend(Path configDir, Map<String, Object> root) {
@@ -150,22 +164,27 @@ public class OpenClawUtil {
         }
         String provider = primary.substring(0, slash).trim();
         String modelId = primary.substring(slash + 1).trim();
-        String backendName = providerToBackendName(provider);
-        if (backendName == null) {
-            log.debug("No backend mapping for openclaw provider: {}", provider);
-            return null;
-        }
+        String backendName = provider;
         List<Map<String, Object>> modelsList = (List<Map<String, Object>>) root.get("models");
         if (modelsList == null || modelsList.isEmpty()) {
             return null;
         }
         for (Object item : modelsList) {
             if (!(item instanceof Map)) continue;
-            Object nameObj = ((Map<?, ?>) item).get("name");
+            Object nameObj = ((Map<?, ?>) item).get("type");
             if (nameObj == null) continue;
             if (backendName.equalsIgnoreCase(nameObj.toString().trim())) {
                 return new PrimaryBackend(backendName, modelId);
             }
+        }
+        // No match in lagi.yml: if primary provider uses openai-completions API, return "custom" backend
+        try {
+            String providerApi = readOpenclawProviderApi(configDir, provider);
+            if (OPENAI_COMPLETIONS_API.equalsIgnoreCase(providerApi != null ? providerApi.trim() : null)) {
+                return new PrimaryBackend("custom", modelId);
+            }
+        } catch (IOException e) {
+            log.debug("Could not read provider api from openclaw.json: {}", e.getMessage());
         }
         log.debug("Primary backend {} not found in lagi.yml models", backendName);
         return null;
@@ -369,15 +388,12 @@ public class OpenClawUtil {
             chat.put("route", "best(" + primaryBackend.backendName + ")");
             changed = true;
         }
-        // If no primary matched: do not modify backends (leave as-is)
-
         return changed;
     }
 
     // Match models.json providers against models defined in lagi.yml
     @SuppressWarnings("unchecked")
     private static OpenClawFragmentsResult generateOpenClawFragments(JsonNode providersNode) throws IOException {
-
         Path lagiYmlPath = getLagiYmlPath();
         if (lagiYmlPath == null) {
             throw new IOException("Cannot resolve lagi.yml path");
@@ -428,7 +444,6 @@ public class OpenClawUtil {
             if (name != null && usedNames.contains(name)) {
                 continue;
             }
-
             // Build comma-separated model ids from this provider in models.json
             List<String> modelIds = new ArrayList<>();
             for (JsonNode mNode : modelsNode) {
@@ -479,7 +494,6 @@ public class OpenClawUtil {
             log.warn("No matching models found in lagi.yml for providers.json, skip sync");
             return null;
         }
-
 
         // models 和 backends
         StringBuilder modelsFragment = new StringBuilder();
@@ -639,15 +653,7 @@ public class OpenClawUtil {
         String modelIdLower = modelId == null ? "" : modelId.toLowerCase();
         String modelNameLower = modelName == null ? "" : modelName.toLowerCase();
 
-        //  provider 映射
-        String aliasName = null;
-        if ("moonshot".equalsIgnoreCase(providerName)) {
-            aliasName = "kimi";
-        } else if ("zai".equalsIgnoreCase(providerName)) {
-            aliasName = "chatglm";
-        } else if ("qwen-portal".equalsIgnoreCase(providerName)) {
-            aliasName = "qwen";
-        }
+        String aliasName = providerName.toLowerCase();
         String aliasLower = aliasName == null ? "" : aliasName.toLowerCase();
 
         for (Map<String, Object> def : allModelDefs) {
@@ -720,7 +726,9 @@ public class OpenClawUtil {
         }
     }
 
-    /** Backend name and model id resolved from openclaw.json agents.defaults.model.primary (e.g. zai/glm-4.7-flash). */
+    /**
+     * Backend name and model id resolved from openclaw.json agents.defaults.model.primary (e.g. zai/glm-4.7-flash).
+     */
     private static class PrimaryBackend {
         final String backendName;
         final String modelId;
