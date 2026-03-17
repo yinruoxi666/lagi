@@ -287,12 +287,12 @@ public class PromptCacheTrigger {
             return new ArrayList<>();
         }
         List<List<QaPair>> splitQaPairs = splitQaPairBySemantics(qaPairs);
+        List<QaPair> lastQaPairs;
         if (splitQaPairs.isEmpty() || splitQaPairs.get(splitQaPairs.size() - 1).isEmpty()) {
-            return new ArrayList<>();
+            lastQaPairs = qaPairs;
+        } else {
+            lastQaPairs = splitQaPairs.get(splitQaPairs.size() - 1);
         }
-
-        List<QaPair> lastQaPairs = splitQaPairs.get(splitQaPairs.size() - 1);
-
         QaPair firstQaPair = lastQaPairs.get(0);
         QaPair lastQaPair = lastQaPairs.get(lastQaPairs.size() - 1);
 
@@ -364,7 +364,7 @@ public class PromptCacheTrigger {
         return qaPairs;
     }
 
-    private static Integer findValidAssistantIndex(List<ChatMessage> messages, int startIndex) {
+    public static Integer findValidAssistantIndex(List<ChatMessage> messages, int startIndex) {
         for (int i = startIndex; i >= 0; i--) {
             ChatMessage msg = messages.get(i);
             if (LagiGlobal.LLM_ROLE_TOOL.equals(msg.getRole())
