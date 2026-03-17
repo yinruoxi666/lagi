@@ -164,13 +164,13 @@ cd lagi
   api_key: your-apikey
 ```
 
-然后，使用maven命令进行项目封包，封包完成后的war文件将会在`target`目录下生成：
+然后，使用maven命令进行项目封包，封包完成后的jar文件和war文件将会在`target`目录下生成：
 
 ```shell
-mvn package
+mvn clean package -pl lagi-web -am -DskipTests -U
 ```
 
-最后，将生成的war包部署到Tomcat服务器中。启动Tomcat后，通过浏览器访问对应的端口，即可查看LinkMind(联智) 的具体页面。
+最后，可以将生成的war包部署到Tomcat服务器中，或者直接运行已经嵌入Tomcat的jar包。启动后，通过浏览器访问对应的端口，即可查看LinkMind(联智) 的具体页面。
 
 ### 方法二：使用IDE
 

@@ -47,7 +47,7 @@ public class OpenClawUtil {
             Map<String, Object> root = loadYamlAsMap(lagiYmlPath);
 
             // Resolve primary from openclaw.json: agents.defaults.model.primary -> (backendName, modelId)
-            PrimaryBackend primaryBackend = resolvePrimaryBackend(lagiYmlPath.getParent(), root);
+            PrimaryBackend primaryBackend = resolvePrimaryBackend(root);
 
             // Read models.json and merge model list / primary backends
             JsonNode providersNode = readAndParseModelsJson();
@@ -92,14 +92,42 @@ public class OpenClawUtil {
     private static final String OPENCLAW_JSON = "openclaw.json";
 
     /**
-     * Reads openclaw.json from configDir and returns agents.defaults.model.primary (e.g. "zai/glm-4.7-flash").
+     * Resolves models.json path under OpenClaw dir (same as OpenClawInjector).
+     * ~/.openclaw/agents/main/agent/models.json
      */
-    private static String readOpenclawPrimary(Path configDir) throws IOException {
-        if (configDir == null || !Files.isDirectory(configDir)) {
+    private static Path resolveModelsJsonPath() {
+        String userHome = System.getProperty("user.home");
+        if (userHome == null || userHome.trim().isEmpty()) {
+            log.warn("Cannot get user home directory");
             return null;
         }
-        Path openclawPath = configDir.resolve(OPENCLAW_JSON);
-        if (!Files.exists(openclawPath)) {
+        Path openClawDir = Paths.get(userHome, OPEN_CLAW_DIR_NAME);
+        Path modelsJsonPath = openClawDir;
+        for (String segment : MODELS_JSON_PATH_SEGMENTS) {
+            modelsJsonPath = modelsJsonPath.resolve(segment);
+        }
+        return modelsJsonPath;
+    }
+
+    /**
+     * Resolves openclaw.json path under OpenClaw dir (same as OpenClawInjector).
+     * ~/.openclaw/openclaw.json
+     */
+    private static Path resolveOpenClawJsonPath() {
+        String userHome = System.getProperty("user.home");
+        if (userHome == null || userHome.trim().isEmpty()) {
+            log.warn("Cannot get user home directory");
+            return null;
+        }
+        return Paths.get(userHome, OPEN_CLAW_DIR_NAME, OPENCLAW_JSON);
+    }
+
+    /**
+     * Reads openclaw.json from OpenClaw dir and returns agents.defaults.model.primary (e.g. "zai/glm-4.7-flash").
+     */
+    private static String readOpenclawPrimary() throws IOException {
+        Path openclawPath = resolveOpenClawJsonPath();
+        if (openclawPath == null || !Files.exists(openclawPath)) {
             return null;
         }
         String content = readFileContent(openclawPath);
@@ -119,14 +147,14 @@ public class OpenClawUtil {
     private static final String OPENAI_COMPLETIONS_API = "openai-completions";
 
     /**
-     * Reads openclaw.json from configDir and returns models.providers.{provider}.api for the given provider.
+     * Reads openclaw.json from OpenClaw dir and returns models.providers.{provider}.api for the given provider.
      */
-    private static String readOpenclawProviderApi(Path configDir, String provider) throws IOException {
-        if (configDir == null || !Files.isDirectory(configDir) || provider == null || provider.trim().isEmpty()) {
+    private static String readOpenclawProviderApi(String provider) throws IOException {
+        if (provider == null || provider.trim().isEmpty()) {
             return null;
         }
-        Path openclawPath = configDir.resolve(OPENCLAW_JSON);
-        if (!Files.exists(openclawPath)) {
+        Path openclawPath = resolveOpenClawJsonPath();
+        if (openclawPath == null || !Files.exists(openclawPath)) {
             return null;
         }
         String content = readFileContent(openclawPath);
@@ -148,10 +176,10 @@ public class OpenClawUtil {
      * If no match but the primary's provider has api "openai-completions", returns backend "custom" with the modelId.
      */
     @SuppressWarnings("unchecked")
-    private static PrimaryBackend resolvePrimaryBackend(Path configDir, Map<String, Object> root) {
+    private static PrimaryBackend resolvePrimaryBackend(Map<String, Object> root) {
         String primary = null;
         try {
-            primary = readOpenclawPrimary(configDir);
+            primary = readOpenclawPrimary();
         } catch (IOException e) {
             log.debug("Could not read openclaw.json: {}", e.getMessage());
             return null;
@@ -166,7 +194,7 @@ public class OpenClawUtil {
         }
         String provider = primary.substring(0, slash).trim();
         String modelId = primary.substring(slash + 1).trim();
-        String backendName = provider;
+//        String backendName = provider;
         List<Map<String, Object>> modelsList = (List<Map<String, Object>>) root.get("models");
         if (modelsList == null || modelsList.isEmpty()) {
             return null;
@@ -176,48 +204,35 @@ public class OpenClawUtil {
             Object nameObj = ((Map<?, ?>) item).get("name");
             Object type = ((Map<?, ?>) item).get("type");
             if (nameObj == null) continue;
-            if (backendName.equalsIgnoreCase(nameObj.toString().trim())) {
+            if (provider.equalsIgnoreCase(type.toString().trim())) {
                 return new PrimaryBackend(nameObj.toString(), type.toString(), modelId);
             }
         }
         // No match in lagi.yml: if primary provider uses openai-completions API, return "custom" backend
         try {
-            String providerApi = readOpenclawProviderApi(configDir, provider);
+            String providerApi = readOpenclawProviderApi(provider);
             if (OPENAI_COMPLETIONS_API.equalsIgnoreCase(providerApi != null ? providerApi.trim() : null)) {
                 return new PrimaryBackend("custom", "OpenAICompatible", modelId);
             }
         } catch (IOException e) {
             log.debug("Could not read provider api from openclaw.json: {}", e.getMessage());
         }
-        log.debug("Primary backend {} not found in lagi.yml models", backendName);
+        log.debug("Primary backend {} not found in lagi.yml models", provider);
         return null;
     }
 
     /**
-     * Reads and parses models.json. Tries (1) same directory as lagi.yml, then (2) OpenClaw path.
+     * Reads and parses models.json from OpenClaw dir (same path as OpenClawInjector).
      *
      * @return providers node, or null if not found / invalid
      */
     private static JsonNode readAndParseModelsJson() throws IOException {
-        Path modelsJsonPath = null;
-        String userHome = System.getProperty("user.home");
-        if (userHome != null && !userHome.trim().isEmpty()) {
-            Path openClawDir = Paths.get(userHome, OPEN_CLAW_DIR_NAME);
-            if (Files.isDirectory(openClawDir)) {
-                Path openClawModels = openClawDir;
-                for (String segment : MODELS_JSON_PATH_SEGMENTS) {
-                    openClawModels = openClawModels.resolve(segment);
-                }
-                if (Files.exists(openClawModels)) {
-                    modelsJsonPath = openClawModels;
-                    log.debug("Using OpenClaw models.json: {}", modelsJsonPath);
-                }
-            }
-        }
+        Path modelsJsonPath = resolveModelsJsonPath();
         if (modelsJsonPath == null || !Files.exists(modelsJsonPath)) {
-            log.warn("models.json not found (tried next to lagi.yml and OpenClaw path)");
+            log.warn("models.json not found at: {}", modelsJsonPath);
             return null;
         }
+        log.debug("Using OpenClaw models.json: {}", modelsJsonPath);
 
         String content = readFileContent(modelsJsonPath);
         ObjectMapper mapper = new ObjectMapper();
@@ -370,13 +385,11 @@ public class OpenClawUtil {
             if (functions == null) {
                 functions = new LinkedHashMap<>();
                 root.put("functions", functions);
-                changed = true;
             }
             Map<String, Object> chat = (Map<String, Object>) functions.get("chat");
             if (chat == null) {
                 chat = new LinkedHashMap<>();
                 functions.put("chat", chat);
-                changed = true;
             }
             List<Map<String, Object>> backendsList = new ArrayList<>();
             Map<String, Object> singleBackend = new LinkedHashMap<>();
@@ -384,8 +397,12 @@ public class OpenClawUtil {
             singleBackend.put("model", primaryBackend.getModel());
             singleBackend.put("enable", true);
             singleBackend.put("stream", true);
-            singleBackend.put("protocol", "completion");
-            singleBackend.put("priority", 0);
+            if (RESPONSE_BACKENDS_SET.contains(primaryBackend.getType())) {
+                singleBackend.put("protocol", "response");
+            } else {
+                singleBackend.put("protocol", "completion");
+            }
+            singleBackend.put("priority", 10);
             backendsList.add(singleBackend);
             chat.put("backends", backendsList);
             chat.put("route", "best(" + primaryBackend.getName() + ")");

@@ -80,6 +80,27 @@ The following database types are supported but not limited to:
     </div>
 </div>
 
+## Installation and Running
+
+Prerequisites: **JDK 8** must be installed on your machine. If not installed or for detailed steps on each platform, see the [Installation Guide (JDK installation and configuration)](docs/install_en.md).
+
+**Recommended: Run with JAR**
+
+1. Place `LinkMind.jar` in any directory (e.g. `D:\LinkMind` or `~/LinkMind`).
+2. In that directory, run:
+   - **Windows (PowerShell or cmd):**
+     ```powershell
+     java -jar LinkMind.jar
+     ```
+   - **macOS / Linux:**
+     ```bash
+     java -jar LinkMind.jar
+     ```
+3. On first run, `config`, `data`, and the default `lagi.yml` will be generated automatically.
+4. Open **http://localhost:8080** in your browser to use LinkMind.
+
+For changing the port, specifying config/data directories, and more, see the [Installation Guide](docs/install_en.md).
+
 ## Product Features
 This product provides efficient, stable and easy-to-use functions through a series of advanced technologies and optimized designs to meet diverse user needs. The following are the main features:
 
@@ -146,13 +167,13 @@ Next, modify the [`src/main/resources/lagi.yml`](lagi-web/src/main/resources/lag
   api_key: your-apikey
 ```
 
-Then, use the Maven command to package the project, and the packaged war file will be generated in the `target` directory:
+Then, use the Maven command to package the project. The packaged jar and war files will be generated in the `target` directory:
 
 ```shell
-mvn package
+mvn clean package -pl lagi-web -am -DskipTests -U
 ```
 
-Finally, deploy the generated war package to the Tomcat server. After starting Tomcat, you can view the specific page of LinkMind by accessing the corresponding port through a browser.
+Finally, you can deploy the generated war package to a Tomcat server, or run the embedded Tomcat jar directly. After starting, access the corresponding port in your browser to view the LinkMind interface.
 
 ### Method 2: Using IDE
 
@@ -181,14 +202,6 @@ To help you efficiently become familiar with and utilize LinkMind, we have prepa
 ## API
 
 The LinkMind project also provides multiple RESTful API interfaces, facilitating users to integrate AI services into their own applications. We have prepared detailed [API documentation](docs/API_en.md) for developers, which you can refer to understand how to use these APIs to enrich your application features.
-
-### OpenClaw API
-
-The OpenClaw context compression API is available at the following endpoint:
-
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/v1/openclaw/compress` | Compress conversation history to reduce token usage |
 
 ## Integration
 
@@ -267,12 +280,18 @@ For API references, see [API Documentation](docs/API_en.md).
 
 ## Downloads
 
-Thank you for your support of LinkMind ! To help you get started quickly and easily, we have provided a pre-packaged LinkMind application that is ready for immediate use.
+We provide pre-packaged applications for direct download and use:
 
-- **Jar File**: The core dependency library of LinkMind.
+- **Core library**: The core dependency library of LinkMind.
   - File Name: lagi-core-1.1.0-jar-with-dependencies.jar
-  - Download Link: [Click here to download](https://downloads.landingbj.com/lagi/lagi-core-1.1.0-jar-with-dependencies.jar)
+  - Download Link: [Click here to download](https://downloads.landingbj.com/lagi/lib/lagi-core-1.1.0-jar-with-dependencies.jar)
+
+- **Application file**: The full package of LinkMind; you can run it directly after installing JDK.
+  - File Name: LinkMind.jar
+  - Download Link: [Click here to download](https://downloads.landingbj.com/lagi/installer/LinkMind.jar)
 
 - **War File**: The Web application of LinkMind, which can be directly deployed to a web container.
   - File Name: lagi-web.war
   - Download Link: [Click here to download](https://downloads.landingbj.com/lagi/lagi-web.war)
+
+Thank you for your attention and support of LinkMind! If you have any questions or suggestions, please feel free to contact us.

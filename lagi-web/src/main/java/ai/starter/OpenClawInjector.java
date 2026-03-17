@@ -28,7 +28,7 @@ public final class OpenClawInjector {
     public static final String OPENCLAW_LINKMIND_SET_DEFAULT_PROPERTY = "openclaw.linkmind.setDefault";
 
     private static final String PROVIDER_NAME = "linkmind";
-    private static final String DEFAULT_MODEL_ID = "linkmind-chat";
+    public static final String DEFAULT_MODEL_ID = "linkmind-pro";
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
