@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
+import lombok.AllArgsConstructor;
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
@@ -171,17 +173,18 @@ public class OpenClawUtil {
         }
         for (Object item : modelsList) {
             if (!(item instanceof Map)) continue;
-            Object nameObj = ((Map<?, ?>) item).get("type");
+            Object nameObj = ((Map<?, ?>) item).get("name");
+            Object type = ((Map<?, ?>) item).get("type");
             if (nameObj == null) continue;
             if (backendName.equalsIgnoreCase(nameObj.toString().trim())) {
-                return new PrimaryBackend(backendName, modelId);
+                return new PrimaryBackend(nameObj.toString(), type.toString(), modelId);
             }
         }
         // No match in lagi.yml: if primary provider uses openai-completions API, return "custom" backend
         try {
             String providerApi = readOpenclawProviderApi(configDir, provider);
             if (OPENAI_COMPLETIONS_API.equalsIgnoreCase(providerApi != null ? providerApi.trim() : null)) {
-                return new PrimaryBackend("OpenAICompatible", modelId);
+                return new PrimaryBackend("custom", "OpenAICompatible", modelId);
             }
         } catch (IOException e) {
             log.debug("Could not read provider api from openclaw.json: {}", e.getMessage());
@@ -321,7 +324,7 @@ public class OpenClawUtil {
                     changed = true;
                 }
                 if (selected.get("api_address") != null && !selected.get("api_address").toString().trim().isEmpty()) {
-                    entry.put("api_address", selected.get("api_address"));
+                    entry.put("api_address", selected.get("api_address") + "/chat/completions");
                     changed = true;
                 }
                 if (selected.get("api_key") != null && !selected.get("api_key").toString().trim().isEmpty()) {
@@ -377,15 +380,15 @@ public class OpenClawUtil {
             }
             List<Map<String, Object>> backendsList = new ArrayList<>();
             Map<String, Object> singleBackend = new LinkedHashMap<>();
-            singleBackend.put("backend", primaryBackend.backendName);
-            singleBackend.put("model", primaryBackend.modelId);
+            singleBackend.put("backend", primaryBackend.getName());
+            singleBackend.put("model", primaryBackend.getModel());
             singleBackend.put("enable", true);
             singleBackend.put("stream", true);
             singleBackend.put("protocol", "completion");
             singleBackend.put("priority", 0);
             backendsList.add(singleBackend);
             chat.put("backends", backendsList);
-            chat.put("route", "best(" + primaryBackend.backendName + ")");
+            chat.put("route", "best(" + primaryBackend.getName() + ")");
             changed = true;
         }
         return changed;
@@ -509,9 +512,9 @@ public class OpenClawUtil {
             String apiKey = m.get("api_key") == null ? "" : m.get("api_key").toString();
 
             // Append to models fragment only when this is the primary model
-            boolean isPrimary = primaryBackend != null && primaryBackend.backendName.equalsIgnoreCase(type);
+            boolean isPrimary = primaryBackend != null && primaryBackend.getType().equalsIgnoreCase(type);
             if (isPrimary) {
-                String primaryModelField = primaryBackend.modelId != null ? primaryBackend.modelId : modelField;
+                String primaryModelField = primaryBackend.getModel() != null ? primaryBackend.getModel() : modelField;
                 modelsFragment.append(YAML_INDENT).append("- name: ").append(name).append(System.lineSeparator());
                 if (!type.isEmpty()) {
                     modelsFragment.append(YAML_INDENT).append(YAML_INDENT).append("type: ").append(type).append(System.lineSeparator());
@@ -557,79 +560,6 @@ public class OpenClawUtil {
         );
     }
 
-    // Merge backend names into best( (a|b|c) ) route expression
-    private static String updateBestRoute(String routeExpr, List<String> backendNames) {
-        if (backendNames == null || backendNames.isEmpty()) {
-            return routeExpr == null ? "" : routeExpr;
-        }
-        String route = routeExpr == null ? "" : routeExpr.trim();
-
-        // 没有 route 或不是 best(...)，给一个最简单的 best( (a|b|c) )
-        if (route.isEmpty() || !route.startsWith("best(") || !route.endsWith(")")) {
-            return "best((" + String.join("|", backendNames) + "))";
-        }
-
-        String inside = route.substring("best(".length(), route.length() - 1);
-        int depth = 0;
-        int splitAt = -1;
-        for (int i = 0; i < inside.length(); i++) {
-            char c = inside.charAt(i);
-            if (c == '(') depth++;
-            else if (c == ')') depth = Math.max(0, depth - 1);
-            else if (c == ',' && depth == 0) {
-                splitAt = i;
-                break;
-            }
-        }
-
-        if (splitAt < 0) {
-            String updated = addNamesToGroup(inside.trim(), backendNames);
-            return "best(" + updated + ")";
-        }
-
-        String arg1 = inside.substring(0, splitAt).trim();
-        String arg2 = inside.substring(splitAt + 1).trim();
-        String updatedArg2 = addNamesToGroup(arg2, backendNames);
-        if (updatedArg2.equals(arg2)) {
-            return route;
-        }
-        return "best(" + arg1 + "," + updatedArg2 + ")";
-    }
-
-    // 在分组里追加缺失 backend 名称
-    private static String addNamesToGroup(String groupExpr, List<String> backendNames) {
-        String g = groupExpr == null ? "" : groupExpr.trim();
-        boolean wrapped = g.startsWith("(") && g.endsWith(")");
-        String inner = wrapped ? g.substring(1, g.length() - 1).trim() : g;
-
-        List<String> tokens = new ArrayList<>();
-        if (!inner.isEmpty()) {
-            // 只按 '|' 拆
-            for (String t : inner.split("\\|")) {
-                String tt = t.trim();
-                if (!tt.isEmpty() && !tokens.contains(tt)) {
-                    tokens.add(tt);
-                }
-            }
-        }
-
-        boolean changed = false;
-        for (String name : backendNames) {
-            if (name == null || name.trim().isEmpty()) continue;
-            if (!tokens.contains(name)) {
-                tokens.add(name);
-                changed = true;
-            }
-        }
-
-        if (!changed) {
-            return groupExpr == null ? "" : groupExpr.trim();
-        }
-
-        String rebuilt = String.join("|", tokens);
-        return wrapped ? "(" + rebuilt + ")" : rebuilt;
-    }
-
     private static String repeatIndent(int times) {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < times; i++) {
@@ -656,17 +586,17 @@ public class OpenClawUtil {
                                                             JsonNode modelNode,
                                                             PrimaryBackend primaryBackend) {
 //        String providerLower = providerName == null ? "" : providerName.toLowerCase();
-        String primaryBackendName = (primaryBackend != null && primaryBackend.backendName != null)
-                ? primaryBackend.backendName.trim().toLowerCase() : null;
+        String primaryBackendName = (primaryBackend != null && primaryBackend.getType() != null)
+                ? primaryBackend.getType().trim().toLowerCase() : null;
 
         for (Map<String, Object> def : allModelDefs) {
             if (def == null) continue;
             String type = def.get("type") == null ? "" : def.get("type").toString();
             String typeLower = type.toLowerCase();
-                if (primaryBackendName != null && !primaryBackendName.equals(typeLower)) {
-                    continue;
-                }
-                return def;
+            if (primaryBackendName != null && !primaryBackendName.equals(typeLower)) {
+                continue;
+            }
+            return def;
         }
         return null;
     }
@@ -706,17 +636,13 @@ public class OpenClawUtil {
         }
     }
 
-    /**
-     * Backend name and model id resolved from openclaw.json agents.defaults.model.primary (e.g. zai/glm-4.7-flash).
-     */
-    private static class PrimaryBackend {
-        final String backendName;
-        final String modelId;
 
-        PrimaryBackend(String backendName, String modelId) {
-            this.backendName = backendName;
-            this.modelId = modelId;
-        }
+    @Data
+    @AllArgsConstructor
+    private static class PrimaryBackend {
+        private String name;
+        private String type;
+        private String model;
     }
 }
 
