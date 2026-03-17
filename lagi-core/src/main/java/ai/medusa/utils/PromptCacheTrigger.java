@@ -19,6 +19,7 @@ import ai.utils.*;
 import ai.utils.qa.ChatCompletionUtil;
 import ai.vector.VectorDbService;
 import cn.hutool.core.bean.BeanUtil;
+import org.apache.hadoop.util.Lists;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -279,6 +280,27 @@ public class PromptCacheTrigger {
         res.add(finalIndex);
         return res;
     }
+
+    public static List<Integer> theFinalRoundOfConversation(List<ChatMessage> chatMessages) {
+        List<QaPair> qaPairs = convert2QaPair(chatMessages, 30);
+        if (qaPairs.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<List<QaPair>> splitQaPairs = splitQaPairBySemantics(qaPairs);
+        if (splitQaPairs.isEmpty() || splitQaPairs.get(splitQaPairs.size() - 1).isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        List<QaPair> lastQaPairs = splitQaPairs.get(splitQaPairs.size() - 1);
+
+        QaPair firstQaPair = lastQaPairs.get(0);
+        QaPair lastQaPair = lastQaPairs.get(lastQaPairs.size() - 1);
+
+        int startIndex = firstQaPair.getQIndex();
+        int endIndex = lastQaPair.getAIndex();
+        return Lists.newArrayList(startIndex, endIndex + 1);
+    }
+
 
     private static List<QaPair> convert2QaPair(List<String> questionList, List<String> answerList) {
         List<QaPair> qaPairs = new ArrayList<>();
