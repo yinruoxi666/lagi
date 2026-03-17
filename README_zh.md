@@ -80,6 +80,27 @@ LinkMind（联智）是由北京联动北方科技有限公司精心打造的一
     </div>
 </div>
 
+## 安装运行
+
+前置要求：本机已安装 **JDK 8**。若未安装或需各平台详细步骤，请参阅 [安装指南（JDK 安装与详细配置）](docs/install_zh.md)。
+
+**推荐方式：使用 JAR 运行**
+
+1. 将 `LinkMind.jar` 放到任意目录（如 `D:\LinkMind` 或 `~/LinkMind`）。
+2. 在该目录下执行：
+   - **Windows（PowerShell 或 cmd）：**
+     ```powershell
+     java -jar LinkMind.jar
+     ```
+   - **macOS / Linux：**
+     ```bash
+     java -jar LinkMind.jar
+     ```
+3. 首次运行会自动生成 `config`、`data` 及默认配置 `lagi.yml`。
+4. 浏览器访问 **http://localhost:8080** 即可使用。
+
+修改端口、指定配置/数据目录等说明见 [安装指南](docs/install_zh.md)。
+
 ## 产品特性
 本产品通过一系列先进技术和优化设计，提供高效、稳定且易用的功能，以满足多样化的用户需求。以下为主要特性：
 
@@ -256,12 +277,12 @@ Rerank功能只需要ai数据库文件，Embedding模型两者都需要。
 
 我们为用户提供了预打包的应用程序，方便直接下载和使用：
 
-- **Jar 文件**：LinkMind(联智)的核心依赖库。
+- **核心库文件**：LinkMind(联智)的核心依赖库。
   - 文件名：`lagi-core-1.1.0-jar-with-dependencies.jar`
-  - 下载链接：[点击这里下载](https://downloads.landingbj.com/lagi/lagi-core-1.1.0-jar-with-dependencies.jar)
-- **War 文件**：LinkMind(联智)的Web应用，可直接部署到Web容器。
-  - 文件名：`lagi-web.war`
-  - 下载链接：[点击这里下载](https://downloads.landingbj.com/lagi/lagi-web.war)
+  - 下载链接：[点击这里下载](https://downloads.landingbj.com/lagi/lib/lagi-core-1.1.0-jar-with-dependencies.jar)
+- **应用文件**：LinkMind(联智)的完整封包，安装 JDK 后可直接运行。
+  - 文件名：`LinkMind.jar`
+  - 下载链接：[点击这里下载](https://downloads.landingbj.com/lagi/installer/LinkMind.jar)
 
 
 感谢您对 LinkMind(联智) 的关注与支持！如有任何问题或建议，请随时与我们联系。
