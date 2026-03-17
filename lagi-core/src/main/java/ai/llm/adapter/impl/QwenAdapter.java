@@ -94,14 +94,26 @@ public class QwenAdapter extends ModelService implements ILlmAdapter {
             }
             AtomicReference<String> responseId = new AtomicReference<>();
             AtomicReference<ChatMessage> assistantMessage = new AtomicReference<>(ChatMessage.builder().role("assistant").content("").build());
-            return response.getStreamData()
-                    .doOnNext(chunk -> {
-                        if (chunk != null && chunk.getId() != null) {
-                            responseId.set(chunk.getId());
-                        }
-                        mergeAssistantMessage(assistantMessage.get(), chunk);
-                    })
-                    .doOnComplete(() -> SESSION_MANAGER.onSuccess(sessionContext, responseId.get(), assistantMessage.get()));
+            return Observable.create(emitter->{
+                response.getStreamData().subscribe(chunk -> {
+                    System.out.println(chunk);
+                    emitter.onNext( chunk);
+                    if(chunk.getId() != null) {
+                        responseId.set(chunk.getId());
+                    }
+                }, throwable -> {}, () -> {
+                    SESSION_MANAGER.onSuccess(sessionContext, responseId.get(), assistantMessage.get());
+                });
+            });
+//            return response.getStreamData()
+//                    .doOnNext(chunk -> {
+//                        if (chunk != null && chunk.getId() != null) {
+//                            responseId.set(chunk.getId());
+//                        }
+//                        mergeAssistantMessage(assistantMessage.get(), chunk);
+//                        System.out.println(chunk);
+//                    })
+//                    .doOnComplete(() -> SESSION_MANAGER.onSuccess(sessionContext, responseId.get(), assistantMessage.get()));
         }
         Generation gen = new Generation();
         GenerationParam param = convertRequest(chatCompletionRequest);

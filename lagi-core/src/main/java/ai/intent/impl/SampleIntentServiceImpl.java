@@ -14,6 +14,7 @@ import ai.intent.enums.IntentTypeEnum;
 import ai.intent.pojo.IntentResult;
 import ai.medusa.utils.PromptCacheTrigger;
 import ai.openai.pojo.ChatCompletionRequest;
+import ai.openai.pojo.ChatMessage;
 import ai.utils.ContinueWordUtil;
 import ai.utils.EmbeddingSimilarityCalculator;
 import ai.utils.StoppingWordUtil;
@@ -135,6 +136,42 @@ public class SampleIntentServiceImpl implements IntentService {
             }
         }
         return intentResult;
+    }
+
+
+    public List<Integer> theFinalRoundOfConversation(List<ChatMessage> chatMessages) {
+        return PromptCacheTrigger.theFinalRoundOfConversation(chatMessages);
+    }
+
+    public boolean isContinue(List<ChatMessage> chatMessages, ChatMessage lastUserMessage) {
+        String lastQ = lastUserMessage.getContent();
+        boolean isStop = StoppingWordUtil.containsStoppingWorlds(lastQ);
+        if(isStop) {
+            return false;
+        }
+        boolean isContinueWord = ContinueWordUtil.containsStoppingWorlds(lastQ);
+        if(isContinueWord) {
+            return true;
+        }
+        if(chatMessages.isEmpty()) {
+            return false;
+        }
+        String preQ = chatMessages.get(0).getContent();
+        if(ContextLoader.configuration != null
+                && ContextLoader.configuration.getFunctions().getEmbedding() != null
+                && !ContextLoader.configuration.getFunctions().getEmbedding().isEmpty()) {
+            List<EmbeddingConfig> embedding = ContextLoader.configuration.getFunctions().getEmbedding();
+            EmbeddingConfig config = embedding.get(0);
+            Embeddings embeddings = EmbeddingFactory.getEmbedding(config);
+            String q1 = preQ;
+            String q2 = lastQ;
+            q1 = q1.substring(0, Math.min(q1.length(), 1000));
+            q2 = q2.substring(0, Math.min(q2.length(), 1000));
+            List<List<Float>> embeddingDataList = embeddings.createEmbedding(Lists.newArrayList(q1+"\n"+q2, q1));
+            double similarity = EmbeddingSimilarityCalculator.calculateCosineSimilarity(embeddingDataList.get(0), embeddingDataList.get(1));
+            return similarity > 0.91;
+        }
+        return false;
     }
 
     @Override

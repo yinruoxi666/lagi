@@ -70,6 +70,9 @@ public class SecurityFilterImpl implements BeforeModel, AfterModel {
                             } else {
                                 ChatCompletionResult toEmit = cacheQueue.poll();
                                 cacheQueue.offer(chunk);
+                                if(toEmit.getChoices().get(0).getDelta() == null) {
+                                    toEmit.getChoices().get(0).setDelta(toEmit.getChoices().get(0).getMessage());
+                                }
                                 emitter.onNext(toEmit);
                             }
                         } catch (Exception e) {
@@ -81,6 +84,9 @@ public class SecurityFilterImpl implements BeforeModel, AfterModel {
                         while (!cacheQueue.isEmpty()) {
                             ChatCompletionResult remaining = cacheQueue.poll();
                             if (remaining != null) {
+                                if(remaining.getChoices().get(0).getDelta() == null) {
+                                    remaining.getChoices().get(0).setDelta(remaining.getChoices().get(0).getMessage());
+                                }
                                 emitter.onNext(remaining);
                             }
                         }

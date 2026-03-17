@@ -20,7 +20,7 @@ public final class QwenResponsesChatCompletionConverter {
                                                       String modelName) {
         QwenResponseCreateRequest responseRequest = new QwenResponseCreateRequest();
         responseRequest.setModel(modelName);
-        responseRequest.setInput(toInputItems(sessionContext.getInputMessages()));
+        responseRequest.setInput(toInputItems2(sessionContext.getInputMessages()));
         responseRequest.setPrevious_response_id(sessionContext.getPreviousResponseId());
         responseRequest.setStream(Boolean.TRUE.equals(request.getStream()));
         responseRequest.setMax_output_tokens(request.getMax_tokens());
@@ -32,6 +32,60 @@ public final class QwenResponsesChatCompletionConverter {
         responseRequest.setTop_p(request.getTop_p());
         return responseRequest;
     }
+
+    private static List<ChatMessage> toInputItems2(List<ChatMessage> messages) {
+        List<ChatMessage> items = new ArrayList<>();
+        if (messages == null || messages.isEmpty()) {
+            return items;
+        }
+
+        List<ChatMessage> toolMessagesBuffer = new ArrayList<>();
+
+        for (ChatMessage message : messages) {
+            if ("tool".equals(message.getRole())) {
+                toolMessagesBuffer.add(message);
+            } else {
+                if (!toolMessagesBuffer.isEmpty()) {
+                    StringBuilder mergedContent = new StringBuilder();
+                    for (int i = 0; i < toolMessagesBuffer.size(); i++) {
+                        if (i > 0) {
+                            mergedContent.append("\n");
+                        }
+                        String content = toolMessagesBuffer.get(i).getContent();
+                        if (content != null) {
+                            mergedContent.append(content);
+                        }
+                    }
+                    ChatMessage mergedToolMessage = new ChatMessage();
+                    mergedToolMessage.setRole("user");
+                    mergedToolMessage.setContent(mergedContent.toString());
+                    items.add(mergedToolMessage);
+                    toolMessagesBuffer.clear();
+                }
+                items.add(message);
+            }
+        }
+
+        if (!toolMessagesBuffer.isEmpty()) {
+            StringBuilder mergedContent = new StringBuilder();
+            for (int i = 0; i < toolMessagesBuffer.size(); i++) {
+                if (i > 0) {
+                    mergedContent.append("\n");
+                }
+                String content = toolMessagesBuffer.get(i).getContent();
+                if (content != null) {
+                    mergedContent.append(content);
+                }
+            }
+            ChatMessage mergedToolMessage = new ChatMessage();
+            mergedToolMessage.setRole("user");
+            mergedToolMessage.setContent(mergedContent.toString());
+            items.add(mergedToolMessage);
+        }
+
+        return items;
+    }
+
 
     private static List<QwenResponseInputItem> toInputItems(List<ChatMessage> messages) {
         List<QwenResponseInputItem> items = new ArrayList<>();
@@ -82,28 +136,30 @@ public final class QwenResponsesChatCompletionConverter {
         if (StrUtil.isBlank(content)) {
             return "";
         }
-        try {
-            List<MultiModalContent> multimodalContents = MAPPER.readValue(content, new TypeReference<List<MultiModalContent>>() {});
-            List<QwenResponseInputContent> responseContents = new ArrayList<>();
-            for (MultiModalContent multimodalContent : multimodalContents) {
-                QwenResponseInputContent inputContent = new QwenResponseInputContent();
-                if ("text".equals(multimodalContent.getType())) {
-                    inputContent.setType("text");
-                    inputContent.setText(multimodalContent.getText());
-                } else if ("image_url".equals(multimodalContent.getType()) && multimodalContent.getImageUrl() != null) {
-                    inputContent.setType("image_url");
-                    inputContent.setImageUrl(multimodalContent.getImageUrl());
-                } else {
-                    continue;
-                }
-                responseContents.add(inputContent);
-            }
-            if (!responseContents.isEmpty()) {
-                return responseContents;
-            }
-        } catch (Exception ignored) {
-        }
         return content;
+//        try {
+//
+//            List<MultiModalContent> multimodalContents = MAPPER.readValue(content, new TypeReference<List<MultiModalContent>>() {});
+//            List<QwenResponseInputContent> responseContents = new ArrayList<>();
+//            for (MultiModalContent multimodalContent : multimodalContents) {
+//                QwenResponseInputContent inputContent = new QwenResponseInputContent();
+//                if ("text".equals(multimodalContent.getType())) {
+//                    inputContent.setType("text");
+//                    inputContent.setText(multimodalContent.getText());
+//                } else if ("image_url".equals(multimodalContent.getType()) && multimodalContent.getImageUrl() != null) {
+//                    inputContent.setType("image_url");
+//                    inputContent.setImageUrl(multimodalContent.getImageUrl());
+//                } else {
+//                    continue;
+//                }
+//                responseContents.add(inputContent);
+//            }
+//            if (!responseContents.isEmpty()) {
+//                return responseContents;
+//            }
+//        } catch (Exception ignored) {
+//        }
+//        return content;
     }
 
     private static List<ResponseTool> toTools(List<Tool> tools) {
