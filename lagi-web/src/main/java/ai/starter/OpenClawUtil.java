@@ -50,7 +50,7 @@ public class OpenClawUtil {
             // Read models.json and merge model list / primary backends
             JsonNode providersNode = readAndParseModelsJson();
             if (providersNode != null) {
-                OpenClawFragmentsResult fragmentsResult = generateOpenClawFragments(providersNode);
+                OpenClawFragmentsResult fragmentsResult = generateOpenClawFragments(providersNode, primaryBackend);
                 if (fragmentsResult != null && !fragmentsResult.fragments.isEmpty()) {
                     boolean changed = mergeOpenClawIntoYaml(root, fragmentsResult.selectedModels, primaryBackend);
                     if (changed) {
@@ -181,7 +181,7 @@ public class OpenClawUtil {
         try {
             String providerApi = readOpenclawProviderApi(configDir, provider);
             if (OPENAI_COMPLETIONS_API.equalsIgnoreCase(providerApi != null ? providerApi.trim() : null)) {
-                return new PrimaryBackend("custom", modelId);
+                return new PrimaryBackend("OpenAICompatible", modelId);
             }
         } catch (IOException e) {
             log.debug("Could not read provider api from openclaw.json: {}", e.getMessage());
@@ -393,7 +393,7 @@ public class OpenClawUtil {
 
     // Match models.json providers against models defined in lagi.yml
     @SuppressWarnings("unchecked")
-    private static OpenClawFragmentsResult generateOpenClawFragments(JsonNode providersNode) throws IOException {
+    private static OpenClawFragmentsResult generateOpenClawFragments(JsonNode providersNode, PrimaryBackend primaryBackend) throws IOException {
         Path lagiYmlPath = getLagiYmlPath();
         if (lagiYmlPath == null) {
             throw new IOException("Cannot resolve lagi.yml path");
@@ -433,7 +433,7 @@ public class OpenClawUtil {
                 continue;
             }
 
-            Map<String, Object> matched = findMatchingModelDef(allModelDefs, providerName, firstModelNode);
+            Map<String, Object> matched = findMatchingModelDef(allModelDefs, providerName, firstModelNode, primaryBackend);
             if (matched == null) {
                 log.warn("No matching model found in lagi.yml for provider: {}, skip", providerName);
                 continue;
@@ -495,7 +495,7 @@ public class OpenClawUtil {
             return null;
         }
 
-        // models 和 backends
+        // models fragment: only append the primary model's content; backends fragment: all selected
         StringBuilder modelsFragment = new StringBuilder();
         StringBuilder backendsFragment = new StringBuilder();
 
@@ -508,27 +508,30 @@ public class OpenClawUtil {
             String apiAddress = m.get("api_address") == null ? "" : m.get("api_address").toString();
             String apiKey = m.get("api_key") == null ? "" : m.get("api_key").toString();
 
-            // 追加到 models下的内容
-            modelsFragment.append(YAML_INDENT).append("- name: ").append(name).append(System.lineSeparator());
-            if (!type.isEmpty()) {
-                modelsFragment.append(YAML_INDENT).append(YAML_INDENT).append("type: ").append(type).append(System.lineSeparator());
-            }
-            if (!modelField.isEmpty()) {
-                modelsFragment.append(YAML_INDENT).append(YAML_INDENT).append("model: ").append(modelField).append(System.lineSeparator());
-            }
-            if (!driver.isEmpty()) {
-                modelsFragment.append(YAML_INDENT).append(YAML_INDENT).append("driver: ").append(driver).append(System.lineSeparator());
-            }
-            modelsFragment.append(YAML_INDENT).append(YAML_INDENT).append("enable: true").append(System.lineSeparator());
-            if (!apiAddress.isEmpty()) {
-                modelsFragment.append(YAML_INDENT).append(YAML_INDENT).append("api_address: ").append(apiAddress).append(System.lineSeparator());
-            }
-            if (!apiKey.isEmpty()) {
-                modelsFragment.append(YAML_INDENT).append(YAML_INDENT).append("api_key: ").append(apiKey).append(System.lineSeparator());
+            // Append to models fragment only when this is the primary model
+            boolean isPrimary = primaryBackend != null && primaryBackend.backendName.equalsIgnoreCase(type);
+            if (isPrimary) {
+                String primaryModelField = primaryBackend.modelId != null ? primaryBackend.modelId : modelField;
+                modelsFragment.append(YAML_INDENT).append("- name: ").append(name).append(System.lineSeparator());
+                if (!type.isEmpty()) {
+                    modelsFragment.append(YAML_INDENT).append(YAML_INDENT).append("type: ").append(type).append(System.lineSeparator());
+                }
+                if (!primaryModelField.isEmpty()) {
+                    modelsFragment.append(YAML_INDENT).append(YAML_INDENT).append("model: ").append(primaryModelField).append(System.lineSeparator());
+                }
+                if (!driver.isEmpty()) {
+                    modelsFragment.append(YAML_INDENT).append(YAML_INDENT).append("driver: ").append(driver).append(System.lineSeparator());
+                }
+                modelsFragment.append(YAML_INDENT).append(YAML_INDENT).append("enable: true").append(System.lineSeparator());
+                if (!apiAddress.isEmpty()) {
+                    modelsFragment.append(YAML_INDENT).append(YAML_INDENT).append("api_address: ").append(apiAddress).append(System.lineSeparator());
+                }
+                if (!apiKey.isEmpty()) {
+                    modelsFragment.append(YAML_INDENT).append(YAML_INDENT).append("api_key: ").append(apiKey).append(System.lineSeparator());
+                }
             }
 
-            // 追加到 functions.chat.backends 下的内容
-
+            // Append to functions.chat.backends fragment (all selected)
             if (!isFirstBackend) {
                 backendsFragment.append(System.lineSeparator());
             }
@@ -644,49 +647,26 @@ public class OpenClawUtil {
         return new YAMLMapper(factory);
     }
 
+    /**
+     * Finds the model def in lagi.yml that matches the provider (and optionally the primary backend).
+     * When primaryBackend is not null, only returns the def that corresponds to the primary (def name equals primaryBackend.backendName).
+     */
     private static Map<String, Object> findMatchingModelDef(List<Map<String, Object>> allModelDefs,
                                                             String providerName,
-                                                            JsonNode modelNode) {
-        String providerLower = providerName == null ? "" : providerName.toLowerCase();
-        String modelId = getNodeTextValue(modelNode, "id");
-        String modelName = getNodeTextValue(modelNode, "name");
-        String modelIdLower = modelId == null ? "" : modelId.toLowerCase();
-        String modelNameLower = modelName == null ? "" : modelName.toLowerCase();
-
-        String aliasName = providerName.toLowerCase();
-        String aliasLower = aliasName == null ? "" : aliasName.toLowerCase();
+                                                            JsonNode modelNode,
+                                                            PrimaryBackend primaryBackend) {
+//        String providerLower = providerName == null ? "" : providerName.toLowerCase();
+        String primaryBackendName = (primaryBackend != null && primaryBackend.backendName != null)
+                ? primaryBackend.backendName.trim().toLowerCase() : null;
 
         for (Map<String, Object> def : allModelDefs) {
             if (def == null) continue;
-            String name = def.get("name") == null ? "" : def.get("name").toString();
             String type = def.get("type") == null ? "" : def.get("type").toString();
-            Object modelFieldObj = def.get("model");
-            String modelField = modelFieldObj == null ? "" : modelFieldObj.toString();
-
-            String nameLower = name.toLowerCase();
             String typeLower = type.toLowerCase();
-            String modelFieldLower = modelField.toLowerCase();
-
-            if (!nameLower.isEmpty() && providerLower.contains(nameLower)) {
+                if (primaryBackendName != null && !primaryBackendName.equals(typeLower)) {
+                    continue;
+                }
                 return def;
-            }
-            if (!aliasLower.isEmpty() && nameLower.equals(aliasLower)) {
-                return def;
-            }
-
-            // provider 与 type 近似
-            if (!typeLower.isEmpty() &&
-                    (providerLower.contains(typeLower) || typeLower.contains(providerLower))) {
-                return def;
-            }
-
-            // models.json id/name appears in lagi.yml model field
-            if (!modelIdLower.isEmpty() && modelFieldLower.contains(modelIdLower)) {
-                return def;
-            }
-            if (!modelNameLower.isEmpty() && modelFieldLower.contains(modelNameLower)) {
-                return def;
-            }
         }
         return null;
     }
