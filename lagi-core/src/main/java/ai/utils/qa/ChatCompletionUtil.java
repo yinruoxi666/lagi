@@ -43,6 +43,16 @@ public class ChatCompletionUtil {
         return null;
     }
 
+    public static Integer findAssistantIndex(List<ChatMessage> messages, int lastIndex) {
+        for (int i = messages.size() -1; i >= 0 && i > lastIndex; i--) {
+            ChatMessage msg = messages.get(i);
+            if (LagiGlobal.LLM_ROLE_ASSISTANT.equals(msg.getRole())) {
+                return i;
+            }
+        }
+        return null;
+    }
+
     public static void setLastMessage(ChatCompletionRequest chatCompletionRequest, String lastMessage) {
         List<ChatMessage> messages = chatCompletionRequest.getMessages();
         messages.get(messages.size() - 1).setContent(lastMessage);

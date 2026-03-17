@@ -20,7 +20,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 @Component
 public class SecurityFilterImpl implements BeforeModel, AfterModel {
 
-    @Value("${filters[0].filter_window_length:3}")
+    @Value("${filters[0].filter_window_length:1}")
     private Integer queueCapacity;
 
     @Override
@@ -74,6 +74,7 @@ public class SecurityFilterImpl implements BeforeModel, AfterModel {
                                     toEmit.getChoices().get(0).setDelta(toEmit.getChoices().get(0).getMessage());
                                 }
                                 emitter.onNext(toEmit);
+                                System.out.println("send: " + toEmit.getChoices().get(0).getMessage().getContent());
                             }
                         } catch (Exception e) {
                             emitter.onError(e);
@@ -88,6 +89,7 @@ public class SecurityFilterImpl implements BeforeModel, AfterModel {
                                     remaining.getChoices().get(0).setDelta(remaining.getChoices().get(0).getMessage());
                                 }
                                 emitter.onNext(remaining);
+                                System.out.println("send: " + remaining.getChoices().get(0).getMessage().getContent());
                             }
                         }
                         emitter.onComplete();

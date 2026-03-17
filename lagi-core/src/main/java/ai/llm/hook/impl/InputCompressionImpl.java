@@ -13,7 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Order
-@Component
+//@Component
 public class InputCompressionImpl implements BeforeModel {
 
     private final SampleIntentServiceImpl intentService = new SampleIntentServiceImpl();

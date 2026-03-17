@@ -45,6 +45,7 @@ public final class ResponsesChatCompletionConverter {
 
     public static ChatCompletionResult convertStreamEvent(String body) {
         //记录日志
+//        System.out.println(body);
         log.debug("Received stream event: {}", body);
         if (StrUtil.isBlank(body) || "[DONE]".equals(body)) {
             return null;
