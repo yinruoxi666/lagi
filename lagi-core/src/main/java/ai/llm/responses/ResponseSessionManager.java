@@ -147,12 +147,13 @@ public class ResponseSessionManager {
             if(context.getModel().startsWith("qwen")) {
                 context.setInputMessages(inputs);
                 context.setNormalizedMessages(normalized);
-                context.setStateful(true);
+                context.setStateful(false);
             } else {
                 systemMessages.addAll(incrementalMessages);
                 context.setInputMessages(systemMessages);
                 context.setNormalizedMessages(normalized);
-                context.setStateful(false);
+                context.setPreviousResponseId(responseSessionState.getPreviousResponseId());
+                context.setStateful(true);
             }
             return context;
         } else {
