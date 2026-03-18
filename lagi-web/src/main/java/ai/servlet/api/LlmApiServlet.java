@@ -91,6 +91,20 @@ public class LlmApiServlet extends BaseServlet {
     }
 
     @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        req.setCharacterEncoding("UTF-8");
+        resp.setHeader("Content-Type", "application/json;charset=utf-8");
+        String url = req.getRequestURI();
+        if (url.endsWith("/v1/models") || url.endsWith("/models")) {
+            PrintWriter out = resp.getWriter();
+            String modelsJson = "{\"object\":\"list\",\"data\":[{\"id\":\"gpt-5.4\",\"object\":\"model\",\"created\":1700000000,\"owned_by\":\"azure\"}]}";
+            out.print(modelsJson);
+            out.flush();
+            out.close();
+        }
+    }
+
+    @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         req.setCharacterEncoding("UTF-8");
         resp.setHeader("Content-Type", "application/json;charset=utf-8");
