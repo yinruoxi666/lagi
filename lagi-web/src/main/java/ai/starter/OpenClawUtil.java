@@ -320,19 +320,6 @@ public class OpenClawUtil {
         return byName;
     }
 
-    private static Set<String> collectModelNamesFromList(List<Map<String, Object>> modelsList) {
-        Set<String> names = new HashSet<>();
-        for (Object item : modelsList) {
-            if (item instanceof Map) {
-                String name = trimmedModelName((Map<?, ?>) item);
-                if (name != null) {
-                    names.add(name);
-                }
-            }
-        }
-        return names;
-    }
-
     /**
      * Applies OpenClaw fields onto an existing lagi.yml model row. api_address is stored with /chat/completions suffix.
      */
@@ -377,6 +364,8 @@ public class OpenClawUtil {
             selectedModels = Collections.emptyList();
         }
 
+        Map<String, String> endpointMap = new HashMap<>();
+
         if (!selectedModels.isEmpty()) {
             List<Map<String, Object>> modelsList = (List<Map<String, Object>>) root.get("models");
             if (modelsList == null) {
@@ -402,6 +391,10 @@ public class OpenClawUtil {
                 if (applySelectedToExistingEntry(entry, selected)) {
                     changed = true;
                 }
+                String endpoint = entry.get("api_address") == null ? null : entry.get("api_address").toString();
+                if (endpoint != null) {
+                    endpointMap.put(name, endpoint);
+                }
             }
         }
 
@@ -423,7 +416,8 @@ public class OpenClawUtil {
             singleBackend.put("model", primaryBackend.getModel());
             singleBackend.put("enable", true);
             singleBackend.put("stream", true);
-            if (RESPONSE_BACKENDS_SET.contains(primaryBackend.getType())) {
+            String endpoint = endpointMap.get(primaryBackend.getName());
+            if (endpoint != null && isResponseSupported(endpoint)) {
                 singleBackend.put("protocol", "response");
             } else {
                 singleBackend.put("protocol", "completion");
@@ -446,7 +440,7 @@ public class OpenClawUtil {
         return null;
     }
 
-    private boolean isResponseSupported(String apiUrl) {
+    private static boolean isResponseSupported(String apiUrl) {
         Set<String> allUrl = new HashSet<>();
         allUrl.addAll(RESPONSE_BACKENDS_MAP.keySet());
         for (String url: RESPONSE_BACKENDS_MAP.values()) {
