@@ -2,6 +2,7 @@ package ai.starter;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.catalina.Context;
+import org.apache.catalina.connector.Connector;
 import org.apache.catalina.startup.Tomcat;
 import org.apache.tomcat.util.scan.StandardJarScanner;
 
@@ -38,17 +39,21 @@ public final class TomcatUtil {
     /**
      * Starts embedded Tomcat and blocks until the server stops.
      *
+     * @param host      bind address (e.g. localhost, 0.0.0.0)
      * @param port      server port
      * @param webappDir webapp root directory
      * @param devMode   if true, context is reloadable (e.g. for IDE)
      */
-    public static void startAndAwait(int port, Path webappDir, boolean devMode) throws Exception {
+    public static void startAndAwait(String host, int port, Path webappDir, boolean devMode) throws Exception {
         Path baseDir = createTempDirWithLimit(TOMCAT_BASE_PREFIX);
 
         Tomcat tomcat = new Tomcat();
         tomcat.setPort(port);
         tomcat.setBaseDir(baseDir.toAbsolutePath().toString());
-        tomcat.getConnector();
+        Connector connector = tomcat.getConnector();
+        if (host != null && !host.isEmpty()) {
+            connector.setProperty("address", host);
+        }
 
         Context ctx = tomcat.addWebapp("", webappDir.toAbsolutePath().toString());
         ctx.setReloadable(devMode);
@@ -63,7 +68,8 @@ public final class TomcatUtil {
         jarScanner.setScanAllFiles(false);
 
         tomcat.start();
-        log.info("Server started on http://localhost:{}", port);
+        String logHost = (host == null || host.isEmpty()) ? "0.0.0.0" : host;
+        log.info("Server started on http://{}:{}", logHost, port);
         tomcat.getServer().await();
     }
 

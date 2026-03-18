@@ -1,718 +1,704 @@
 package ai.starter;
 
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
+import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
+import lombok.AllArgsConstructor;
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.Yaml;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.io.File;
+import java.nio.file.*;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Slf4j
 public class OpenClawUtil {
+    private static final String OPEN_CLAW_DIR_NAME = ".openclaw";
+    private static final String[] MODELS_JSON_PATH_SEGMENTS = {"agents", "main", "agent", "models.json"};
+    private static final String CONFIG_FILE_PROPERTY = Application.CONFIG_FILE_PROPERTY;
+    private static final String YAML_INDENT = "  ";
+    private static final String[] RESPONSE_SUPPORTED_BACKENDS = {"qwen", "openai"};
+    private static final Set<String> RESPONSE_BACKENDS_SET = new HashSet<>(Arrays.asList(RESPONSE_SUPPORTED_BACKENDS));
+    private static final String OPENAI_COMPLETIONS_API = "openai-completions";
+    private static final Yaml SNAKE_YAML = createSnakeYaml();
 
-    /**
-     * Synchronize configurations for OpenClaw application.
-     */
-    public static void sync() {
-        Map<String, String> providerToModelName = new LinkedHashMap<String, String>();
-        providerToModelName.put("fastchat", "fastchat");
-        providerToModelName.put("openai", "chatgpt");
-        providerToModelName.put("azure", "chatgpt-azure");
-        providerToModelName.put("baidu", "ernie");
-        providerToModelName.put("zai", "chatglm");
-        providerToModelName.put("moonshot", "kimi");
-        providerToModelName.put("baichuan", "baichuan");
-        providerToModelName.put("volcengine", "spark");
-        providerToModelName.put("sense", "SenseChat");
-        providerToModelName.put("google", "gemini");
-        providerToModelName.put("douban", "doubao");
-        providerToModelName.put("anthropic", "claude");
+    private static final Map<String, String> RESPONSE_BACKENDS_MAP = new HashMap<>();
 
-        Path openClawModelsPath = findOpenClawModelsJson();
-        if (openClawModelsPath == null || !Files.exists(openClawModelsPath)) {
-            return;
-        }
-        Path lagiYmlPath = resolveLagiYmlPath();
-        if (lagiYmlPath == null || !Files.exists(lagiYmlPath)) {
-            return;
-        }
-
-        String modelsJsonText = readText(openClawModelsPath);
-        String lagiYmlText = readText(lagiYmlPath);
-        String modelYmlText = resolveAndReadModelYmlText(lagiYmlPath);
-        if (modelYmlText == null || modelYmlText.trim().isEmpty()) {
-            return;
-        }
-
-        JsonObject root = JsonParser.parseString(modelsJsonText).getAsJsonObject();
-        JsonObject providers = root.has("providers") && root.get("providers").isJsonObject()
-                ? root.getAsJsonObject("providers")
-                : new JsonObject();
-
-        List<String> copiedNames = new ArrayList<String>();
-        List<String> copiedPreferredModels = new ArrayList<String>();
-
-        for (Map.Entry<String, String> e : providerToModelName.entrySet()) {
-            String providerKey = normalizeKey(e.getKey());
-            String targetName = normalizeKey(e.getValue());
-
-            JsonObject providerObj = providers.has(providerKey) && providers.get(providerKey).isJsonObject()
-                    ? providers.getAsJsonObject(providerKey)
-                    : null;
-            if (providerObj == null) {
-                continue;
-            }
-
-            String apiKey = providerObj.has("apiKey") && !providerObj.get("apiKey").isJsonNull()
-                    ? providerObj.get("apiKey").getAsString()
-                    : "";
-
-            // Keep model.yml as the single source of truth; lagi.yml is patched by copying blocks over.
-            YamlBlock modelBlock = extractModelBlockFromModelYml(modelYmlText, targetName);
-            if (modelBlock == null) {
-                continue;
-            }
-
-            String preferredModel = extractFirstModelFromBlock(modelBlock.blockText);
-            String updatedBlock = replaceApiKeyInBlock(modelBlock.blockText, apiKey);
-            lagiYmlText = upsertModelBlockIntoLagiYml(lagiYmlText, targetName, updatedBlock);
-
-            copiedNames.add(targetName);
-            copiedPreferredModels.add(preferredModel);
-        }
-
-        if (!copiedNames.isEmpty()) {
-            lagiYmlText = updateChatRoute(lagiYmlText, copiedNames);
-            lagiYmlText = upsertChatBackends(lagiYmlText, copiedNames, copiedPreferredModels);
-        }
-
-        writeText(lagiYmlPath, lagiYmlText);
+    static {
+        RESPONSE_BACKENDS_MAP.put("dashscope.aliyuncs.com", "https://dashscope.aliyuncs.com/api/v2/apps/protocols/compatible-mode/v1");
+        RESPONSE_BACKENDS_MAP.put("api.openai.com", null);
+        RESPONSE_BACKENDS_MAP.put("admin-dgmeta-resource.cognitiveservices.azure.com", null);
     }
 
-
-    private static Path resolveLagiYmlPath() {
-        String configured = System.getProperty(ai.starter.Application.CONFIG_FILE_PROPERTY);
-        if (configured != null && !configured.trim().isEmpty()) {
-            Path p = Paths.get(configured.trim());
-            if (Files.exists(p) && Files.isRegularFile(p)) {
-                return p;
-            }
-        }
-        Path p1 = Paths.get("lagi-web", "src", "main", "resources", "lagi.yml");
-        if (Files.exists(p1) && Files.isRegularFile(p1)) return p1;
-        Path p2 = Paths.get("src", "main", "resources", "lagi.yml");
-        if (Files.exists(p2) && Files.isRegularFile(p2)) return p2;
-        return null;
+    public static void sync(int port) {
+        syncToOpenClaw(port);
+        syncToLinkMind();
     }
 
+    public static void syncToOpenClaw(int port) {
+        OpenClawInjector.inject("http://127.0.0.1:" + port + "/v1");
+    }
 
-    private static String resolveAndReadModelYmlText(Path lagiYmlPath) {
-        Path near = null;
+    public static void syncToLinkMind() {
         try {
-            Path dir = lagiYmlPath == null ? null : lagiYmlPath.getParent();
-            if (dir != null) {
-                near = dir.resolve("model.yml");
-                if (Files.exists(near) && Files.isRegularFile(near)) {
-                    return readText(near);
+            Path lagiYmlPath = getLagiYmlPath();
+            if (lagiYmlPath == null || !Files.exists(lagiYmlPath)) {
+                return;
+            }
+
+            Map<String, Object> root = loadYamlAsMap(lagiYmlPath);
+
+            // Resolve primary from openclaw.json: agents.defaults.model.primary -> (backendName, modelId)
+            PrimaryBackend primaryBackend = resolvePrimaryBackend(root);
+
+            // Read models.json and merge model list / primary backends
+            JsonNode providersNode = readAndParseModelsJson();
+            if (providersNode != null) {
+                OpenClawFragmentsResult fragmentsResult = generateOpenClawFragments(providersNode, primaryBackend);
+                if (fragmentsResult != null && !fragmentsResult.fragments.isEmpty()) {
+                    boolean changed = mergeOpenClawIntoYaml(root, fragmentsResult.selectedModels, primaryBackend);
+                    if (changed) {
+                        writeYaml(lagiYmlPath, root);
+                        log.info("Successfully synced OpenClaw configuration to {}", lagiYmlPath);
+                    }
                 }
             }
-        } catch (Exception ignore) {
-        }
 
-        Path dev1 = Paths.get("lagi-web", "src", "main", "resources", "model.yml");
-        if (Files.exists(dev1) && Files.isRegularFile(dev1)) return readText(dev1);
-        Path dev2 = Paths.get("src", "main", "resources", "model.yml");
-        if (Files.exists(dev2) && Files.isRegularFile(dev2)) return readText(dev2);
+//            // If no models.json sync, still apply primary backend only (backends = single primary)
+//            if (primaryBackend != null) {
+//                boolean changed = mergeOpenClawIntoYaml(root, null, primaryBackend);
+//                if (changed) {
+//                    writeYaml(lagiYmlPath, root);
+//                    log.info("Successfully synced primary backend from openclaw.json to {}", lagiYmlPath);
+//                }
+//            } else {
+//                log.info("No changes needed, lagi.yml already up to date");
+//            }
 
-        return readClasspathText("/model.yml");
-    }
-
-    private static String readClasspathText(String resourcePath) {
-        try (InputStream in = OpenClawUtil.class.getResourceAsStream(resourcePath)) {
-            if (in == null) return null;
-            byte[] bytes = readAllBytesCompat(in);
-            return new String(bytes, StandardCharsets.UTF_8);
         } catch (Exception e) {
+            log.error("Failed to sync OpenClaw config", e);
+        }
+    }
+
+
+    private static Path getLagiYmlPath() {
+        String configFilePath = System.getProperty(CONFIG_FILE_PROPERTY);
+        if (configFilePath == null || configFilePath.trim().isEmpty()) {
             return null;
         }
+        return Paths.get(configFilePath);
     }
 
 
-    private static byte[] readAllBytesCompat(InputStream in) throws java.io.IOException {
-        byte[] buffer = new byte[8192];
-        int n;
-        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
-        while ((n = in.read(buffer)) >= 0) {
-            baos.write(buffer, 0, n);
-        }
-        return baos.toByteArray();
-    }
+    private static final String OPENCLAW_JSON = "openclaw.json";
 
-    private static Path findOpenClawModelsJson() {
-
-        String explicit = System.getenv("OPENCLAW_MODELS_JSON");
-        if (explicit != null && !explicit.trim().isEmpty()) {
-            Path p = Paths.get(explicit.trim());
-            return Files.exists(p) ? p : null;
-        }
-        String openClawHome = System.getenv("OPENCLAW_HOME");
-        if (openClawHome != null && !openClawHome.trim().isEmpty()) {
-            Path p = Paths.get(openClawHome.trim(), "agents", "main", "agent", "models.json");
-            return Files.exists(p) ? p : null;
-        }
-
-        // Prefer the current user's home, but tolerate misconfigured environments on Windows.
+    /**
+     * Resolves models.json path under OpenClaw dir (same as OpenClawInjector).
+     * ~/.openclaw/agents/main/agent/models.json
+     */
+    private static Path resolveModelsJsonPath() {
         String userHome = System.getProperty("user.home");
-        if (userHome != null && !userHome.trim().isEmpty()) {
-            Path p = Paths.get(userHome.trim(), ".openclaw", "agents", "main", "agent", "models.json");
-            if (Files.exists(p)) {
-                return p;
-            }
-        }
-
-        // Fallback: scan all drive roots for a Windows-style Users/* home layout.
-        File[] roots = File.listRoots();
-        if (roots != null) {
-            for (File r : roots) {
-                File usersDir = new File(r, "Users");
-                if (!usersDir.exists() || !usersDir.isDirectory()) {
-                    continue;
-                }
-                File[] userDirs = usersDir.listFiles();
-                if (userDirs == null) {
-                    continue;
-                }
-                for (File u : userDirs) {
-                    if (u == null || !u.isDirectory()) {
-                        continue;
-                    }
-                    File models = new File(u, ".openclaw\\agents\\main\\agent\\models.json");
-                    if (models.exists() && models.isFile()) {
-                        return models.toPath();
-                    }
-                }
-            }
-        }
-
-        // If we reach here, OpenClaw is likely not installed/configured for this machine.
-        return null;
-    }
-
-    private static String normalizeKey(String s) {
-        return s == null ? "" : s.trim();
-    }
-
-    private static String readText(Path path) {
-        try {
-            byte[] bytes = Files.readAllBytes(path);
-            return new String(bytes, StandardCharsets.UTF_8);
-        } catch (Exception ex) {
-            throw new RuntimeException(ex);
-        }
-    }
-
-    private static void writeText(Path path, String text) {
-        try {
-            Files.write(path, text.getBytes(StandardCharsets.UTF_8));
-        } catch (Exception ex) {
-            throw new RuntimeException(ex);
-        }
-    }
-
-    private static final class YamlBlock {
-        final int startLine;
-        final int endLineExclusive;
-        final String blockText;
-
-        private YamlBlock(int startLine, int endLineExclusive, String blockText) {
-            this.startLine = startLine;
-            this.endLineExclusive = endLineExclusive;
-            this.blockText = blockText;
-        }
-    }
-
-    private static YamlBlock extractModelBlockFromModelYml(String modelYmlText, String targetName) {
-        List<String> lines = splitPreserveNewlines(modelYmlText);
-
-        int nameLine = -1;
-        for (int i = 0; i < lines.size(); i++) {
-            String raw = stripLineBreak(lines.get(i));
-            if (raw.matches("^\\s*-\\s*name\\s*:\\s*" + Pattern.quote(targetName) + "\\s*$")) {
-                nameLine = i;
-                break;
-            }
-        }
-        if (nameLine < 0) {
+        if (userHome == null || userHome.trim().isEmpty()) {
+            log.warn("Cannot get user home directory");
             return null;
         }
-
-        // Expand upward to keep leading blank/comment lines with the block for stable diffs.
-        int start = nameLine;
-        for (int i = nameLine - 1; i >= 0; i--) {
-            String raw = stripLineBreak(lines.get(i));
-            if (raw.matches("^\\s*$") || raw.matches("^\\s*#.*$")) {
-                start = i;
-                continue;
-            }
-            break;
+        Path openClawDir = Paths.get(userHome, OPEN_CLAW_DIR_NAME);
+        Path modelsJsonPath = openClawDir;
+        for (String segment : MODELS_JSON_PATH_SEGMENTS) {
+            modelsJsonPath = modelsJsonPath.resolve(segment);
         }
-
-        int end = lines.size();
-        Pattern nextBlock = Pattern.compile("^\\s*-\\s*name\\s*:\\s*.+$");
-        int currentIndent = leadingSpaces(stripLineBreak(lines.get(nameLine)));
-        for (int i = nameLine + 1; i < lines.size(); i++) {
-            String raw = stripLineBreak(lines.get(i));
-            if (raw.trim().isEmpty()) {
-                continue;
-            }
-            int indent = leadingSpaces(raw);
-            // A sibling "- name:" at the same indentation terminates the current model block.
-            if (indent == currentIndent && nextBlock.matcher(raw).matches()) {
-                end = i;
-                break;
-            }
-        }
-
-        StringBuilder sb = new StringBuilder();
-        for (int i = start; i < end; i++) {
-            sb.append(lines.get(i));
-        }
-        return new YamlBlock(start, end, sb.toString());
-    }
-
-    private static String replaceApiKeyInBlock(String blockText, String apiKey) {
-        // Preserve any trailing inline comment while avoiding "api_key:XXX#comment" concatenation.
-        Pattern p = Pattern.compile("(?m)^(\\s*api_key\\s*:\\s*)([^\\r\\n#]*)(\\s*)(#.*)?$");
-        Matcher m = p.matcher(blockText);
-        if (!m.find()) {
-            return blockText;
-        }
-        String prefix = m.group(1);
-        String spacesBeforeComment = m.group(3) == null ? "" : m.group(3);
-        String comment = m.group(4);
-
-        String key = apiKey == null ? "" : apiKey.trim();
-        if (comment != null && spacesBeforeComment.isEmpty()) {
-            spacesBeforeComment = " ";
-        }
-        String replacedLine = prefix + key + spacesBeforeComment + (comment == null ? "" : comment);
-        return blockText.substring(0, m.start()) + replacedLine + blockText.substring(m.end());
+        return modelsJsonPath;
     }
 
     /**
-     * 从模型配置块中解析 model 字段的第一个值。
+     * Resolves openclaw.json path under OpenClaw dir (same as OpenClawInjector).
+     * ~/.openclaw/openclaw.json
      */
-    private static String extractFirstModelFromBlock(String blockText) {
-        if (blockText == null || blockText.isEmpty()) {
-            return "";
+    private static Path resolveOpenClawJsonPath() {
+        String userHome = System.getProperty("user.home");
+        if (userHome == null || userHome.trim().isEmpty()) {
+            log.warn("Cannot get user home directory");
+            return null;
         }
-
-        String lb = detectLineBreak(blockText);
-        List<String> lines = splitPreserveNewlines(blockText);
-
-        int modelLineIdx = -1;
-        int modelIndent = -1;
-        for (int i = 0; i < lines.size(); i++) {
-            String raw = stripLineBreak(lines.get(i));
-            if (raw.matches("^\\s*model\\s*:\\s*.*$")) {
-                modelLineIdx = i;
-                modelIndent = leadingSpaces(raw);
-                break;
-            }
-        }
-        if (modelLineIdx < 0) {
-            return "";
-        }
-
-        StringBuilder sb = new StringBuilder();
-        String firstLine = stripLineBreak(lines.get(modelLineIdx));
-        String afterColon = firstLine.substring(firstLine.indexOf(':') + 1);
-        sb.append(afterColon);
-
-        for (int i = modelLineIdx + 1; i < lines.size(); i++) {
-            String raw = stripLineBreak(lines.get(i));
-            if (raw.trim().isEmpty()) {
-                continue;
-            }
-            int indent = leadingSpaces(raw);
-            // continuations are more indented than the "model:" line; stop at next key
-            if (indent <= modelIndent) {
-                break;
-            }
-            if (raw.trim().startsWith("#")) {
-                // Ignore comment-only lines inside a multi-line model declaration.
-                continue;
-            }
-            sb.append(" ").append(raw.trim());
-        }
-
-        String all = sb.toString();
-        int hash = all.indexOf('#');
-        if (hash >= 0) {
-            all = all.substring(0, hash);
-        }
-        all = all.replace(lb, " ").trim();
-        if (all.isEmpty()) {
-            return "";
-        }
-
-        String[] parts = all.split(",");
-        for (String p : parts) {
-            String v = p == null ? "" : p.trim();
-            if (!v.isEmpty()) {
-                return v;
-            }
-        }
-        return "";
+        return Paths.get(userHome, OPEN_CLAW_DIR_NAME, OPENCLAW_JSON);
     }
 
-    private static String upsertModelBlockIntoLagiYml(String lagiYmlText, String name, String blockText) {
-        List<String> lines = splitPreserveNewlines(lagiYmlText);
-
-        int modelsIdx = indexOfLineStartsWith(lines, "models:");
-        if (modelsIdx < 0) {
-            return lagiYmlText;
+    /**
+     * Reads openclaw.json from OpenClaw dir and returns agents.defaults.model.primary (e.g. "zai/glm-4.7-flash").
+     */
+    private static String readOpenclawPrimary() throws IOException {
+        Path openclawPath = resolveOpenClawJsonPath();
+        if (openclawPath == null || !Files.exists(openclawPath)) {
+            return null;
         }
-        int includeModelsIdx = indexOfLineStartsWith(lines, "include_models:");
-        if (includeModelsIdx < 0) {
-            includeModelsIdx = lines.size();
+        String content = readFileContent(openclawPath);
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode root = mapper.readTree(content);
+        JsonNode agents = root != null ? root.get("agents") : null;
+        JsonNode defaults = agents != null && agents.isObject() ? agents.get("defaults") : null;
+        JsonNode model = defaults != null && defaults.isObject() ? defaults.get("model") : null;
+        JsonNode primary = model != null && model.isObject() ? model.get("primary") : null;
+        if (primary == null || primary.isNull() || !primary.isTextual()) {
+            return null;
         }
-
-        // Bound the search/update to the models section to avoid accidental cross-section replacements.
-        YamlBlock existing = extractBlockFromSectionByName(lines, modelsIdx + 1, includeModelsIdx, name, 2);
-        List<String> newBlockLines = splitPreserveNewlines(blockText);
-
-        if (existing != null) {
-            List<String> out = new ArrayList<String>(lines.size() - (existing.endLineExclusive - existing.startLine) + newBlockLines.size());
-            out.addAll(lines.subList(0, existing.startLine));
-            out.addAll(newBlockLines);
-            out.addAll(lines.subList(existing.endLineExclusive, lines.size()));
-            return joinLines(out);
-        }
-
-        int insertAt = includeModelsIdx;
-        if (insertAt > 0) {
-            String prev = insertAt - 1 < lines.size() ? stripLineBreak(lines.get(insertAt - 1)) : "";
-            if (!prev.trim().isEmpty()) {
-                newBlockLines = withLeadingBlankLine(newBlockLines, detectLineBreak(lagiYmlText));
-            }
-        }
-
-        List<String> out = new ArrayList<String>(lines.size() + newBlockLines.size());
-        out.addAll(lines.subList(0, insertAt));
-        out.addAll(newBlockLines);
-        out.addAll(lines.subList(insertAt, lines.size()));
-        return joinLines(out);
+        String value = primary.asText().trim();
+        return value.isEmpty() ? null : value;
     }
 
-    private static String updateChatRoute(String lagiYmlText, List<String> names) {
-        List<String> lines = splitPreserveNewlines(lagiYmlText);
-        int routeIdx = indexOfLineMatches(lines, "^\\s*route\\s*:\\s*.*$");
-        if (routeIdx < 0) {
-            return lagiYmlText;
-        }
 
-        String lb = detectLineBreak(lagiYmlText);
-        String raw = stripLineBreak(lines.get(routeIdx));
-        int colon = raw.indexOf(':');
-        if (colon < 0) {
-            return lagiYmlText;
+    /**
+     * Reads openclaw.json from OpenClaw dir and returns models.providers.{provider}.api for the given provider.
+     */
+    private static String readOpenclawProviderApi(String provider) throws IOException {
+        if (provider == null || provider.trim().isEmpty()) {
+            return null;
         }
-        String prefix = raw.substring(0, colon + 1);
-        String expr = raw.substring(colon + 1).trim();
+        Path openclawPath = resolveOpenClawJsonPath();
+        if (openclawPath == null || !Files.exists(openclawPath)) {
+            return null;
+        }
+        String content = readFileContent(openclawPath);
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode root = mapper.readTree(content);
+        JsonNode models = root != null ? root.get("models") : null;
+        JsonNode providers = models != null && models.isObject() ? models.get("providers") : null;
+        JsonNode providerNode = providers != null && providers.isObject() ? providers.get(provider) : null;
+        JsonNode apiNode = providerNode != null && providerNode.isObject() ? providerNode.get("api") : null;
+        if (apiNode == null || apiNode.isNull() || !apiNode.isTextual()) {
+            return null;
+        }
+        String value = apiNode.asText().trim();
+        return value.isEmpty() ? null : value;
+    }
 
-        for (String name : names) {
-            if (expr.contains(name)) {
-                continue;
+    /**
+     * Resolves openclaw primary "provider/modelId" to (backendName, modelId) if that backend exists in lagi.yml models.
+     * If no match but the primary's provider has api "openai-completions", returns backend "custom" with the modelId.
+     */
+    @SuppressWarnings("unchecked")
+    private static PrimaryBackend resolvePrimaryBackend(Map<String, Object> root) {
+        String primary = null;
+        try {
+            primary = readOpenclawPrimary();
+        } catch (IOException e) {
+            log.debug("Could not read openclaw.json: {}", e.getMessage());
+            return null;
+        }
+        if (primary == null || primary.trim().isEmpty()) {
+            return null;
+        }
+        int slash = primary.indexOf('/');
+        if (slash <= 0 || slash == primary.length() - 1) {
+            log.debug("Invalid openclaw primary format: {}", primary);
+            return null;
+        }
+        String provider = primary.substring(0, slash).trim();
+        String modelId = primary.substring(slash + 1).trim();
+//        String backendName = provider;
+        List<Map<String, Object>> modelsList = (List<Map<String, Object>>) root.get("models");
+        if (modelsList == null || modelsList.isEmpty()) {
+            return null;
+        }
+        for (Object item : modelsList) {
+            if (!(item instanceof Map)) continue;
+            Object nameObj = ((Map<?, ?>) item).get("name");
+            Object type = ((Map<?, ?>) item).get("type");
+            if (nameObj == null) continue;
+            if (provider.equalsIgnoreCase(type.toString().trim())) {
+                return new PrimaryBackend(nameObj.toString(), type.toString(), modelId);
             }
-            // Heuristic: keep any "(...kimi...)" group intact and only extend that group to avoid changing precedence.
-            Pattern groupWithKimi = Pattern.compile("\\(([^)]*\\bkimi\\b[^)]*)\\)");
-            Matcher gm = groupWithKimi.matcher(expr);
-            if (gm.find()) {
-                String inner = gm.group(1);
-                String updatedInner = inner + "|" + name;
-                expr = expr.substring(0, gm.start(1)) + updatedInner + expr.substring(gm.end(1));
-            } else if (expr.endsWith(")")) {
-                // If the expression already ends with a group, append inside the group rather than creating a new one.
-                expr = expr.substring(0, expr.length() - 1) + "|" + name + ")";
+        }
+        // No match in lagi.yml: if primary provider uses openai-completions API, return "custom" backend
+        try {
+            String providerApi = readOpenclawProviderApi(provider);
+            if (OPENAI_COMPLETIONS_API.equalsIgnoreCase(providerApi != null ? providerApi.trim() : null)) {
+                return new PrimaryBackend("custom", "OpenAICompatible", modelId);
+            }
+        } catch (IOException e) {
+            log.debug("Could not read provider api from openclaw.json: {}", e.getMessage());
+        }
+        log.debug("Primary backend {} not found in lagi.yml models", provider);
+        return null;
+    }
+
+    /**
+     * Reads and parses models.json from OpenClaw dir (same path as OpenClawInjector).
+     *
+     * @return providers node, or null if not found / invalid
+     */
+    private static JsonNode readAndParseModelsJson() throws IOException {
+        Path modelsJsonPath = resolveModelsJsonPath();
+        if (modelsJsonPath == null || !Files.exists(modelsJsonPath)) {
+            log.warn("models.json not found at: {}", modelsJsonPath);
+            return null;
+        }
+        log.debug("Using OpenClaw models.json: {}", modelsJsonPath);
+
+        String content = readFileContent(modelsJsonPath);
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode root = mapper.readTree(content);
+        JsonNode providersNode = root.get("providers");
+
+        return (providersNode != null && providersNode.isObject()) ? providersNode : null;
+    }
+
+
+    private static String readFileContent(Path path) throws IOException {
+        byte[] bytes = Files.readAllBytes(path);
+        return new String(bytes, StandardCharsets.UTF_8);
+    }
+
+    // 写临时文件后 move 覆盖目标文件
+    private static void writeFileAtomic(Path path, String content) throws IOException {
+        Path tempFile = Files.createTempFile(path.getParent(), "lagi_openclaw_temp_", ".yml");
+        try {
+            Files.write(tempFile, content.getBytes(StandardCharsets.UTF_8),
+                    StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE);
+            Files.move(tempFile, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } finally {
+            Files.deleteIfExists(tempFile);
+        }
+    }
+
+    private static Yaml createSnakeYaml() {
+        DumperOptions options = new DumperOptions();
+        options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+        options.setIndent(2);
+        options.setPrettyFlow(true);
+        return new Yaml(options);
+    }
+
+    private static Map<String, Object> loadYamlAsMap(Path path) throws IOException {
+        if (!Files.exists(path)) {
+            return new LinkedHashMap<>();
+        }
+        try (InputStream in = Files.newInputStream(path)) {
+            Object loaded = SNAKE_YAML.load(in);
+            if (loaded instanceof Map) {
+                return (Map<String, Object>) loaded;
+            }
+            Map<String, Object> root = new LinkedHashMap<>();
+            root.put("content", loaded);
+            return root;
+        }
+    }
+
+    private static void writeYaml(Path path, Map<String, Object> root) throws IOException {
+        String yaml = SNAKE_YAML.dump(root);
+        writeFileAtomic(path, yaml + System.lineSeparator());
+    }
+
+    /** Non-null, non-empty trimmed string value for the given key, or false. */
+    private static boolean hasNonBlank(Map<String, Object> map, String key) {
+        Object v = map.get(key);
+        return v != null && !v.toString().trim().isEmpty();
+    }
+
+    /** Trimmed model name from map, or null if missing or blank. */
+    private static String trimmedModelName(Map<?, ?> map) {
+        Object n = map.get("name");
+        if (n == null) {
+            return null;
+        }
+        String s = n.toString().trim();
+        return s.isEmpty() ? null : s;
+    }
+
+    private static Map<String, Map<String, Object>> indexSelectedModelsByName(List<Map<String, Object>> selected) {
+        Map<String, Map<String, Object>> byName = new HashMap<>();
+        for (Map<String, Object> m : selected) {
+            String name = trimmedModelName(m);
+            if (name != null) {
+                byName.put(name, m);
+            }
+        }
+        return byName;
+    }
+
+    /**
+     * Applies OpenClaw fields onto an existing lagi.yml model row. api_address is stored with /chat/completions suffix.
+     */
+    private static boolean applySelectedToExistingEntry(Map<String, Object> entry, Map<String, Object> selected) {
+        boolean rowChanged = false;
+        if (hasNonBlank(selected, "model")) {
+            entry.put("model", selected.get("model"));
+            rowChanged = true;
+        }
+        if (hasNonBlank(selected, "api_address")) {
+            String responseEndpoint = getResponseEndpoint(selected.get("api_address").toString());
+            if (responseEndpoint != null) {
+                entry.put("api_address", responseEndpoint + "/responses");
             } else {
-                expr = expr + "|" + name;
+                entry.put("api_address", selected.get("api_address").toString().trim() + "/chat/completions");
             }
+            rowChanged = true;
         }
-
-        lines.set(routeIdx, prefix + " " + expr + lb);
-        return joinLines(lines);
+        if (hasNonBlank(selected, "api_key")) {
+            entry.put("api_key", selected.get("api_key"));
+            rowChanged = true;
+        }
+        if (selected.get("enable") != null) {
+            entry.put("enable", selected.get("enable"));
+            rowChanged = true;
+        }
+        return rowChanged;
     }
 
-    private static String upsertChatBackends(String lagiYmlText, List<String> names, List<String> preferredModels) {
-        List<String> lines = splitPreserveNewlines(lagiYmlText);
-        String lb = detectLineBreak(lagiYmlText);
 
-        int chatIdx = indexOfLineStartsWith(lines, "  chat:");
-        if (chatIdx < 0) {
-            return lagiYmlText;
+    /**
+     * Merges OpenClaw selected models into the lagi.yml root map: adds/updates models list.
+     * If primaryBackend is set, functions.chat.backends is replaced with a single element (primary only);
+     * otherwise backends are not modified.
+     */
+    @SuppressWarnings("unchecked")
+    private static boolean mergeOpenClawIntoYaml(Map<String, Object> root,
+                                                 List<Map<String, Object>> selectedModels,
+                                                 PrimaryBackend primaryBackend) {
+        boolean changed = false;
+        if (selectedModels == null) {
+            selectedModels = Collections.emptyList();
         }
-        int backendsIdx = indexOfLineStartsWith(lines, "    backends:");
-        if (backendsIdx < 0 || backendsIdx < chatIdx) {
-            return lagiYmlText;
-        }
 
-        int listStart = backendsIdx + 1;
-        int listEnd = recomputeBackendsListEnd(lines, listStart, chatIdx);
+        Map<String, String> endpointMap = new HashMap<>();
 
-        for (int idx = 0; idx < names.size(); idx++) {
-            String name = names.get(idx);
-            String preferModel = idx < preferredModels.size() ? preferredModels.get(idx) : "";
-            if (preferModel == null || preferModel.trim().isEmpty()) {
-                preferModel = "default";
+        if (!selectedModels.isEmpty()) {
+            List<Map<String, Object>> modelsList = (List<Map<String, Object>>) root.get("models");
+            if (modelsList == null) {
+                modelsList = new ArrayList<>();
+                root.put("models", modelsList);
+                changed = true;
             }
+            Map<String, Map<String, Object>> selectedByName = indexSelectedModelsByName(selectedModels);
 
-            YamlBlock existing = extractBackendBlock(lines, listStart, listEnd, name);
-            List<String> backendBlock = Arrays.asList(
-                    "      - backend: " + name + lb,
-                    "        model: " + preferModel + lb,
-                    "        enable: true" + lb,
-                    "        stream: true" + lb,
-                    "        protocol: completion" + lb,
-                    "        priority: 150" + lb,
-                    lb
-            );
+            for (Object item : modelsList) {
+                if (!(item instanceof Map)) {
+                    continue;
+                }
+                Map<String, Object> entry = (Map<String, Object>) item;
+                String name = trimmedModelName(entry);
+                if (name == null) {
+                    continue;
+                }
+                Map<String, Object> selected = selectedByName.get(name);
+                if (selected == null) {
+                    continue;
+                }
+                if (applySelectedToExistingEntry(entry, selected)) {
+                    changed = true;
+                }
+                String endpoint = entry.get("api_address") == null ? null : entry.get("api_address").toString();
+                if (endpoint != null) {
+                    endpointMap.put(name, endpoint);
+                }
+            }
+        }
 
-            if (existing != null) {
-                // After replacing a slice, recompute indexes because line numbers become stale.
-                List<String> out = new ArrayList<String>(lines.size() - (existing.endLineExclusive - existing.startLine) + backendBlock.size());
-                out.addAll(lines.subList(0, existing.startLine));
-                out.addAll(backendBlock);
-                out.addAll(lines.subList(existing.endLineExclusive, lines.size()));
-                lines = out;
-
-                backendsIdx = indexOfLineStartsWith(lines, "    backends:");
-                listStart = backendsIdx + 1;
-                listEnd = recomputeBackendsListEnd(lines, listStart, chatIdx);
+        // If primary from openclaw.json matched: replace functions.chat.backends with single primary backend only
+        if (primaryBackend != null) {
+            Map<String, Object> functions = (Map<String, Object>) root.get("functions");
+            if (functions == null) {
+                functions = new LinkedHashMap<>();
+                root.put("functions", functions);
+            }
+            Map<String, Object> chat = (Map<String, Object>) functions.get("chat");
+            if (chat == null) {
+                chat = new LinkedHashMap<>();
+                functions.put("chat", chat);
+            }
+            List<Map<String, Object>> backendsList = new ArrayList<>();
+            Map<String, Object> singleBackend = new LinkedHashMap<>();
+            singleBackend.put("backend", primaryBackend.getName());
+            singleBackend.put("model", primaryBackend.getModel());
+            singleBackend.put("enable", true);
+            singleBackend.put("stream", true);
+            String endpoint = endpointMap.get(primaryBackend.getName());
+            if (endpoint != null && isResponseSupported(endpoint)) {
+                singleBackend.put("protocol", "response");
             } else {
-                int insertAt = listEnd;
-                List<String> out = new ArrayList<String>(lines.size() + backendBlock.size());
-                out.addAll(lines.subList(0, insertAt));
-                out.addAll(backendBlock);
-                out.addAll(lines.subList(insertAt, lines.size()));
-                lines = out;
-
-                backendsIdx = indexOfLineStartsWith(lines, "    backends:");
-                listStart = backendsIdx + 1;
-                listEnd = recomputeBackendsListEnd(lines, listStart, chatIdx);
+                singleBackend.put("protocol", "completion");
             }
+            singleBackend.put("priority", 10);
+            backendsList.add(singleBackend);
+            chat.put("backends", backendsList);
+            chat.put("route", "best(" + primaryBackend.getName() + ")");
+            changed = true;
         }
-
-        return joinLines(lines);
+        return changed;
     }
 
-    private static int recomputeBackendsListEnd(List<String> lines, int listStart, int chatIdx) {
-        int listEnd = lines.size();
-        for (int i = listStart; i < lines.size(); i++) {
-            String raw = stripLineBreak(lines.get(i));
-            if (raw.trim().isEmpty()) {
+    private static String getResponseEndpoint(String apiUrl) {
+        for (Map.Entry<String, String> entry : RESPONSE_BACKENDS_MAP.entrySet()) {
+            if (apiUrl.contains(entry.getKey())) {
+                return entry.getValue();
+            }
+        }
+        return null;
+    }
+
+    private static boolean isResponseSupported(String apiUrl) {
+        Set<String> allUrl = new HashSet<>();
+        allUrl.addAll(RESPONSE_BACKENDS_MAP.keySet());
+        for (String url: RESPONSE_BACKENDS_MAP.values()) {
+            if (url != null) {
+                allUrl.add(url);
+            }
+        }
+        for (String url: allUrl) {
+            if (apiUrl.contains(url)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Match models.json providers against models defined in lagi.yml
+    @SuppressWarnings("unchecked")
+    private static OpenClawFragmentsResult generateOpenClawFragments(JsonNode providersNode, PrimaryBackend primaryBackend) throws IOException {
+        Path lagiYmlPath = getLagiYmlPath();
+        if (lagiYmlPath == null) {
+            throw new IOException("Cannot resolve lagi.yml path");
+        }
+        if (!Files.exists(lagiYmlPath)) {
+            throw new IOException("lagi.yml not found at: " + lagiYmlPath);
+        }
+
+        YAMLMapper yamlMapper = createYamlMapper();
+        Map<String, Object> modelRoot = yamlMapper.readValue(Files.newInputStream(lagiYmlPath), Map.class);
+        List<Map<String, Object>> allModelDefs = (List<Map<String, Object>>) modelRoot.get("models");
+        if (allModelDefs == null || allModelDefs.isEmpty()) {
+            throw new IOException("No models defined in lagi.yml");
+        }
+
+        // Match models.json providers against model entries in lagi.yml
+        List<Map<String, Object>> selectedModels = new ArrayList<>();
+        List<String> usedNames = new ArrayList<>();
+
+        Iterator<Map.Entry<String, JsonNode>> providerIterator = providersNode.fields();
+        while (providerIterator.hasNext()) {
+            Map.Entry<String, JsonNode> providerEntry = providerIterator.next();
+            String providerName = providerEntry.getKey();
+            JsonNode providerNode = providerEntry.getValue();
+            if (providerName == null || providerName.trim().isEmpty() || providerNode == null || providerNode.isNull()) {
                 continue;
             }
-            int indent = leadingSpaces(raw);
-            if (indent == 4 && raw.matches("^\\s{4}[a-zA-Z0-9_\\-]+\\s*:\\s*.*$")) {
-                listEnd = i;
-                break;
-            }
-            if (indent == 2 && raw.matches("^\\s{2}[a-zA-Z0-9_\\-]+\\s*:\\s*.*$") && i > chatIdx) {
-                listEnd = i;
-                break;
-            }
-        }
-        return listEnd;
-    }
 
-    private static YamlBlock extractBackendBlock(List<String> lines, int startInclusive, int endExclusive, String backendName) {
-        int backendLine = -1;
-        for (int i = startInclusive; i < endExclusive; i++) {
-            String raw = stripLineBreak(lines.get(i));
-            if (raw.matches("^\\s{6}-\\s*backend\\s*:\\s*" + Pattern.quote(backendName) + "\\s*$")) {
-                backendLine = i;
-                break;
+            JsonNode modelsNode = providerNode.get("models");
+            if (modelsNode == null || !modelsNode.isArray() || modelsNode.size() == 0) {
+                continue;
+            }
+            JsonNode firstModelNode = modelsNode.get(0);
+            if (firstModelNode == null || firstModelNode.isNull()) {
+                continue;
+            }
+            Map<String, Object> matched = findMatchingModelDef(allModelDefs, providerName, firstModelNode, primaryBackend);
+            if (matched == null) {
+                log.warn("No matching model found in lagi.yml for provider: {}, skip", providerName);
+                continue;
+            }
+            String name = matched.get("name") == null ? null : matched.get("name").toString();
+            if (name != null && usedNames.contains(name)) {
+                continue;
+            }
+            // Build comma-separated model ids from this provider in models.json
+            List<String> modelIds = new ArrayList<>();
+            for (JsonNode mNode : modelsNode) {
+                String id = getNodeTextValue(mNode, "id");
+                if (id != null && !id.isEmpty()) {
+                    modelIds.add(id);
+                }
+            }
+            String modelValue = modelIds.isEmpty() ? null : String.join(",", modelIds);
+
+            Map<String, Object> copy = new LinkedHashMap<>();
+
+            if (matched.get("name") != null) {
+                copy.put("name", matched.get("name"));
+            }
+            if (matched.get("type") != null) {
+                copy.put("type", matched.get("type"));
+            }
+
+            if (modelValue != null) {
+                copy.put("model", modelValue);
+            } else if (matched.get("model") != null) {
+                copy.put("model", matched.get("model"));
+            }
+            if (matched.get("driver") != null) {
+                copy.put("driver", matched.get("driver"));
+            }
+
+            copy.put("enable", Boolean.TRUE);
+
+            String baseUrl = getNodeTextValue(providerNode, "baseUrl");
+            String apiKey = getNodeTextValue(providerNode, "apiKey");
+            if (baseUrl != null && !baseUrl.isEmpty()) {
+                copy.put("api_address", baseUrl);
+            }
+            if (apiKey != null && !apiKey.isEmpty()) {
+                copy.put("api_key", apiKey);
+            }
+
+            selectedModels.add(copy);
+            if (name != null) {
+                usedNames.add(name);
             }
         }
-        if (backendLine < 0) {
+
+        if (selectedModels.isEmpty()) {
+            log.warn("No matching models found in lagi.yml for providers.json, skip sync");
             return null;
         }
 
-        int start = backendLine;
-        for (int i = backendLine - 1; i >= startInclusive; i--) {
-            String raw = stripLineBreak(lines.get(i));
-            if (raw.matches("^\\s*$")) {
-                start = i;
-                continue;
+        // models fragment: only append the primary model's content; backends fragment: all selected
+        StringBuilder modelsFragment = new StringBuilder();
+        StringBuilder backendsFragment = new StringBuilder();
+
+        boolean isFirstBackend = true;
+        for (Map<String, Object> m : selectedModels) {
+            String name = m.get("name") == null ? "" : m.get("name").toString();
+            String type = m.get("type") == null ? "" : m.get("type").toString();
+            String modelField = m.get("model") == null ? "" : m.get("model").toString();
+            String driver = m.get("driver") == null ? "" : m.get("driver").toString();
+            String apiAddress = m.get("api_address") == null ? "" : m.get("api_address").toString();
+            String apiKey = m.get("api_key") == null ? "" : m.get("api_key").toString();
+
+            // Append to models fragment only when this is the primary model
+            boolean isPrimary = primaryBackend != null && primaryBackend.getType().equalsIgnoreCase(type);
+            if (isPrimary) {
+                String primaryModelField = primaryBackend.getModel() != null ? primaryBackend.getModel() : modelField;
+                modelsFragment.append(YAML_INDENT).append("- name: ").append(name).append(System.lineSeparator());
+                if (!type.isEmpty()) {
+                    modelsFragment.append(YAML_INDENT).append(YAML_INDENT).append("type: ").append(type).append(System.lineSeparator());
+                }
+                if (!primaryModelField.isEmpty()) {
+                    modelsFragment.append(YAML_INDENT).append(YAML_INDENT).append("model: ").append(primaryModelField).append(System.lineSeparator());
+                }
+                if (!driver.isEmpty()) {
+                    modelsFragment.append(YAML_INDENT).append(YAML_INDENT).append("driver: ").append(driver).append(System.lineSeparator());
+                }
+                modelsFragment.append(YAML_INDENT).append(YAML_INDENT).append("enable: true").append(System.lineSeparator());
+                if (!apiAddress.isEmpty()) {
+                    modelsFragment.append(YAML_INDENT).append(YAML_INDENT).append("api_address: ").append(apiAddress).append(System.lineSeparator());
+                }
+                if (!apiKey.isEmpty()) {
+                    modelsFragment.append(YAML_INDENT).append(YAML_INDENT).append("api_key: ").append(apiKey).append(System.lineSeparator());
+                }
             }
-            break;
+
+            // Append to functions.chat.backends fragment (all selected)
+            if (!isFirstBackend) {
+                backendsFragment.append(System.lineSeparator());
+            }
+            backendsFragment.append(repeatIndent(3))
+                    .append("- backend: ").append(name).append(System.lineSeparator());
+            backendsFragment.append(repeatIndent(4))
+                    .append("model: ").append(modelField).append(System.lineSeparator());
+            backendsFragment.append(repeatIndent(4))
+                    .append("enable: true").append(System.lineSeparator());
+            backendsFragment.append(repeatIndent(4))
+                    .append("stream: true").append(System.lineSeparator());
+            backendsFragment.append(repeatIndent(4))
+                    .append("protocol: completion").append(System.lineSeparator());
+            backendsFragment.append(repeatIndent(4))
+                    .append("priority: 100").append(System.lineSeparator());
+
+            isFirstBackend = false;
         }
 
-        int end = endExclusive;
-        Pattern next = Pattern.compile("^\\s{6}-\\s*backend\\s*:\\s*.+$");
-        for (int i = backendLine + 1; i < endExclusive; i++) {
-            String raw = stripLineBreak(lines.get(i));
-            if (raw.trim().isEmpty()) {
-                continue;
-            }
-            if (next.matcher(raw).matches()) {
-                end = i;
-                break;
-            }
-        }
+        return new OpenClawFragmentsResult(
+                new OpenClawFragments(modelsFragment.toString(), backendsFragment.toString()),
+                selectedModels
+        );
+    }
 
+    private static String repeatIndent(int times) {
         StringBuilder sb = new StringBuilder();
-        for (int i = start; i < end; i++) {
-            sb.append(lines.get(i));
-        }
-        return new YamlBlock(start, end, sb.toString());
-    }
-
-    private static YamlBlock extractBlockFromSectionByName(
-            List<String> lines,
-            int startInclusive,
-            int endExclusive,
-            String name,
-            int expectedIndentForDash
-    ) {
-        int nameLine = -1;
-        String namePattern = "^\\s*-" + "\\s*name\\s*:\\s*" + Pattern.quote(name) + "\\s*$";
-        for (int i = startInclusive; i < endExclusive; i++) {
-            String raw = stripLineBreak(lines.get(i));
-            if (leadingSpaces(raw) == expectedIndentForDash && raw.matches(namePattern)) {
-                nameLine = i;
-                break;
-            }
-        }
-        if (nameLine < 0) {
-            return null;
-        }
-
-        int start = nameLine;
-        for (int i = nameLine - 1; i >= startInclusive; i--) {
-            String raw = stripLineBreak(lines.get(i));
-            if (raw.matches("^\\s*$") || raw.matches("^\\s*#.*$")) {
-                start = i;
-                continue;
-            }
-            break;
-        }
-
-        int end = endExclusive;
-        Pattern nextBlock = Pattern.compile("^\\s{" + expectedIndentForDash + "}-\\s*name\\s*:\\s*.+$");
-        for (int i = nameLine + 1; i < endExclusive; i++) {
-            String raw = stripLineBreak(lines.get(i));
-            if (raw.trim().isEmpty()) {
-                continue;
-            }
-            if (nextBlock.matcher(raw).matches()) {
-                end = i;
-                break;
-            }
-        }
-
-        StringBuilder sb = new StringBuilder();
-        for (int i = start; i < end; i++) {
-            sb.append(lines.get(i));
-        }
-        return new YamlBlock(start, end, sb.toString());
-    }
-
-    private static int indexOfLineStartsWith(List<String> lines, String startsWith) {
-        for (int i = 0; i < lines.size(); i++) {
-            String raw = stripLineBreak(lines.get(i));
-            if (raw.startsWith(startsWith)) {
-                return i;
-            }
-        }
-        return -1;
-    }
-
-    private static int indexOfLineMatches(List<String> lines, String regex) {
-        Pattern p = Pattern.compile(regex);
-        for (int i = 0; i < lines.size(); i++) {
-            String raw = stripLineBreak(lines.get(i));
-            if (p.matcher(raw).matches()) {
-                return i;
-            }
-        }
-        return -1;
-    }
-
-    private static int leadingSpaces(String s) {
-        int n = 0;
-        while (n < s.length() && s.charAt(n) == ' ') {
-            n++;
-        }
-        return n;
-    }
-
-    private static String detectLineBreak(String text) {
-        int idx = text.indexOf("\r\n");
-        return idx >= 0 ? "\r\n" : "\n";
-    }
-
-    private static String stripLineBreak(String lineWithBreak) {
-        if (lineWithBreak.endsWith("\r\n")) {
-            return lineWithBreak.substring(0, lineWithBreak.length() - 2);
-        }
-        if (lineWithBreak.endsWith("\n")) {
-            return lineWithBreak.substring(0, lineWithBreak.length() - 1);
-        }
-        return lineWithBreak;
-    }
-
-    private static List<String> splitPreserveNewlines(String text) {
-        String lb = detectLineBreak(text);
-        List<String> out = new ArrayList<String>();
-        int idx = 0;
-        while (idx < text.length()) {
-            int next = text.indexOf(lb, idx);
-            if (next < 0) {
-                out.add(text.substring(idx));
-                break;
-            }
-            out.add(text.substring(idx, next + lb.length()));
-            idx = next + lb.length();
-        }
-        if (text.isEmpty()) {
-            out.add("");
-        }
-        return out;
-    }
-
-    private static String joinLines(List<String> lines) {
-        StringBuilder sb = new StringBuilder();
-        for (String s : lines) {
-            sb.append(s);
+        for (int i = 0; i < times; i++) {
+            sb.append(YAML_INDENT);
         }
         return sb.toString();
     }
 
-    private static List<String> withLeadingBlankLine(List<String> blockLines, String lb) {
-        if (blockLines.isEmpty()) {
-            List<String> out = new ArrayList<String>();
-            out.add(lb);
-            return out;
+    private static YAMLMapper createYamlMapper() {
+        com.fasterxml.jackson.dataformat.yaml.YAMLFactory factory =
+                new com.fasterxml.jackson.dataformat.yaml.YAMLFactory()
+                        .disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
+                        .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
+                        .enable(YAMLGenerator.Feature.INDENT_ARRAYS_WITH_INDICATOR);
+        return new YAMLMapper(factory);
+    }
+
+    /**
+     * Finds the model def in lagi.yml that matches the provider (and optionally the primary backend).
+     * When primaryBackend is not null, only returns the def that corresponds to the primary (def name equals primaryBackend.backendName).
+     */
+    private static Map<String, Object> findMatchingModelDef(List<Map<String, Object>> allModelDefs,
+                                                            String providerName,
+                                                            JsonNode modelNode,
+                                                            PrimaryBackend primaryBackend) {
+//        String providerLower = providerName == null ? "" : providerName.toLowerCase();
+        String primaryBackendName = (primaryBackend != null && primaryBackend.getType() != null)
+                ? primaryBackend.getType().trim().toLowerCase() : null;
+
+        for (Map<String, Object> def : allModelDefs) {
+            if (def == null) continue;
+            String type = def.get("type") == null ? "" : def.get("type").toString();
+            String typeLower = type.toLowerCase();
+            if (primaryBackendName != null && !primaryBackendName.equals(typeLower)) {
+                continue;
+            }
+            return def;
         }
-        String first = stripLineBreak(blockLines.get(0));
-        if (first.trim().isEmpty()) {
-            return blockLines;
+        return null;
+    }
+
+    // 从 JsonNode 安全取字符串字段
+    private static String getNodeTextValue(JsonNode node, String fieldName) {
+        JsonNode fieldNode = node.get(fieldName);
+        if (fieldNode == null || fieldNode.isNull() || fieldNode.asText().trim().isEmpty()) {
+            return null;
         }
-        List<String> out = new ArrayList<String>(blockLines.size() + 1);
-        out.add(lb);
-        out.addAll(blockLines);
-        return out;
+        return fieldNode.asText().trim();
+    }
+
+    // 追加到 models / backends
+    private static class OpenClawFragments {
+        final String modelsFragment;    // 要追加到 models: 下的内容
+        final String backendsFragment;  // 要追加到 functions.chat.backends 下的内容
+
+        OpenClawFragments(String modelsFragment, String backendsFragment) {
+            this.modelsFragment = modelsFragment;
+            this.backendsFragment = backendsFragment;
+        }
+
+        boolean isEmpty() {
+            return (modelsFragment == null || modelsFragment.trim().isEmpty()) &&
+                    (backendsFragment == null || backendsFragment.trim().isEmpty());
+        }
+    }
+
+    private static class OpenClawFragmentsResult {
+        final OpenClawFragments fragments;
+        final List<Map<String, Object>> selectedModels;
+
+        OpenClawFragmentsResult(OpenClawFragments fragments, List<Map<String, Object>> selectedModels) {
+            this.fragments = fragments;
+            this.selectedModels = selectedModels;
+        }
     }
 
 
+    @Data
+    @AllArgsConstructor
+    private static class PrimaryBackend {
+        private String name;
+        private String type;
+        private String model;
+    }
 }
 

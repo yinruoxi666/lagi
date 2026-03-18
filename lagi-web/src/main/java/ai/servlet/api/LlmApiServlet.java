@@ -56,6 +56,8 @@ import io.reactivex.Observable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static ai.starter.OpenClawInjector.DEFAULT_MODEL_ID;
+
 public class LlmApiServlet extends BaseServlet {
     private static final long serialVersionUID = 1L;
 
@@ -390,11 +392,16 @@ public class LlmApiServlet extends BaseServlet {
 
     private ChatCompletionRequest setCustomerModel(HttpServletRequest req, HttpSession session) throws IOException {
         ModelPreferenceDto preference = JSONUtil.toBean((String) session.getAttribute("preference"), ModelPreferenceDto.class) ;
-        ChatCompletionRequest chatCompletionRequest = objectMapper.readValue(requestToJson(req), ChatCompletionRequest.class);
+        String json = requestToJson(req);
+//        System.out.println("ChatCompletionRequest json: " + json);
+        ChatCompletionRequest chatCompletionRequest = objectMapper.readValue(json, ChatCompletionRequest.class);
         if(chatCompletionRequest.getModel() == null
                 && preference != null
                 && preference.getLlm() != null) {
             chatCompletionRequest.setModel(preference.getLlm());
+        }
+        if (chatCompletionRequest.getModel() != null && chatCompletionRequest.getModel().equals(DEFAULT_MODEL_ID)) {
+            chatCompletionRequest.setModel(null);
         }
         return chatCompletionRequest;
     }

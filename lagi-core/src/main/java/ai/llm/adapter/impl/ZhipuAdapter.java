@@ -26,6 +26,7 @@ public class ZhipuAdapter extends ModelService implements ILlmAdapter {
 
     @Override
     public ChatCompletionResult completions(ChatCompletionRequest chatCompletionRequest) {
+        setDefaultField(chatCompletionRequest);
         ClientV4 client = new ClientV4.Builder(getApiKey()).build();
         ModelApiResponse invokeModelApiResp = client.invokeModelApi(convertRequest(chatCompletionRequest));
         int code = invokeModelApiResp.getCode();
@@ -37,6 +38,7 @@ public class ZhipuAdapter extends ModelService implements ILlmAdapter {
 
     @Override
     public Observable<ChatCompletionResult> streamCompletions(ChatCompletionRequest chatCompletionRequest) {
+        setDefaultField(chatCompletionRequest);
         ClientV4 client = new ClientV4.Builder(getApiKey()).build();
         ModelApiResponse sseModelApiResp = client.invokeModelApi(convertRequest(chatCompletionRequest));
         int code = sseModelApiResp.getCode();
