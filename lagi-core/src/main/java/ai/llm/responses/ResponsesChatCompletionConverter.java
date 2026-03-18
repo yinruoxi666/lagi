@@ -10,8 +10,8 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
-@Slf4j
 public final class ResponsesChatCompletionConverter {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -23,6 +23,7 @@ public final class ResponsesChatCompletionConverter {
                                                   String modelName) {
         ResponseCreateRequest responseRequest = new ResponseCreateRequest();
         responseRequest.setModel(modelName);
+        responseRequest.setInstructions(extractInstructions(sessionContext));
         responseRequest.setInput(toInputItems(sessionContext.getInputMessages()));
         responseRequest.setPrevious_response_id(sessionContext.getPreviousResponseId());
         responseRequest.setStream(Boolean.TRUE.equals(request.getStream()));
@@ -45,8 +46,7 @@ public final class ResponsesChatCompletionConverter {
 
     public static ChatCompletionResult convertStreamEvent(String body) {
         //记录日志
-//        System.out.println(body);
-        log.debug("Received stream event: {}", body);
+//        System.out.println("body:" + body);
         if (StrUtil.isBlank(body) || "[DONE]".equals(body)) {
             return null;
         }
@@ -71,77 +71,10 @@ public final class ResponsesChatCompletionConverter {
                 }
                 return result;
             }
-            if("response.output_item.added".equals(type)) {
-                JsonNode itemNode = root.path("item");
-                String itemType = itemNode.path("type").asText();
-                if ("function_call".equals(itemType)) {
-                    String callId = itemNode.path("call_id").asText("");
-                    String name = itemNode.path("name").asText("");
-                    String arguments = itemNode.path("arguments").asText("");
-                    return createFunctionCallDeltaChunk( callId, name, arguments);
-                }
-            }
-            if("response.function_call_arguments.delta".equals(type)) {
-                String delta = root.path("delta").asText("");
-                return createFunctionArgumentsDeltaChunk( delta);
-            }
-            if("response.function_call_arguments.done".equals(type)) {
-                return createFunctionArgumentsDeltaChunk("");
-            }
-
             return null;
         } catch (Exception e) {
             throw new RuntimeException("Failed to convert responses stream event", e);
         }
-    }
-
-    private static ChatCompletionResult createFunctionCallDeltaChunk(String callId, String name, String arguments) {
-        ChatCompletionResult result = new ChatCompletionResult();
-        result.setCreated(0);
-
-        ToolCallFunction function = new ToolCallFunction();
-        function.setName(name);
-        function.setArguments(arguments);
-
-        ToolCall toolCall = new ToolCall();
-        toolCall.setId(callId);
-        toolCall.setType("function");
-        toolCall.setFunction(function);
-
-        ChatMessage message = new ChatMessage();
-        message.setRole("assistant");
-        message.setContent("");
-        message.setTool_calls(Collections.singletonList(toolCall));
-
-        ChatCompletionChoice choice = new ChatCompletionChoice();
-        choice.setMessage(message);
-        result.setChoices(Collections.singletonList(choice));
-        return result;
-    }
-
-    private static ChatCompletionResult createFunctionArgumentsDeltaChunk(String delta) {
-        ChatCompletionResult result = new ChatCompletionResult();
-        result.setId("");
-        result.setCreated(0);
-
-        ToolCallFunction function = new ToolCallFunction();
-        function.setArguments(delta);
-
-        ToolCall toolCall = new ToolCall();
-        toolCall.setId("");
-        toolCall.setType("function");
-        toolCall.setFunction(function);
-
-        ChatMessage message = new ChatMessage();
-        message.setRole("assistant");
-        message.setContent("");
-        message.setTool_calls(Collections.singletonList(toolCall));
-
-
-        ChatCompletionChoice choice = new ChatCompletionChoice();
-        choice.setMessage(message);
-        result.setChoices(Collections.singletonList(choice));
-        return result;
     }
 
     private static ChatCompletionResult convertResponse(JsonNode root) {
@@ -158,15 +91,16 @@ public final class ResponsesChatCompletionConverter {
         if (StrUtil.isNotBlank(reasoning)) {
             message.setReasoning_content(reasoning);
         }
-//        List<ToolCall> toolCalls = extractToolCalls(root.path("output"));
-//        if (!toolCalls.isEmpty()) {
-//            message.setTool_calls(toolCalls);
-//        }
+        List<ToolCall> toolCalls = extractToolCalls(root.path("output"));
+        if (!toolCalls.isEmpty()) {
+            message.setTool_calls(toolCalls);
+        }
 
         ChatCompletionChoice choice = new ChatCompletionChoice();
         choice.setIndex(0);
         choice.setMessage(message);
-        choice.setFinish_reason( "stop");
+        choice.setDelta(message);
+        choice.setFinish_reason("stop");
         result.setChoices(Collections.singletonList(choice));
         result.setUsage(toUsage(root.path("usage")));
         return result;
@@ -208,6 +142,9 @@ public final class ResponsesChatCompletionConverter {
             return items;
         }
         for (ChatMessage message : messages) {
+            if ("system".equals(message.getRole())) {
+                continue;
+            }
             if ("tool".equals(message.getRole()) && StrUtil.isNotBlank(message.getTool_call_id())) {
                 ResponseInputItem item = new ResponseInputItem();
                 item.setType("function_call_output");
@@ -235,6 +172,21 @@ public final class ResponsesChatCompletionConverter {
             items.add(createMessageItem(message.getRole(), message.getContent()));
         }
         return items;
+    }
+
+    private static String extractInstructions(ResponseSessionContext sessionContext) {
+        List<ChatMessage> messages = sessionContext.getNormalizedMessages();
+        if (messages == null || messages.isEmpty()) {
+            messages = sessionContext.getInputMessages();
+        }
+        if (messages == null || messages.isEmpty()) {
+            return null;
+        }
+        String instructions = messages.stream()
+                .filter(message -> message != null && "system".equals(message.getRole()) && StrUtil.isNotBlank(message.getContent()))
+                .map(ChatMessage::getContent)
+                .collect(Collectors.joining("\n\n"));
+        return StrUtil.isBlank(instructions) ? null : instructions;
     }
 
     private static ResponseInputItem createMessageItem(String role, String content) {

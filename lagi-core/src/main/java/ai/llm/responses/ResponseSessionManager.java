@@ -43,87 +43,48 @@ public class ResponseSessionManager {
 
         List<ChatMessage> chatMessages = request.getMessages();
         List<ChatMessage> systemMessages = chatMessages.stream().filter(message -> message.getRole().equals(LagiGlobal.LLM_ROLE_SYSTEM)).collect(Collectors.toList());
-        Integer validAssistantIndex = ChatCompletionUtil.findValidAssistantIndex(chatMessages);
         List<ChatMessage> incrementalMessages;
         List<ChatMessage> keyMessages;
-        // first message
-        Integer assistantIndex = ChatCompletionUtil.findAssistantIndex(chatMessages);
-        if(validAssistantIndex == null) {
-            if(assistantIndex != null) {
-                incrementalMessages = chatMessages.subList(assistantIndex + 1, chatMessages.size());
-                keyMessages = chatMessages.subList(0, assistantIndex + 1).stream().filter(message -> !message.getRole().equals(LagiGlobal.LLM_ROLE_SYSTEM)).collect(Collectors.toList());
-                keyMessages = new ArrayList<>(keyMessages);
-                return getResponseSessionContext(keyMessages, systemMessages, incrementalMessages, context);
-            } else {
-                incrementalMessages = chatMessages.subList(0, chatMessages.size()).stream().filter(message -> !message.getRole().equals(LagiGlobal.LLM_ROLE_SYSTEM)).collect(Collectors.toList());
-                context.setInputMessages(chatMessages);
-                context.setNormalizedMessages(incrementalMessages);
-                context.setStateful(false);
-                return context;
-            }
-        }
-        List<Integer> theFinalRoundOfConversation = sampleIntentService.theFinalRoundOfConversation(request.getMessages());
-        // no conversation
-        if(theFinalRoundOfConversation.isEmpty()) {
+
+        Integer lastAssistantIndex = ChatCompletionUtil.findToolAssistantIndex(chatMessages);
+
+        if (lastAssistantIndex == null || lastAssistantIndex <= systemMessages.size()) {
             incrementalMessages = chatMessages.subList(0, chatMessages.size()).stream().filter(message -> !message.getRole().equals(LagiGlobal.LLM_ROLE_SYSTEM)).collect(Collectors.toList());
             context.setInputMessages(chatMessages);
             context.setNormalizedMessages(incrementalMessages);
             context.setStateful(false);
             return context;
         }
-        Integer lastIndex = theFinalRoundOfConversation.get(1);
-        assistantIndex = ChatCompletionUtil.findAssistantIndex(chatMessages, lastIndex);
-        if(assistantIndex != null) {
-            incrementalMessages = chatMessages.subList(assistantIndex + 1, chatMessages.size());
-            List<ChatMessage> userMessages = incrementalMessages.stream().filter(message -> message.getRole().equals(LagiGlobal.LLM_ROLE_USER)).collect(Collectors.toList());
-            List<ChatMessage> toolMessages = incrementalMessages.stream().filter(message -> message.getRole().equals(LagiGlobal.LLM_ROLE_TOOL)).collect(Collectors.toList());
-            // TODO 2026/3/18 The results of sampleIntentService.isContinue and sampleIntentService.theFinalRoundOfConversation may not be the same.
-            if(userMessages.isEmpty()) {
-                // continue
-                incrementalMessages = toolMessages;
-                keyMessages = chatMessages.subList(theFinalRoundOfConversation.get(0), assistantIndex + 1).stream().filter(message -> !message.getRole().equals(LagiGlobal.LLM_ROLE_SYSTEM)).collect(Collectors.toList());
-                keyMessages = new ArrayList<>(keyMessages);
-                return getResponseSessionContext(keyMessages, systemMessages, incrementalMessages, context);
-            } else{
-                incrementalMessages = userMessages;
-                Integer conversationStartIndex = theFinalRoundOfConversation.get(0);
-                keyMessages = chatMessages.subList(conversationStartIndex, assistantIndex);
-                ChatMessage chatMessage = userMessages.get(0);
-                boolean aContinue = sampleIntentService.isContinue(keyMessages, chatMessage);
-                if(aContinue) {
-                    return getResponseSessionContext(keyMessages, systemMessages, incrementalMessages, context);
-                } else {
-                    systemMessages.addAll(incrementalMessages);
-                    context.setInputMessages(systemMessages);
+
+        int systemEndIndex = 0;
+        for (int i = 0; i < chatMessages.size(); i++) {
+            if (chatMessages.get(i).getRole().equals(LagiGlobal.LLM_ROLE_SYSTEM)) {
+                systemEndIndex = i;
+            } else {
+                break;
+            }
+        }
+
+        keyMessages = chatMessages.subList(systemEndIndex + 1, lastAssistantIndex + 1);
+        incrementalMessages = chatMessages.subList(lastAssistantIndex + 1, chatMessages.size());
+        ChatMessage chatMessage = incrementalMessages.get(0);
+        if(chatMessage.getRole().equals(LagiGlobal.LLM_ROLE_USER)) {
+            List<Integer> bd = sampleIntentService.theFinalRoundOfConversation(chatMessages);
+            if(!bd.isEmpty()) {
+                boolean aContinue = sampleIntentService.isContinue(chatMessages.subList(bd.get(0), bd.get(1)), chatMessage);
+                if(!aContinue) {
+                    incrementalMessages = chatMessages.subList(0, chatMessages.size()).stream().filter(message -> !message.getRole().equals(LagiGlobal.LLM_ROLE_SYSTEM)).collect(Collectors.toList());
+                    context.setInputMessages(chatMessages);
                     context.setNormalizedMessages(incrementalMessages);
                     context.setStateful(false);
                     return context;
                 }
             }
         }
-        incrementalMessages = chatMessages.subList(theFinalRoundOfConversation.get(1), chatMessages.size());
-        List<ChatMessage> userMessages = incrementalMessages.stream().filter(message -> message.getRole().equals(LagiGlobal.LLM_ROLE_USER)).collect(Collectors.toList());
-        List<ChatMessage> toolMessages = incrementalMessages.stream().filter(message -> message.getRole().equals(LagiGlobal.LLM_ROLE_TOOL)).collect(Collectors.toList());
-        if(userMessages.isEmpty()) {
-            // tool
-            incrementalMessages = toolMessages;
-            keyMessages = chatMessages.subList(theFinalRoundOfConversation.get(0), theFinalRoundOfConversation.get(1));
-            return getResponseSessionContext(keyMessages, systemMessages, incrementalMessages, context);
-        } else {
-            incrementalMessages = userMessages;
-            keyMessages = chatMessages.subList(theFinalRoundOfConversation.get(0), theFinalRoundOfConversation.get(1));
-            boolean aContinue = sampleIntentService.isContinue(keyMessages, userMessages.get(0));
-            if(aContinue) {
-                return getResponseSessionContext(keyMessages, systemMessages, incrementalMessages, context);
-            } else {
-                systemMessages.addAll(incrementalMessages);
-                context.setInputMessages(systemMessages);
-                context.setNormalizedMessages(incrementalMessages);
-                context.setStateful(false);
-                return context;
-            }
-        }
+        return getResponseSessionContext(keyMessages, systemMessages, incrementalMessages, context);
+
     }
+
 
     private List<PromptInput> convert2PromptInputs(List<ChatMessage> messages) {
         List<PromptInput> promptInputs =  new ArrayList<>();
@@ -140,15 +101,18 @@ public class ResponseSessionManager {
     private ResponseSessionContext getResponseSessionContext(List<ChatMessage> keyMessages, List<ChatMessage> systemMessages, List<ChatMessage> incrementalMessages, ResponseSessionContext context) {
         ResponseSessionState responseSessionState = splitSessionCache.get(convert2PromptInputs(keyMessages));
         List<ChatMessage> normalized = new ArrayList<>(keyMessages);
-        normalized.addAll(incrementalMessages);
+//        normalized.addAll(incrementalMessages);
         List<ChatMessage> inputs = new ArrayList<>(systemMessages);
-        inputs.addAll(normalized);
         if(responseSessionState != null){
             if(context.getModel().startsWith("qwen")) {
+                inputs.addAll(normalized);
+                inputs.addAll(incrementalMessages);
                 context.setInputMessages(inputs);
                 context.setNormalizedMessages(normalized);
+                context.setPreviousResponseId(null);
                 context.setStateful(false);
             } else {
+                inputs.addAll(incrementalMessages);
                 systemMessages.addAll(incrementalMessages);
                 context.setInputMessages(systemMessages);
                 context.setNormalizedMessages(normalized);
@@ -159,6 +123,8 @@ public class ResponseSessionManager {
         } else {
             // key + increment = normalized
             // system + normalized = input
+            inputs.addAll(normalized);
+            inputs.addAll(incrementalMessages);
             context.setInputMessages(inputs);
             context.setNormalizedMessages(normalized);
             context.setStateful(false);
