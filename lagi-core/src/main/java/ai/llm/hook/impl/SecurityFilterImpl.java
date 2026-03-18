@@ -74,7 +74,7 @@ public class SecurityFilterImpl implements BeforeModel, AfterModel {
                                     toEmit.getChoices().get(0).setDelta(toEmit.getChoices().get(0).getMessage());
                                 }
                                 emitter.onNext(toEmit);
-                                System.out.println("send: " + toEmit.getChoices().get(0).getMessage().getContent());
+//                                System.out.println("send: " + toEmit.getChoices().get(0).getMessage().getContent());
                             }
                         } catch (Exception e) {
                             emitter.onError(e);
@@ -89,7 +89,7 @@ public class SecurityFilterImpl implements BeforeModel, AfterModel {
                                     remaining.getChoices().get(0).setDelta(remaining.getChoices().get(0).getMessage());
                                 }
                                 emitter.onNext(remaining);
-                                System.out.println("send: " + remaining.getChoices().get(0).getMessage().getContent());
+//                                System.out.println("send: " + remaining.getChoices().get(0).getMessage().getContent());
                             }
                         }
                         emitter.onComplete();
