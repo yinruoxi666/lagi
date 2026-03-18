@@ -4,6 +4,7 @@ import ai.openai.pojo.ChatCompletionChoice;
 import ai.openai.pojo.ChatCompletionRequest;
 import ai.openai.pojo.ChatCompletionResult;
 import ai.openai.pojo.ChatMessage;
+import ai.utils.LagiGlobal;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -14,6 +15,42 @@ public class ChatCompletionUtil {
         List<ChatMessage> messages = chatCompletionRequest.getMessages();
         String content = messages.get(messages.size() - 1).getContent().trim();
         return content;
+    }
+
+    public static Integer findValidAssistantIndex(List<ChatMessage> messages) {
+        for (int i = messages.size() -1; i >= 0; i--) {
+            ChatMessage msg = messages.get(i);
+            if (LagiGlobal.LLM_ROLE_TOOL.equals(msg.getRole())
+                    || msg.getTool_calls() != null
+                    || msg.getContent() == null
+                    || msg.getContent().trim().isEmpty()) {
+                continue;
+            }
+            if (LagiGlobal.LLM_ROLE_ASSISTANT.equals(msg.getRole())) {
+                return i;
+            }
+        }
+        return null;
+    }
+
+    public static Integer findAssistantIndex(List<ChatMessage> messages) {
+        for (int i = messages.size() -1; i >= 0; i--) {
+            ChatMessage msg = messages.get(i);
+            if (LagiGlobal.LLM_ROLE_ASSISTANT.equals(msg.getRole())) {
+                return i;
+            }
+        }
+        return null;
+    }
+
+    public static Integer findAssistantIndex(List<ChatMessage> messages, int lastIndex) {
+        for (int i = messages.size() -1; i >= 0 && i > lastIndex; i--) {
+            ChatMessage msg = messages.get(i);
+            if (LagiGlobal.LLM_ROLE_ASSISTANT.equals(msg.getRole())) {
+                return i;
+            }
+        }
+        return null;
     }
 
     public static void setLastMessage(ChatCompletionRequest chatCompletionRequest, String lastMessage) {

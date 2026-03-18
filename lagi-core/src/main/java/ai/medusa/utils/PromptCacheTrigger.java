@@ -19,6 +19,7 @@ import ai.utils.*;
 import ai.utils.qa.ChatCompletionUtil;
 import ai.vector.VectorDbService;
 import cn.hutool.core.bean.BeanUtil;
+import org.apache.hadoop.util.Lists;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -280,6 +281,27 @@ public class PromptCacheTrigger {
         return res;
     }
 
+    public static List<Integer> theFinalRoundOfConversation(List<ChatMessage> chatMessages) {
+        List<QaPair> qaPairs = convert2QaPair(chatMessages, 30);
+        if (qaPairs.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<List<QaPair>> splitQaPairs = splitQaPairBySemantics(qaPairs);
+        List<QaPair> lastQaPairs;
+        if (splitQaPairs.isEmpty() || splitQaPairs.get(splitQaPairs.size() - 1).isEmpty()) {
+            lastQaPairs = qaPairs;
+        } else {
+            lastQaPairs = splitQaPairs.get(splitQaPairs.size() - 1);
+        }
+        QaPair firstQaPair = lastQaPairs.get(0);
+        QaPair lastQaPair = lastQaPairs.get(lastQaPairs.size() - 1);
+
+        int startIndex = firstQaPair.getQIndex();
+        int endIndex = lastQaPair.getAIndex();
+        return Lists.newArrayList(startIndex, endIndex + 1);
+    }
+
+
     private static List<QaPair> convert2QaPair(List<String> questionList, List<String> answerList) {
         List<QaPair> qaPairs = new ArrayList<>();
         for (int i = 0; i < questionList.size(); i++) {
@@ -342,7 +364,7 @@ public class PromptCacheTrigger {
         return qaPairs;
     }
 
-    private static Integer findValidAssistantIndex(List<ChatMessage> messages, int startIndex) {
+    public static Integer findValidAssistantIndex(List<ChatMessage> messages, int startIndex) {
         for (int i = startIndex; i >= 0; i--) {
             ChatMessage msg = messages.get(i);
             if (LagiGlobal.LLM_ROLE_TOOL.equals(msg.getRole())

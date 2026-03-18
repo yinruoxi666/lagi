@@ -6,7 +6,6 @@ import ai.llm.adapter.impl.GPTAdapter;
 import ai.llm.adapter.impl.GPTAzureAdapter;
 import ai.llm.adapter.impl.OpenAIStandardAdapter;
 import ai.llm.adapter.impl.QwenAdapter;
-import ai.llm.adapter.impl.QwenCompatibleAdapter;
 import ai.llm.utils.LLMErrorConstants;
 import ai.wrapper.impl.AlibabaAdapter;
 import cn.hutool.core.util.StrUtil;
@@ -36,7 +35,6 @@ public final class ResponseProtocolUtil {
                 || StrUtil.equals(driver, OpenAIStandardAdapter.class.getName())
                 || StrUtil.equals(driver, GPTAzureAdapter.class.getName())
                 || StrUtil.equals(driver, QwenAdapter.class.getName())
-                || StrUtil.equals(driver, QwenCompatibleAdapter.class.getName())
                 || StrUtil.equals(driver, AlibabaAdapter.class.getName());
     }
 
@@ -44,8 +42,7 @@ public final class ResponseProtocolUtil {
         return modelService instanceof GPTAdapter
                 || modelService instanceof OpenAIStandardAdapter
                 || modelService instanceof GPTAzureAdapter
-                || modelService instanceof QwenAdapter
-                || modelService instanceof QwenCompatibleAdapter;
+                || modelService instanceof QwenAdapter;
     }
 
     public static RRException invalidRequest(String message) {
