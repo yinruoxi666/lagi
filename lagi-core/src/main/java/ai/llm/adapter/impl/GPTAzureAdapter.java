@@ -113,6 +113,8 @@ public class GPTAzureAdapter extends ModelService implements ILlmAdapter {
         Map incloudUsage = new HashMap<>();
         incloudUsage.put("include_usage", true);
         chatCompletionRequest.setStream_options(incloudUsage);
+        chatCompletionRequest.setMax_completion_tokens(chatCompletionRequest.getMax_tokens());
+        chatCompletionRequest.setMax_tokens(null);
         Proxy proxy = new Proxy(Proxy.Type.SOCKS, GptAzureConvert.convertProxyUrl2InetSocketAddress());
         String json = toJson(chatCompletionRequest);
         LlmApiResponse llmApiResponse = OpenAiApiUtil.streamCompletions(apiKey, apiUrl, HTTP_TIMEOUT, json,
