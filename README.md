@@ -288,6 +288,6 @@ We provide pre-packaged applications for direct download and use:
 
 - **Application file**: The full package of LinkMind; you can run it directly after installing JDK.
   - File Name: LinkMind.jar
-  - Download Link: [Click here to download](https://downloads.landingbj.com/lagi/installer/LinkMind-v1.2.0)
+  - Download Link: [Click here to download](https://downloads.landingbj.com/lagi/installer/LinkMind-v1.2.0.jar)
 
 Thank you for your attention and support of LinkMind! If you have any questions or suggestions, please feel free to contact us.
