@@ -47,6 +47,9 @@ public class SecurityFilterImpl implements BeforeModel, AfterModel {
             processedSource.subscribe(
                     chunk -> {
                         try {
+                            if (chunk.getChoices() == null || chunk.getChoices().isEmpty()) {
+                                return;
+                            }
                             String content = chunk.getChoices().get(0).getMessage().getContent();
                             contents.add(content);
                             String totalContent = String.join("", contents);
@@ -85,6 +88,9 @@ public class SecurityFilterImpl implements BeforeModel, AfterModel {
                         while (!cacheQueue.isEmpty()) {
                             ChatCompletionResult remaining = cacheQueue.poll();
                             if (remaining != null) {
+                                if (remaining.getChoices() == null || remaining.getChoices().isEmpty()) {
+                                    continue;
+                                }
                                 if(remaining.getChoices().get(0).getDelta() == null) {
                                     remaining.getChoices().get(0).setDelta(remaining.getChoices().get(0).getMessage());
                                 }
