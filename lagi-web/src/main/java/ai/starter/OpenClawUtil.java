@@ -24,9 +24,16 @@ public class OpenClawUtil {
     private static final String YAML_INDENT = "  ";
     private static final String[] RESPONSE_SUPPORTED_BACKENDS = {"qwen", "openai"};
     private static final Set<String> RESPONSE_BACKENDS_SET = new HashSet<>(Arrays.asList(RESPONSE_SUPPORTED_BACKENDS));
-
+    private static final String OPENAI_COMPLETIONS_API = "openai-completions";
     private static final Yaml SNAKE_YAML = createSnakeYaml();
 
+    private static final Map<String, String> RESPONSE_BACKENDS_MAP = new HashMap<>();
+
+    static {
+        RESPONSE_BACKENDS_MAP.put("dashscope.aliyuncs.com", "https://dashscope.aliyuncs.com/api/v2/apps/protocols/compatible-mode/v1");
+        RESPONSE_BACKENDS_MAP.put("api.openai.com", null);
+        RESPONSE_BACKENDS_MAP.put("admin-dgmeta-resource.cognitiveservices.azure.com", null);
+    }
 
     public static void sync(int port) {
         syncToOpenClaw(port);
@@ -58,21 +65,20 @@ public class OpenClawUtil {
                     if (changed) {
                         writeYaml(lagiYmlPath, root);
                         log.info("Successfully synced OpenClaw configuration to {}", lagiYmlPath);
-                        return;
                     }
                 }
             }
 
-            // If no models.json sync, still apply primary backend only (backends = single primary)
-            if (primaryBackend != null) {
-                boolean changed = mergeOpenClawIntoYaml(root, null, primaryBackend);
-                if (changed) {
-                    writeYaml(lagiYmlPath, root);
-                    log.info("Successfully synced primary backend from openclaw.json to {}", lagiYmlPath);
-                }
-            } else {
-                log.info("No changes needed, lagi.yml already up to date");
-            }
+//            // If no models.json sync, still apply primary backend only (backends = single primary)
+//            if (primaryBackend != null) {
+//                boolean changed = mergeOpenClawIntoYaml(root, null, primaryBackend);
+//                if (changed) {
+//                    writeYaml(lagiYmlPath, root);
+//                    log.info("Successfully synced primary backend from openclaw.json to {}", lagiYmlPath);
+//                }
+//            } else {
+//                log.info("No changes needed, lagi.yml already up to date");
+//            }
 
         } catch (Exception e) {
             log.error("Failed to sync OpenClaw config", e);
@@ -144,7 +150,6 @@ public class OpenClawUtil {
         return value.isEmpty() ? null : value;
     }
 
-    private static final String OPENAI_COMPLETIONS_API = "openai-completions";
 
     /**
      * Reads openclaw.json from OpenClaw dir and returns models.providers.{provider}.api for the given provider.
@@ -288,6 +293,76 @@ public class OpenClawUtil {
         writeFileAtomic(path, yaml + System.lineSeparator());
     }
 
+    /** Non-null, non-empty trimmed string value for the given key, or false. */
+    private static boolean hasNonBlank(Map<String, Object> map, String key) {
+        Object v = map.get(key);
+        return v != null && !v.toString().trim().isEmpty();
+    }
+
+    /** Trimmed model name from map, or null if missing or blank. */
+    private static String trimmedModelName(Map<?, ?> map) {
+        Object n = map.get("name");
+        if (n == null) {
+            return null;
+        }
+        String s = n.toString().trim();
+        return s.isEmpty() ? null : s;
+    }
+
+    private static Map<String, Map<String, Object>> indexSelectedModelsByName(List<Map<String, Object>> selected) {
+        Map<String, Map<String, Object>> byName = new HashMap<>();
+        for (Map<String, Object> m : selected) {
+            String name = trimmedModelName(m);
+            if (name != null) {
+                byName.put(name, m);
+            }
+        }
+        return byName;
+    }
+
+    private static Set<String> collectModelNamesFromList(List<Map<String, Object>> modelsList) {
+        Set<String> names = new HashSet<>();
+        for (Object item : modelsList) {
+            if (item instanceof Map) {
+                String name = trimmedModelName((Map<?, ?>) item);
+                if (name != null) {
+                    names.add(name);
+                }
+            }
+        }
+        return names;
+    }
+
+    /**
+     * Applies OpenClaw fields onto an existing lagi.yml model row. api_address is stored with /chat/completions suffix.
+     */
+    private static boolean applySelectedToExistingEntry(Map<String, Object> entry, Map<String, Object> selected) {
+        boolean rowChanged = false;
+        if (hasNonBlank(selected, "model")) {
+            entry.put("model", selected.get("model"));
+            rowChanged = true;
+        }
+        if (hasNonBlank(selected, "api_address")) {
+            String responseEndpoint = getResponseEndpoint(selected.get("api_address").toString());
+            if (responseEndpoint != null) {
+                entry.put("api_address", responseEndpoint + "/responses");
+            } else {
+                entry.put("api_address", selected.get("api_address").toString().trim() + "/chat/completions");
+            }
+            rowChanged = true;
+        }
+        if (hasNonBlank(selected, "api_key")) {
+            entry.put("api_key", selected.get("api_key"));
+            rowChanged = true;
+        }
+        if (selected.get("enable") != null) {
+            entry.put("enable", selected.get("enable"));
+            rowChanged = true;
+        }
+        return rowChanged;
+    }
+
+
     /**
      * Merges OpenClaw selected models into the lagi.yml root map: adds/updates models list.
      * If primaryBackend is set, functions.chat.backends is replaced with a single element (primary only);
@@ -302,7 +377,6 @@ public class OpenClawUtil {
             selectedModels = Collections.emptyList();
         }
 
-        // Merge into top-level "models" list (by name) only when we have selected models from models.json
         if (!selectedModels.isEmpty()) {
             List<Map<String, Object>> modelsList = (List<Map<String, Object>>) root.get("models");
             if (modelsList == null) {
@@ -310,72 +384,24 @@ public class OpenClawUtil {
                 root.put("models", modelsList);
                 changed = true;
             }
-            Set<String> existingModelNames = new HashSet<>();
+            Map<String, Map<String, Object>> selectedByName = indexSelectedModelsByName(selectedModels);
+
             for (Object item : modelsList) {
-                if (item instanceof Map) {
-                    Object n = ((Map<?, ?>) item).get("name");
-                    if (n != null) {
-                        existingModelNames.add(n.toString().trim());
-                    }
+                if (!(item instanceof Map)) {
+                    continue;
                 }
-            }
-            Map<String, Map<String, Object>> selectedByName = new HashMap<>();
-            for (Map<String, Object> m : selectedModels) {
-                String name = m.get("name") == null ? null : m.get("name").toString().trim();
-                if (name != null && !name.isEmpty()) {
-                    selectedByName.put(name, m);
-                }
-            }
-            for (Object item : modelsList) {
-                if (!(item instanceof Map)) continue;
                 Map<String, Object> entry = (Map<String, Object>) item;
-                Object nameObj = entry.get("name");
-                if (nameObj == null) continue;
-                String name = nameObj.toString().trim();
+                String name = trimmedModelName(entry);
+                if (name == null) {
+                    continue;
+                }
                 Map<String, Object> selected = selectedByName.get(name);
-                if (selected == null) continue;
-                if (selected.get("model") != null && !selected.get("model").toString().trim().isEmpty()) {
-                    entry.put("model", selected.get("model"));
+                if (selected == null) {
+                    continue;
+                }
+                if (applySelectedToExistingEntry(entry, selected)) {
                     changed = true;
                 }
-                if (selected.get("api_address") != null && !selected.get("api_address").toString().trim().isEmpty()) {
-                    entry.put("api_address", selected.get("api_address") + "/chat/completions");
-                    changed = true;
-                }
-                if (selected.get("api_key") != null && !selected.get("api_key").toString().trim().isEmpty()) {
-                    entry.put("api_key", selected.get("api_key"));
-                    changed = true;
-                }
-                if (selected.get("enable") != null) {
-                    entry.put("enable", selected.get("enable"));
-                    changed = true;
-                }
-            }
-            for (Map<String, Object> m : selectedModels) {
-                String name = m.get("name") == null ? null : m.get("name").toString().trim();
-                if (name == null || name.isEmpty()) continue;
-                if (existingModelNames.contains(name)) continue;
-                Map<String, Object> entry = new LinkedHashMap<>();
-                entry.put("name", name);
-                if (m.get("type") != null && !m.get("type").toString().trim().isEmpty()) {
-                    entry.put("type", m.get("type"));
-                }
-                if (m.get("model") != null && !m.get("model").toString().trim().isEmpty()) {
-                    entry.put("model", m.get("model"));
-                }
-                if (m.get("driver") != null && !m.get("driver").toString().trim().isEmpty()) {
-                    entry.put("driver", m.get("driver"));
-                }
-                entry.put("enable", m.getOrDefault("enable", Boolean.TRUE));
-                if (m.get("api_address") != null && !m.get("api_address").toString().trim().isEmpty()) {
-                    entry.put("api_address", m.get("api_address"));
-                }
-                if (m.get("api_key") != null && !m.get("api_key").toString().trim().isEmpty()) {
-                    entry.put("api_key", m.get("api_key"));
-                }
-                modelsList.add(entry);
-                existingModelNames.add(name);
-                changed = true;
             }
         }
 
@@ -409,6 +435,31 @@ public class OpenClawUtil {
             changed = true;
         }
         return changed;
+    }
+
+    private static String getResponseEndpoint(String apiUrl) {
+        for (Map.Entry<String, String> entry : RESPONSE_BACKENDS_MAP.entrySet()) {
+            if (apiUrl.contains(entry.getKey())) {
+                return entry.getValue();
+            }
+        }
+        return null;
+    }
+
+    private boolean isResponseSupported(String apiUrl) {
+        Set<String> allUrl = new HashSet<>();
+        allUrl.addAll(RESPONSE_BACKENDS_MAP.keySet());
+        for (String url: RESPONSE_BACKENDS_MAP.values()) {
+            if (url != null) {
+                allUrl.add(url);
+            }
+        }
+        for (String url: allUrl) {
+            if (apiUrl.contains(url)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // Match models.json providers against models defined in lagi.yml
@@ -446,20 +497,15 @@ public class OpenClawUtil {
             if (modelsNode == null || !modelsNode.isArray() || modelsNode.size() == 0) {
                 continue;
             }
-
-            // 使用该 provider 下的第一个 model 进行匹配
             JsonNode firstModelNode = modelsNode.get(0);
             if (firstModelNode == null || firstModelNode.isNull()) {
                 continue;
             }
-
             Map<String, Object> matched = findMatchingModelDef(allModelDefs, providerName, firstModelNode, primaryBackend);
             if (matched == null) {
                 log.warn("No matching model found in lagi.yml for provider: {}, skip", providerName);
                 continue;
             }
-
-            // 避免同一个 name 重复写入
             String name = matched.get("name") == null ? null : matched.get("name").toString();
             if (name != null && usedNames.contains(name)) {
                 continue;
@@ -488,7 +534,6 @@ public class OpenClawUtil {
             } else if (matched.get("model") != null) {
                 copy.put("model", matched.get("model"));
             }
-            // 保留 driver 字段，如果有的话
             if (matched.get("driver") != null) {
                 copy.put("driver", matched.get("driver"));
             }
