@@ -15,6 +15,7 @@ import ai.llm.utils.convert.GptAzureConvert;
 import ai.openai.pojo.ChatCompletionRequest;
 import ai.openai.pojo.ChatCompletionResult;
 import ai.openai.pojo.ChatMessage;
+import ai.openai.pojo.Usage;
 import cn.hutool.core.util.StrUtil;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -25,6 +26,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.Proxy;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -86,6 +88,11 @@ public class GPTAzureAdapter extends ModelService implements ILlmAdapter {
     public Observable<ChatCompletionResult> streamCompletions(ChatCompletionRequest chatCompletionRequest) {
         setDefaultField(chatCompletionRequest);
         if (ResponseProtocolUtil.isResponseProtocol(this)) {
+            long t0Response = System.currentTimeMillis();
+            List<ChatMessage> msgsResp = chatCompletionRequest.getMessages();
+            int msgCountResp = msgsResp != null ? msgsResp.size() : 0;
+            int ctxCharsResp = msgsResp != null ? msgsResp.stream()
+                    .mapToInt(m -> m.getContent() != null ? m.getContent().length() : 0).sum() : 0;
             ResponseSessionContext sessionContext = SESSION_MANAGER.prepare(chatCompletionRequest, this);
             Proxy proxy = new Proxy(Proxy.Type.SOCKS, GptAzureConvert.convertProxyUrl2InetSocketAddress());
             String json = toJson(ResponsesChatCompletionConverter.toRequest(chatCompletionRequest, sessionContext, getDeployment()));
@@ -98,17 +105,50 @@ public class GPTAzureAdapter extends ModelService implements ILlmAdapter {
             }
             AtomicReference<String> responseId = new AtomicReference<>();
             AtomicReference<ChatMessage> assistantMessage = new AtomicReference<>(ChatMessage.builder().role("assistant").content("").build());
+            AtomicReference<Usage> usageRefResp = new AtomicReference<>();
             return response.getStreamData()
                     .doOnNext(chunk -> {
                         if (chunk != null && chunk.getId() != null) {
                             responseId.set(chunk.getId());
                         }
+                        if (chunk != null && chunk.getUsage() != null) {
+                            usageRefResp.set(chunk.getUsage());
+                        }
                         mergeAssistantMessage(assistantMessage.get(), chunk);
                     })
-                    .doOnComplete(() -> SESSION_MANAGER.onSuccess(sessionContext, responseId.get(), assistantMessage.get()));
+                    .doOnComplete(() -> {
+                        SESSION_MANAGER.onSuccess(sessionContext, responseId.get(), assistantMessage.get());
+                        long elapsed = System.currentTimeMillis() - t0Response;
+                        Usage u = usageRefResp.get();
+                        long prompt = 0, completion = 0, total = 0, cached = 0;
+                        if (u != null) {
+                            prompt = u.getPrompt_tokens();
+                            completion = u.getCompletion_tokens();
+                            total = u.getTotal_tokens();
+                            if (u.getPrompt_tokens_details() != null) {
+                                cached = u.getPrompt_tokens_details().getCached_tokens();
+                            }
+                        }
+                        long cacheRatio = prompt > 0 ? cached * 100 / prompt : 0;
+                        logger.info("\n======= [RESPONSE protocol] metrics =======\n" +
+                                "  time:         {}ms\n" +
+                                "  context:      {} turns / {} chars\n" +
+                                "  prompt token: {}\n" +
+                                "  output token: {}\n" +
+                                "  total token:  {}\n" +
+                                "  cached token: {} (cache ratio {}%)\n" +
+                                "===========================================",
+                                elapsed, msgCountResp, ctxCharsResp,
+                                prompt, completion, total, cached, cacheRatio);
+                    });
         }
         String apiUrl = getApiAddress();
         String apiKey = getApiKey();
+        long t0Completion = System.currentTimeMillis();
+        List<ChatMessage> msgsComp = chatCompletionRequest.getMessages();
+        int msgCountComp = msgsComp != null ? msgsComp.size() : 0;
+        int ctxCharsComp = msgsComp != null ? msgsComp.stream()
+                .mapToInt(m -> m.getContent() != null ? m.getContent().length() : 0).sum() : 0;
         Map<String, String> headers = new HashMap<>();
         headers.put("api-key", apiKey);
         Map incloudUsage = new HashMap<>();
@@ -126,7 +166,37 @@ public class GPTAzureAdapter extends ModelService implements ILlmAdapter {
             logger.error("open ai stream api error {}", llmApiResponse.getMsg());
             throw new RRException(code, llmApiResponse.getMsg());
         }
-        return llmApiResponse.getStreamData();
+        AtomicReference<Usage> usageRefComp = new AtomicReference<>();
+        return llmApiResponse.getStreamData()
+                .doOnNext(chunk -> {
+                    if (chunk != null && chunk.getUsage() != null) {
+                        usageRefComp.set(chunk.getUsage());
+                    }
+                })
+                .doOnComplete(() -> {
+                    long elapsed = System.currentTimeMillis() - t0Completion;
+                    Usage u = usageRefComp.get();
+                    long prompt = 0, completion = 0, total = 0, cached = 0;
+                    if (u != null) {
+                        prompt = u.getPrompt_tokens();
+                        completion = u.getCompletion_tokens();
+                        total = u.getTotal_tokens();
+                        if (u.getPrompt_tokens_details() != null) {
+                            cached = u.getPrompt_tokens_details().getCached_tokens();
+                        }
+                    }
+                    long cacheRatio = prompt > 0 ? cached * 100 / prompt : 0;
+                    logger.info("\n======= [COMPLETION protocol] metrics =======\n" +
+                            "  time:         {}ms\n" +
+                            "  context:      {} turns / {} chars\n" +
+                            "  prompt token: {}\n" +
+                            "  output token: {}\n" +
+                            "  total token:  {}\n" +
+                            "  cached token: {} (cache ratio {}%)\n" +
+                            "=============================================",
+                            elapsed, msgCountComp, ctxCharsComp,
+                            prompt, completion, total, cached, cacheRatio);
+                });
     }
 
     private String getResponsesApiAddress() {

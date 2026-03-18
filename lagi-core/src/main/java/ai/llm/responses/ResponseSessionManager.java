@@ -140,6 +140,15 @@ public class ResponseSessionManager {
         if (context == null  || StrUtil.isBlank(responseId)) {
             return;
         };
+        // If the model responded with tool_calls, do NOT cache previous_response_id.
+        // The Responses API requires tool outputs to be submitted before a new user turn
+        // can reference that response_id; since the middleware cannot fulfill that,
+        // we fall back to full-context on the next turn.
+        if (responseMessage != null
+                && responseMessage.getTool_calls() != null
+                && !responseMessage.getTool_calls().isEmpty()) {
+            return;
+        }
         ResponseSessionState responseSessionState = splitSessionCache.get(convert2PromptInputs(context.getNormalizedMessages()));
         if(responseSessionState != null) {
             List<ChatMessage> lastConversation = new ArrayList<>(context.getNormalizedMessages());

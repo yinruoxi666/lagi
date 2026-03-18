@@ -167,9 +167,14 @@ public class SampleIntentServiceImpl implements IntentService {
             String q2 = lastQ;
             q1 = q1.substring(0, Math.min(q1.length(), 1000));
             q2 = q2.substring(0, Math.min(q2.length(), 1000));
-            List<List<Float>> embeddingDataList = embeddings.createEmbedding(Lists.newArrayList(q1+"\n"+q2, q1));
-            double similarity = EmbeddingSimilarityCalculator.calculateCosineSimilarity(embeddingDataList.get(0), embeddingDataList.get(1));
-            return similarity > 0.91;
+            try {
+                List<List<Float>> embeddingDataList = embeddings.createEmbedding(Lists.newArrayList(q1+"\n"+q2, q1));
+                double similarity = EmbeddingSimilarityCalculator.calculateCosineSimilarity(embeddingDataList.get(0), embeddingDataList.get(1));
+                return similarity > 0.91;
+            } catch (Exception e) {
+                log.warn("isContinue: embedding call failed ({}), treating as new conversation", e.getMessage());
+                return false;
+            }
         }
         return false;
     }

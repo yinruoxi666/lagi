@@ -418,7 +418,7 @@ public class GlobalConfigurations extends AbstractConfiguration {
             }
             return backend;
         }).filter(Objects::nonNull).collect(Collectors.toList());
-        LLM llm = LLM.builder().backends(models).embedding(functions.getEmbedding().get(0))
+        LLM llm = LLM.builder().backends(models).embedding(functions.getEmbedding() != null && !functions.getEmbedding().isEmpty() ? functions.getEmbedding().get(0) : null)
                 .chatBackends(chatBackends)
                 .build();
         llm.getBackends().forEach(backend -> {
