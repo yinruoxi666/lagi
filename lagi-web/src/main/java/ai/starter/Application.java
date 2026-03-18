@@ -32,6 +32,7 @@ public class Application {
         boolean devMode = jarFile == null;
 
         applyConfigAndDataDir(args, jarFile);
+        SLF4JBridgeHandler.removeHandlersForRootLogger();
         SLF4JBridgeHandler.install();
         int port = resolvePort(args);
         String host = resolveHost(args);
