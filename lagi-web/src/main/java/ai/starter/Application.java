@@ -23,23 +23,25 @@ public class Application {
     public static final String CONFIG_FILE_PROPERTY = "linkmind.config";
 
     private static final int DEFAULT_PORT = 8080;
+    private static final String DEFAULT_HOST = "localhost";
     private static final String LAGI_YML = "lagi.yml";
     private static final String SQLITE_RESOURCE_DIR = "sqlite";
 
     public static void main(String[] args) throws Exception {
         File jarFile = getJarFile();
-        applyConfigAndDataDir(args, jarFile);
-
-        SLF4JBridgeHandler.removeHandlersForRootLogger();
-        SLF4JBridgeHandler.install();
-        int port = resolvePort(args);
-
-        OpenClawUtil.sync(port);
-
-        Path webappDir = TomcatUtil.resolveWebappDir(Application.class);
         boolean devMode = jarFile == null;
 
-        TomcatUtil.startAndAwait(port, webappDir, devMode);
+        applyConfigAndDataDir(args, jarFile);
+        SLF4JBridgeHandler.install();
+        int port = resolvePort(args);
+        String host = resolveHost(args);
+
+        if (!devMode) {
+            OpenClawUtil.sync(port);
+        }
+
+        Path webappDir = TomcatUtil.resolveWebappDir(Application.class);
+        TomcatUtil.startAndAwait(host, port, webappDir, devMode);
     }
 
     /**
@@ -144,6 +146,19 @@ public class Application {
             return Integer.parseInt(envPort);
         }
         return DEFAULT_PORT;
+    }
+
+    /** Binds Tomcat; override with --host=, server.address, or SERVER_ADDRESS. */
+    private static String resolveHost(String[] args) {
+        String fromArg = parseArg(args, "--host=");
+        if (fromArg != null && !fromArg.isEmpty()) {
+            return fromArg;
+        }
+        String envHost = System.getProperty("server.address", System.getenv("SERVER_ADDRESS"));
+        if (envHost != null && !envHost.isEmpty()) {
+            return envHost.trim();
+        }
+        return DEFAULT_HOST;
     }
 
     private static File getJarFile() {
