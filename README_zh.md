@@ -278,11 +278,11 @@ Rerank功能只需要ai数据库文件，Embedding模型两者都需要。
 我们为用户提供了预打包的应用程序，方便直接下载和使用：
 
 - **核心库文件**：LinkMind(联智)的核心依赖库。
-  - 文件名：`lagi-core-1.1.0-jar-with-dependencies.jar`
-  - 下载链接：[点击这里下载](https://downloads.landingbj.com/lagi/lib/lagi-core-1.1.0-jar-with-dependencies.jar)
+  - 文件名：`lagi-core-jar-with-dependencies.jar`
+  - 下载链接：[点击这里下载](https://downloads.landingbj.com/lagi/lib/lagi-core-1.2.0-jar-with-dependencies.jar)
 - **应用文件**：LinkMind(联智)的完整封包，安装 JDK 后可直接运行。
   - 文件名：`LinkMind.jar`
-  - 下载链接：[点击这里下载](https://downloads.landingbj.com/lagi/installer/LinkMind.jar)
+  - 下载链接：[点击这里下载](https://downloads.landingbj.com/lagi/installer/LinkMind-v1.2.0.jar)
 
 
 感谢您对 LinkMind(联智) 的关注与支持！如有任何问题或建议，请随时与我们联系。
