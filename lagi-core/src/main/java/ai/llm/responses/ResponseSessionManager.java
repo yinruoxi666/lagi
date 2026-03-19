@@ -194,7 +194,7 @@ public class ResponseSessionManager {
             return;
         };
         ResponseSessionState responseSessionState = getCachedSession(context.getAllHistoryChatMessage());
-        if(responseSessionState != null) {
+        if(responseSessionState != null && context.getPreviousResponseId() != null) {
             responseSessionState.setConversationStartIndex(context.getSplitStartIndex());
             List<ChatMessage> historyChatMessage = new ArrayList<>(context.getAllHistoryChatMessage());
             historyChatMessage.add(responseMessage);
