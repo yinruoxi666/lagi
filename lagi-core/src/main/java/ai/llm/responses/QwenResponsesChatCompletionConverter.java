@@ -23,7 +23,8 @@ public final class QwenResponsesChatCompletionConverter {
         responseRequest.setModel(modelName);
         responseRequest.setInstructions(extractInstructions(sessionContext));
         responseRequest.setInput(toInputItems(sessionContext.getInputMessages()));
-        responseRequest.setPrevious_response_id(sessionContext.getPreviousResponseId());
+//        responseRequest.setPrevious_response_id(sessionContext.getPreviousResponseId());
+        responseRequest.setPrevious_response_id(null);
         responseRequest.setStream(Boolean.TRUE.equals(request.getStream()));
         responseRequest.setMax_output_tokens(request.getMax_tokens());
         responseRequest.setTools(toTools(request.getTools()));
@@ -52,6 +53,7 @@ public final class QwenResponsesChatCompletionConverter {
                     ChatMessage mergedToolMessage = new ChatMessage();
                     mergedToolMessage.setRole("user");
                     mergedToolMessage.setContent(mergedContent);
+                    mergedToolMessage.setTool_call_id(null);
                     items.add(mergedToolMessage);
                     toolMessagesBuffer.clear();
                 }
@@ -64,6 +66,7 @@ public final class QwenResponsesChatCompletionConverter {
             ChatMessage mergedToolMessage = new ChatMessage();
             mergedToolMessage.setRole("user");
             mergedToolMessage.setContent(mergedContent);
+            mergedToolMessage.setTool_call_id(null);
             items.add(mergedToolMessage);
         }
 

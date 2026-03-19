@@ -4,6 +4,7 @@ import ai.openai.pojo.ChatMessage;
 import lombok.Data;
 
 import java.util.List;
+import java.util.Vector;
 
 @Data
 public class ResponseSessionState {
@@ -12,4 +13,5 @@ public class ResponseSessionState {
     private String backend;
     private String model;
     private String protocol;
+    private Integer ConversationStartIndex;
 }

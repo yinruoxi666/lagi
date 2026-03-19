@@ -33,7 +33,7 @@ public class ChatCompletionUtil {
         return null;
     }
 
-    public static Integer findToolAssistantIndex(List<ChatMessage> messages) {
+    public static Integer findLastAssistantIndex(List<ChatMessage> messages) {
         for (int i = messages.size() -1; i >= 0; i--) {
             ChatMessage msg = messages.get(i);
             if (LagiGlobal.LLM_ROLE_ASSISTANT.equals(msg.getRole())) {
@@ -43,7 +43,7 @@ public class ChatCompletionUtil {
         return null;
     }
 
-    public static Integer findToolAssistantIndex(List<ChatMessage> messages, int lastIndex) {
+    public static Integer findLastAssistantIndex(List<ChatMessage> messages, int lastIndex) {
         for (int i = messages.size() -1; i >= 0 && i > lastIndex; i--) {
             ChatMessage msg = messages.get(i);
             if (LagiGlobal.LLM_ROLE_ASSISTANT.equals(msg.getRole())) {

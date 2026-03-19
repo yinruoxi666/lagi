@@ -15,4 +15,6 @@ public class ResponseSessionContext {
     private String model;
     private String protocol;
     private boolean stateful;
+    private Integer splitStartIndex;
+    private List<ChatMessage> allHistoryChatMessage;
 }
