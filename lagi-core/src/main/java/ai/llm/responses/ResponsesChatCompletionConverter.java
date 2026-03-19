@@ -263,7 +263,7 @@ public final class ResponsesChatCompletionConverter {
     }
 
     private static String extractInstructions(ResponseSessionContext sessionContext) {
-        List<ChatMessage> messages = sessionContext.getNormalizedMessages();
+        List<ChatMessage> messages = sessionContext.getInputMessages();
         if (messages == null || messages.isEmpty()) {
             messages = sessionContext.getInputMessages();
         }
