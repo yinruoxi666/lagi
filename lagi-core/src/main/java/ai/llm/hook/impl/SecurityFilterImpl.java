@@ -5,6 +5,7 @@ import ai.annotation.Order;
 import ai.annotation.Value;
 import ai.llm.hook.AfterModel;
 import ai.llm.hook.BeforeModel;
+import ai.llm.pojo.ModelContext;
 import ai.openai.pojo.ChatCompletionRequest;
 import ai.openai.pojo.ChatCompletionResult;
 import ai.openai.pojo.ChatMessage;
@@ -24,7 +25,8 @@ public class SecurityFilterImpl implements BeforeModel, AfterModel {
     private Integer queueCapacity;
 
     @Override
-    public ChatCompletionRequest beforeModel(ChatCompletionRequest request) {
+    public ChatCompletionRequest beforeModel(ModelContext context) {
+        ChatCompletionRequest request = context.getRequest();
         if (request.getMessages() == null || request.getMessages().isEmpty()) return request;
         ChatMessage last = request.getMessages().get(request.getMessages().size() - 1);
         String raw = last.getContent();
@@ -34,12 +36,13 @@ public class SecurityFilterImpl implements BeforeModel, AfterModel {
     }
 
     @Override
-    public ChatCompletionResult apply(ChatCompletionResult result) {
-        return SensitiveWordUtil.filter4ChatCompletionResult(result);
+    public ChatCompletionResult apply(ModelContext context) {
+        return SensitiveWordUtil.filter4ChatCompletionResult(context.getResult());
     }
 
     @Override
-    public Observable<ChatCompletionResult> stream(Observable<ChatCompletionResult> source) {
+    public Observable<ChatCompletionResult> stream(ModelContext context) {
+        Observable<ChatCompletionResult> source = context.getStreamResult();
         Observable<ChatCompletionResult> processedSource = source.filter(result -> true);
         return Observable.create(emitter -> {
             Queue<ChatCompletionResult> cacheQueue = new ArrayBlockingQueue<>(queueCapacity);

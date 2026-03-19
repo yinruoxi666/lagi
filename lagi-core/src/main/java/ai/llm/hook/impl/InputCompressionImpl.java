@@ -2,9 +2,12 @@ package ai.llm.hook.impl;
 
 import ai.annotation.Component;
 import ai.annotation.Order;
+import ai.common.ModelService;
 import ai.intent.impl.SampleIntentServiceImpl;
 import ai.intent.pojo.IntentResult;
 import ai.llm.hook.BeforeModel;
+import ai.llm.pojo.ModelContext;
+import ai.llm.responses.ResponseProtocolUtil;
 import ai.openai.pojo.ChatCompletionRequest;
 import ai.openai.pojo.ChatMessage;
 import ai.utils.LagiGlobal;
@@ -13,13 +16,18 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Order
-//@Component
+@Component
 public class InputCompressionImpl implements BeforeModel {
 
     private final SampleIntentServiceImpl intentService = new SampleIntentServiceImpl();
 
     @Override
-    public ChatCompletionRequest beforeModel(ChatCompletionRequest request) {
+    public ChatCompletionRequest beforeModel(ModelContext context) {
+        boolean responseProtocol = ResponseProtocolUtil.isResponseProtocol((ModelService) context.getAdapter());
+        if(responseProtocol) {
+            return context.getRequest();
+        }
+        ChatCompletionRequest request = context.getRequest();
         List<ChatMessage> merge = mergeConsecutiveMessages(request.getMessages());
         request.setMessages(merge);
         IntentResult intentResult = intentService.detectSegmentationBoundary(request);
