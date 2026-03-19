@@ -157,7 +157,9 @@ public class ResponseSessionManager {
 
     private void removeCachedSession(List<ChatMessage> historyMessages, boolean flag) {
 //        splitSessionCache.remove(convert2PromptInputs(historyMessages));
-        responseSessionState = null;
+        if(flag) {
+            responseSessionState = null;
+        }
     }
 
 
