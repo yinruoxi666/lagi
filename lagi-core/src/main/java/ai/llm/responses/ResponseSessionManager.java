@@ -113,7 +113,9 @@ public class ResponseSessionManager {
         // if cache and boundary is empty, append to cache
         if(boundary.isEmpty()) {
             context.setStateful(true);
-            context.setInputMessages(chatMessages);
+            List<ChatMessage> inputMessages = new ArrayList<>(getSystemMessages(chatMessages));
+            inputMessages.addAll(incrementMessages);
+            context.setInputMessages(inputMessages);
             context.setNormalizedMessages(incrementMessages);
             context.setPreviousResponseId(cachedSession.getPreviousResponseId());
             Integer firstUserIndex = getFirstUserIndex(chatMessages);
@@ -136,7 +138,7 @@ public class ResponseSessionManager {
             return context;
         }
         // The new cache contains all the messages after the boundary as newly added.
-        incrementMessages = chatMessages.subList(boundary.get(1) + 1, chatMessages.size());
+        incrementMessages = chatMessages.subList(boundary.get(0), chatMessages.size());
         newChatMessages.addAll(incrementMessages);
         context.setSplitStartIndex(boundary.get(0));
         return newConversationContext(newChatMessages, incrementMessages, context);
