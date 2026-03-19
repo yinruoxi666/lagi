@@ -84,6 +84,7 @@ public class ResponseSessionManager {
 
         // first message return context without previous response id
         if(historyMessages.isEmpty()) {
+            removeCachedSession(historyMessages, true);
             Integer firstUserIndex = getFirstUserIndex(chatMessages);
             context.setSplitStartIndex(firstUserIndex);
             return newConversationContext(chatMessages, incrementMessages, context);
@@ -154,8 +155,9 @@ public class ResponseSessionManager {
             responseSessionState = state;
     }
 
-    private void removeCachedSession(List<ChatMessage> historyMessages) {
+    private void removeCachedSession(List<ChatMessage> historyMessages, boolean flag) {
 //        splitSessionCache.remove(convert2PromptInputs(historyMessages));
+        responseSessionState = null;
     }
 
 
@@ -195,7 +197,7 @@ public class ResponseSessionManager {
             List<ChatMessage> historyChatMessage = new ArrayList<>(context.getAllHistoryChatMessage());
             historyChatMessage.add(responseMessage);
             setCachedSession(historyChatMessage, responseSessionState);
-            removeCachedSession(context.getAllHistoryChatMessage());
+            removeCachedSession(context.getAllHistoryChatMessage(), false);
         } else {
             ResponseSessionState state = new ResponseSessionState();
             state.setPreviousResponseId(responseId);
