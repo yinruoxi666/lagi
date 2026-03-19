@@ -21,6 +21,7 @@ public final class ResponsesChatCompletionConverter {
     public static ResponseCreateRequest toRequest(ChatCompletionRequest request,
                                                   ResponseSessionContext sessionContext,
                                                   String modelName) {
+        fixupFunctionCallId(request);
         ResponseCreateRequest responseRequest = new ResponseCreateRequest();
         responseRequest.setModel(modelName);
         responseRequest.setInstructions(extractInstructions(sessionContext));
@@ -33,6 +34,28 @@ public final class ResponsesChatCompletionConverter {
         responseRequest.setParallel_tool_calls(request.getParallel_tool_calls());
         responseRequest.setText(toText(request.getResponse_format()));
         return responseRequest;
+    }
+
+    public static void fixupFunctionCallId(ChatCompletionRequest request) {
+        List<ChatMessage> chatMessages = request.getMessages();
+        for (ChatMessage chatMessage : chatMessages) {
+            if (chatMessage.getTool_calls() != null && !chatMessage.getTool_calls().isEmpty()) {
+                for (ToolCall toolCall : chatMessage.getTool_calls()) {
+                    if (toolCall.getId() != null) {
+                        String id = toolCall.getId();
+                        if(id.startsWith("call") && !id.startsWith("call_")){
+                            toolCall.setId(id.replaceAll("call", "call_"));
+                        }
+                    }
+                }
+            }
+            if(chatMessage.getTool_call_id() != null) {
+                String id = chatMessage.getTool_call_id();
+                if(id.startsWith("call") && !id.startsWith("call_")) {
+                    chatMessage.setTool_call_id(id.replaceAll("call", "call_"));
+                }
+            }
+        }
     }
 
     public static ChatCompletionResult convertResponse(String body) {
@@ -71,12 +94,77 @@ public final class ResponsesChatCompletionConverter {
                 }
                 return result;
             }
+//            if("response.output_item.added".equals(type)) {
+//                JsonNode itemNode = root.path("item");
+//                String itemType = itemNode.path("type").asText();
+//                if ("function_call".equals(itemType)) {
+//                    String callId = itemNode.path("call_id").asText("");
+//                    String name = itemNode.path("name").asText("");
+//                    String arguments = itemNode.path("arguments").asText("");
+//                    return createFunctionCallDeltaChunk( callId, name, arguments);
+//                }
+//            }
+//            if("response.function_call_arguments.delta".equals(type)) {
+//                String delta = root.path("delta").asText("");
+//                return createFunctionArgumentsDeltaChunk( delta);
+//            }
+//            if("response.function_call_arguments.done".equals(type)) {
+//                return createFunctionArgumentsDeltaChunk("");
+//            }
             return null;
         } catch (Exception e) {
             throw new RuntimeException("Failed to convert responses stream event", e);
         }
     }
 
+//    private static ChatCompletionResult createFunctionCallDeltaChunk(String callId, String name, String arguments) {
+//        ChatCompletionResult result = new ChatCompletionResult();
+//        result.setCreated(0);
+//
+//        ToolCallFunction function = new ToolCallFunction();
+//        function.setName(name);
+//        function.setArguments(arguments);
+//
+//        ToolCall toolCall = new ToolCall();
+//        toolCall.setId(callId);
+//        toolCall.setType("function");
+//        toolCall.setFunction(function);
+//
+//        ChatMessage message = new ChatMessage();
+//        message.setRole("assistant");
+//        message.setContent("");
+//        message.setTool_calls(Collections.singletonList(toolCall));
+//
+//        ChatCompletionChoice choice = new ChatCompletionChoice();
+//        choice.setMessage(message);
+//        result.setChoices(Collections.singletonList(choice));
+//        return result;
+//    }
+
+    private static ChatCompletionResult createFunctionArgumentsDeltaChunk(String delta) {
+        ChatCompletionResult result = new ChatCompletionResult();
+        result.setId("");
+        result.setCreated(0);
+
+        ToolCallFunction function = new ToolCallFunction();
+        function.setArguments(delta);
+
+        ToolCall toolCall = new ToolCall();
+        toolCall.setId("");
+        toolCall.setType("function");
+        toolCall.setFunction(function);
+
+        ChatMessage message = new ChatMessage();
+        message.setRole("assistant");
+        message.setContent("");
+        message.setTool_calls(Collections.singletonList(toolCall));
+
+
+        ChatCompletionChoice choice = new ChatCompletionChoice();
+        choice.setMessage(message);
+        result.setChoices(Collections.singletonList(choice));
+        return result;
+    }
     private static ChatCompletionResult convertResponse(JsonNode root) {
         ChatCompletionResult result = new ChatCompletionResult();
         result.setId(root.path("id").asText(null));

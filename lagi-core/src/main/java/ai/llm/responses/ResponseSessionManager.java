@@ -198,6 +198,7 @@ public class ResponseSessionManager {
             responseSessionState.setConversationStartIndex(context.getSplitStartIndex());
             List<ChatMessage> historyChatMessage = new ArrayList<>(context.getAllHistoryChatMessage());
             historyChatMessage.add(responseMessage);
+            responseSessionState.setPreviousResponseId(responseId);
             setCachedSession(historyChatMessage, responseSessionState);
             removeCachedSession(context.getAllHistoryChatMessage(), false);
         } else {
