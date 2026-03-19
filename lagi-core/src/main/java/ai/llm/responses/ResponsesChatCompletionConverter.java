@@ -133,6 +133,14 @@ public final class ResponsesChatCompletionConverter {
         usage.setPrompt_tokens(usageNode.path("input_tokens").asLong(0L));
         usage.setCompletion_tokens(usageNode.path("output_tokens").asLong(0L));
         usage.setTotal_tokens(usageNode.path("total_tokens").asLong(0L));
+
+        PromptTokensDetails promptTokensDetails = new PromptTokensDetails();
+        promptTokensDetails.setCached_tokens(usageNode.path("input_tokens_details").path("cached_tokens").asLong(0L));
+        usage.setPrompt_tokens_details(promptTokensDetails);
+
+        CompletionTokensDetails completionTokensDetails = new CompletionTokensDetails();
+        completionTokensDetails.setReasoning_tokens(usageNode.path("output_tokens_details").path("reasoning_tokens").asLong(0L));
+        usage.setCompletion_tokens_details(completionTokensDetails);
         return usage;
     }
 
