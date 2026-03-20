@@ -215,37 +215,74 @@ If you are not satisfied with the adapted large model for LinkMind, you can also
 
 If you find the vector databases currently integrated with LinkMind to be less than satisfactory for your needs, you can also refer to our [Extension documentation](https://github.com/landingbj/lagi/blob/main/docs/extend_en.md#Database-Extension) to expand LinkMind and adapt it to your preferred vector database. This will meet your diverse business requirements, enhance the overall performance and reliability of your system, and provide a more enriching and efficient data management experience.
 
-## Security
+## Security Filtering
 
-In order to better integrate LinkMind into your business, you can add the keywords you need to filter in the [sensitive_word.json](lagi-web/src/main/resources/sensitive_word.json) file, specify the priority keywords in the [priority_word.json](lagi-web/src/main/resources/priority_word.json) file, and set the stopping keywords in the [stopping_word.json](lagi-web/src/main/resources/stopping_word.json) file to change the return results of the conversation, guide the conversation in a specific direction, and automatically stop the conversation when needed.
+LinkMind (LianZhi) supports custom security filtering rules to control model content and guide conversation direction, with two configuration methods available: [`src/main/resources/lagi.yml`](lagi-web/src/main/resources/lagi.yml) (centralized configuration, recommended); ② Specified JSON file (separate file configuration).
 
-Example: 
+### 1. Sensitive Word Filtering
+Controls sensitive content in model input/output, supporting 3 strategies: `mask` (mask replacement), `erase` (content erasure), `block` (full sentence interception).
+#### Method 1: Configuration in [`src/main/resources/lagi.yml`](lagi-web/src/main/resources/lagi.yml)
+```yaml
+filters:
+  - name: sensitive # Output filtering
+    groups:
+      - level: mask # Mask replacement
+        rules: 'openai,FLG,...' # Replace commas with \\, for regex compatibility
+      - level: erase # Content erasure
+        rules: 'your context,...'
+      - level: block # Full sentence interception
+        rules: 'shit,CNM,...'
+  - name: sensitive_input # Input filtering, same format as above
+    groups:
+      - level: mask # Mask replacement
+        rules: 'openai,FLG,...' # Replace commas with \\, for regex compatibility
+      - level: erase # Content erasure
+        rules: 'your context,...'
+      - level: block # Full sentence interception
+        rules: 'shit,CNM,...'
+```
 
-Set the sensitive word filter, level has three values, 1: delete the entire sentence when the sensitive word is matched 2: replace with mask 3: erase (default). mask: mask string (default :...) . rules: represents a list of sensitive rules, where rule for each list element represents the regular expression matching the sensitive word, mask and level are used globally if not specified:   
-
-If `OPENAI` is successfully matched, the `OPENAI` is erased. If `hello` is successfully matched, the `hello` is replaced with `***`. If `people` is successfully matched, use `...` Substitution.
-
+#### Method 2: JSON File Configuration
+- Input Filtering: [sensitive_input.json](lagi-web/src/main/resources/sensitive_input.json)
+- Output Filtering: [sensitive_word.json](lagi-web/src/main/resources/sensitive_word.json)
 ```json
 {
-  "mask": "...",
-  "level": 3,
-  "rules": [
-    {"rule":"OPENAI"},
-    {"rule":"hello", "level": 2, "mask": "***"},
-    {"rule":"people", "level": 2}
-  ]
+  "mask": "...", // Default mask character
+  "level": 3, // 1=block/2=mask/3=erase (default)
+  "rules": [{"rule":"OPENAI"}, {"rule":"hello","level":2,"mask":"***"}]
 }
 ```
 
-Example：Set priority keywords and stop keywords:
-
-```json
-[
-  "openai"
-]
+### 2. Priority Keywords
+Improves RAG retrieval matching weight:
+```yaml
+filters:
+  - name: priority
+    rules: 'car,weather,
+            社*保'
 ```
+- JSON: [priority_word.json](lagi-web/src/main/resources/priority_word.json), format: `["car","社*保"]`
 
-Here’s the English translation of your document:
+### 3. Conversation Stopping Keywords
+#### Stopping Keywords
+Splits and terminates conversation messages after matching:
+- YAML:
+```yaml
+filters:
+  - name: stopping
+    rules: 'bye,
+            开始*'
+```
+- JSON: [stopping_word.json](lagi-web/src/main/resources/stopping_word.json), format: `["bye","开始*"]`
+
+#### Conversation Resumption Keywords
+Marks conversation continuation (YAML configuration only):
+```yaml
+filters:
+  - name: continue
+    rules: 'about,next,资料'
+```
+- JSON: [continue_word.json](lagi-web/src/main/resources/continue_word.json), format: `["bye","开始*"]`
 
 ## Rerank and Embedding Models
 
