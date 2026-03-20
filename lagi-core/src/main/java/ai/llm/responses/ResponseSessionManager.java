@@ -38,42 +38,10 @@ public class ResponseSessionManager {
     }
 
 
-
-    public static List<ChatMessage> getIncrementMessages(List<ChatMessage> messages) {
-        Integer lastAssistantIndex = ChatCompletionUtil.findLastAssistantIndex(messages);
-        if(lastAssistantIndex == null) {
-            return messages.stream().filter(message -> !message.getRole().equals(LagiGlobal.LLM_ROLE_SYSTEM)).collect(Collectors.toList());
-        }
-        return messages.subList(lastAssistantIndex + 1, messages.size());
-    }
-
-    public static List<ChatMessage> getHistoryMessages(List<ChatMessage> messages) {
-        Integer lastAssistantIndex = ChatCompletionUtil.findLastAssistantIndex(messages);
-        if(lastAssistantIndex == null) {
-            return Collections.emptyList();
-        }
-        return messages.subList(0, lastAssistantIndex + 1);
-    }
-
-    public static List<ChatMessage> getSystemMessages(List<ChatMessage> messages) {
-        return messages.stream().filter(message -> message.getRole().equals(LagiGlobal.LLM_ROLE_SYSTEM)).collect(Collectors.toList());
-    }
-
-    public Integer getFirstUserIndex(List<ChatMessage> messages) {
-        for (int i = 0; i < messages.size(); i++) {
-            String role = messages.get(i).getRole();
-            if(role.equals(LagiGlobal.LLM_ROLE_USER)) {
-                return i;
-            }
-        }
-        return null;
-    }
-
-
     public ResponseSessionContext prepare(ai.openai.pojo.ChatCompletionRequest request, ModelService modelService) {
         List<ChatMessage> chatMessages = request.getMessages();
-        List<ChatMessage> historyMessages = getHistoryMessages(chatMessages);
-        List<ChatMessage> incrementMessages = getIncrementMessages(chatMessages);
+        List<ChatMessage> historyMessages = ChatCompletionUtil.getHistoryMessages(chatMessages);
+        List<ChatMessage> incrementMessages = ChatCompletionUtil.getIncrementMessages(chatMessages);
 
         ResponseSessionContext context = new ResponseSessionContext();
         context.setSessionId(request.getSessionId());
@@ -85,7 +53,7 @@ public class ResponseSessionManager {
         // first message return context without previous response id
         if(historyMessages.isEmpty()) {
             removeCachedSession(historyMessages, true);
-            Integer firstUserIndex = getFirstUserIndex(chatMessages);
+            Integer firstUserIndex = ChatCompletionUtil.getFirstUserIndex(chatMessages);
             context.setSplitStartIndex(firstUserIndex);
             return newConversationContext(chatMessages, incrementMessages, context);
         }
@@ -99,12 +67,12 @@ public class ResponseSessionManager {
         if(cachedSession == null) {
             if(boundary.isEmpty()) {
                 // cache all
-                Integer firstUserIndex = getFirstUserIndex(chatMessages);
+                Integer firstUserIndex = ChatCompletionUtil.getFirstUserIndex(chatMessages);
                 context.setSplitStartIndex(firstUserIndex);
                 return newConversationContext(chatMessages, incrementMessages, context);
             }
             // If no cache hit, the message after the start of the cache boundary
-            List<ChatMessage> systemMessages = getSystemMessages(chatMessages);
+            List<ChatMessage> systemMessages = ChatCompletionUtil.getSystemMessages(chatMessages);
             incrementMessages = chatMessages.subList(boundary.get(0), chatMessages.size());
             List<ChatMessage> newChatMessages = new ArrayList<>(systemMessages);
             newChatMessages.addAll(incrementMessages);
@@ -114,19 +82,19 @@ public class ResponseSessionManager {
         // if cache and boundary is empty, append to cache
         if(boundary.isEmpty()) {
             context.setStateful(true);
-            List<ChatMessage> inputMessages = new ArrayList<>(getSystemMessages(chatMessages));
+            List<ChatMessage> inputMessages = new ArrayList<>(ChatCompletionUtil.getSystemMessages(chatMessages));
             inputMessages.addAll(incrementMessages);
             context.setInputMessages(inputMessages);
             context.setNormalizedMessages(incrementMessages);
             context.setPreviousResponseId(cachedSession.getPreviousResponseId());
-            Integer firstUserIndex = getFirstUserIndex(chatMessages);
+            Integer firstUserIndex = ChatCompletionUtil.getFirstUserIndex(chatMessages);
             context.setSplitStartIndex(firstUserIndex);
             return context;
         }
         Integer conversationStartIndex = cachedSession.getConversationStartIndex();
         Integer currentConversationStartIndex = boundary.get(0);
         boolean isContinue = Objects.equals(currentConversationStartIndex, conversationStartIndex);
-        List<ChatMessage> systemMessages = getSystemMessages(chatMessages);
+        List<ChatMessage> systemMessages = ChatCompletionUtil.getSystemMessages(chatMessages);
         List<ChatMessage> newChatMessages = new ArrayList<>(systemMessages);
         if(isContinue) {
             // send incremental messages

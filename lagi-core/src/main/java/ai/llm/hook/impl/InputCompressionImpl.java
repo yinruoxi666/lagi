@@ -30,22 +30,7 @@ public class InputCompressionImpl implements BeforeModel {
         ChatCompletionRequest request = context.getRequest();
         List<ChatMessage> merge = mergeConsecutiveMessages(request.getMessages());
         request.setMessages(merge);
-        IntentResult intentResult = intentService.detectSegmentationBoundary(request);
-        Integer continuedIndex = intentResult.getContinuedIndex();
-        List<ChatMessage> chatMessages = request.getMessages();
-        if(chatMessages.isEmpty()) {
-            return request;
-        }
-        boolean hasSystem = LagiGlobal.LLM_ROLE_SYSTEM.equals(chatMessages.get(0).getRole());
-        List<ChatMessage> newChatMessages = new ArrayList<>();
-        if(hasSystem) {
-            newChatMessages.add(chatMessages.get(0));
-        }
-        if(continuedIndex != null) {
-            newChatMessages.addAll(chatMessages.subList(continuedIndex, chatMessages.size()));
-        } else {
-            newChatMessages.addAll(chatMessages.subList(chatMessages.size() - 1, chatMessages.size()));
-        }
+        List<ChatMessage> newChatMessages = intentService.detectSegmentationBoundary(request);
         request.setMessages(newChatMessages);
         return request;
     }

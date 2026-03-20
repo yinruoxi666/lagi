@@ -248,37 +248,7 @@ public class PromptCacheTrigger {
 
 
     public static List<Integer> analyzeChatBoundariesForIntent(ChatCompletionRequest chatCompletionRequest) {
-        List<ChatMessage> chatMessages = chatCompletionRequest.getMessages();
-        int finalIndex = chatMessages.size() - 1;
-        for (int j = chatMessages.size() -1; j > 0; j--) {
-            ChatMessage chatMessage = chatMessages.get(j);
-            if(chatMessage.getRole().equals(LagiGlobal.LLM_ROLE_USER)) {
-                finalIndex = j;
-                break;
-            }
-        }
-        LinkedList<Integer> res = new LinkedList<>();
-        if(chatMessages.size() < 2) {
-            res.add(finalIndex);
-            return res;
-        }
-        List<QaPair> qaPairs = convert2QaPair(chatMessages, 30);
-        if(qaPairs.isEmpty()) {
-            for (int i = 0; i < chatMessages.size(); i++) {
-                ChatMessage chatMessage = chatMessages.get(i);
-                if(chatMessage.getRole().equals(LagiGlobal.LLM_ROLE_USER)) {
-                    res.add(i);
-                    return res;
-                }
-            }
-        }
-        List<List<QaPair>> splitQaPairs = splitQaPairBySemantics(qaPairs);
-        if(!splitQaPairs.isEmpty() && !splitQaPairs.get(splitQaPairs.size() -1).isEmpty()) {
-            int lastQIndex = splitQaPairs.get(splitQaPairs.size() -1).get(0).getQIndex();
-            res.add(lastQIndex);
-        }
-        res.add(finalIndex);
-        return res;
+        return theFinalRoundOfConversation(chatCompletionRequest.getMessages());
     }
 
     public static List<Integer> theFinalRoundOfConversation(List<ChatMessage> chatMessages) {

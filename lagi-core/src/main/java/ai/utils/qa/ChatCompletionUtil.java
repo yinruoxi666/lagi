@@ -7,14 +7,64 @@ import ai.openai.pojo.ChatMessage;
 import ai.utils.LagiGlobal;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 public class ChatCompletionUtil {
     public static String getLastMessage(ChatCompletionRequest chatCompletionRequest) {
         List<ChatMessage> messages = chatCompletionRequest.getMessages();
         String content = messages.get(messages.size() - 1).getContent().trim();
         return content;
+    }
+
+
+    public static Integer getLastQAUserIndex(List<ChatMessage> messages) {
+        boolean lastAssistantIndex = false;
+        for (int i = messages.size() - 1; i >= 0; i--) {
+            ChatMessage message = messages.get(i);
+            if(lastAssistantIndex) {
+                if(message.getRole().equals(LagiGlobal.LLM_ROLE_USER)) {
+                    return i;
+                }
+            }
+            if(message.getRole().equals(LagiGlobal.LLM_ROLE_ASSISTANT) && message.getTool_calls() != null) {
+                lastAssistantIndex = true;
+            }
+        }
+        return null;
+    }
+
+    public static List<ChatMessage> getIncrementMessages(List<ChatMessage> messages) {
+        Integer lastAssistantIndex = ChatCompletionUtil.findLastAssistantIndex(messages);
+        if(lastAssistantIndex == null) {
+            return messages.stream().filter(message -> !message.getRole().equals(LagiGlobal.LLM_ROLE_SYSTEM)).collect(Collectors.toList());
+        }
+        return messages.subList(lastAssistantIndex + 1, messages.size());
+    }
+
+    public static List<ChatMessage> getHistoryMessages(List<ChatMessage> messages) {
+        Integer lastAssistantIndex = ChatCompletionUtil.findLastAssistantIndex(messages);
+        Integer firstUserIndex = ChatCompletionUtil.getFirstUserIndex(messages);
+        if(lastAssistantIndex == null || firstUserIndex == null) {
+            return Collections.emptyList();
+        }
+        return messages.subList(firstUserIndex, lastAssistantIndex + 1);
+    }
+
+    public static List<ChatMessage> getSystemMessages(List<ChatMessage> messages) {
+        return messages.stream().filter(message -> message.getRole().equals(LagiGlobal.LLM_ROLE_SYSTEM)).collect(Collectors.toList());
+    }
+
+    public static Integer getFirstUserIndex(List<ChatMessage> messages) {
+        for (int i = 0; i < messages.size(); i++) {
+            String role = messages.get(i).getRole();
+            if(role.equals(LagiGlobal.LLM_ROLE_USER)) {
+                return i;
+            }
+        }
+        return null;
     }
 
     public static Integer findValidAssistantIndex(List<ChatMessage> messages) {
