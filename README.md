@@ -249,7 +249,15 @@ filters:
 {
   "mask": "...", // Default mask character
   "level": 3, // 1=block/2=mask/3=erase (default)
-  "rules": [{"rule":"OPENAI"}, {"rule":"hello","level":2,"mask":"***"}]
+  "rules": [
+    {"rule":"OPENAI"}, {"rule":"hello","level":2,"mask":"***"}
+    {"rule":"(?<!\\d)1[3-9]\\d{9}(?!\\d)", "level": 2, "mask": "*", "type": "phone"},
+    {"rule":"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}", "level": 2, "mask": "*", "type": "email"},
+    {"rule":"(?<!\\d)\\d{17}[\\dxX](?!\\d)", "level": 2, "mask": "*", "type": "idcard"},
+    {"rule":"(?<!\\d)1[3-9]\\d{9}(?!\\d)", "level": 2, "mask": "*", "type": "bankcard"},
+    {"rule":"(密码|password|passwd|pwd|secret|token|api_key|apikey)\\s*[=:：]\\s*[\"']?[^\\s\"']+[\"']?", "level": 2, "mask": "*", "type": "password"},
+    {"rule":"sk-[\\da-z]{10,100}", "level": 2, "mask": "*", "type": "api-key"}
+  ]
 }
 ```
 
