@@ -22,8 +22,6 @@ public class OpenClawUtil {
     private static final String[] MODELS_JSON_PATH_SEGMENTS = {"agents", "main", "agent", "models.json"};
     private static final String CONFIG_FILE_PROPERTY = Application.CONFIG_FILE_PROPERTY;
     private static final String YAML_INDENT = "  ";
-    private static final String[] RESPONSE_SUPPORTED_BACKENDS = {"qwen", "openai"};
-    private static final Set<String> RESPONSE_BACKENDS_SET = new HashSet<>(Arrays.asList(RESPONSE_SUPPORTED_BACKENDS));
     private static final String OPENAI_COMPLETIONS_API = "openai-completions";
     private static final Yaml SNAKE_YAML = createSnakeYaml();
 
@@ -177,6 +175,24 @@ public class OpenClawUtil {
     }
 
     /**
+     * Parses OpenClaw {@code primary} string {@code provider/modelId}.
+     *
+     * @return provider and model id, or null if blank or malformed
+     */
+    private static OpenClawModelInfo parseOpenClawModelInfo(String modelInfo) {
+        if (modelInfo == null || modelInfo.trim().isEmpty()) {
+            return null;
+        }
+        int slash = modelInfo.indexOf('/');
+        if (slash <= 0 || slash == modelInfo.length() - 1) {
+            return new OpenClawModelInfo(null, modelInfo);
+        }
+        String provider = modelInfo.substring(0, slash).trim();
+        String modelId = modelInfo.substring(slash + 1).trim();
+        return new OpenClawModelInfo(provider, modelId);
+    }
+
+    /**
      * Resolves openclaw primary "provider/modelId" to (backendName, modelId) if that backend exists in lagi.yml models.
      * If no match but the primary's provider has api "openai-completions", returns backend "custom" with the modelId.
      */
@@ -189,17 +205,12 @@ public class OpenClawUtil {
             log.debug("Could not read openclaw.json: {}", e.getMessage());
             return null;
         }
-        if (primary == null || primary.trim().isEmpty()) {
+        OpenClawModelInfo parsed = parseOpenClawModelInfo(primary);
+        if (parsed == null) {
             return null;
         }
-        int slash = primary.indexOf('/');
-        if (slash <= 0 || slash == primary.length() - 1) {
-            log.debug("Invalid openclaw primary format: {}", primary);
-            return null;
-        }
-        String provider = primary.substring(0, slash).trim();
-        String modelId = primary.substring(slash + 1).trim();
-//        String backendName = provider;
+        String provider = parsed.getProvider();
+        String modelId = parsed.getModelId();
         List<Map<String, Object>> modelsList = (List<Map<String, Object>>) root.get("models");
         if (modelsList == null || modelsList.isEmpty()) {
             return null;
@@ -210,14 +221,14 @@ public class OpenClawUtil {
             Object type = ((Map<?, ?>) item).get("type");
             if (nameObj == null) continue;
             if (provider.equalsIgnoreCase(type.toString().trim())) {
-                return new PrimaryBackend(nameObj.toString(), type.toString(), modelId);
+                return new PrimaryBackend(nameObj.toString(), type.toString(), modelId, provider);
             }
         }
         // No match in lagi.yml: if primary provider uses openai-completions API, return "custom" backend
         try {
             String providerApi = readOpenclawProviderApi(provider);
             if (OPENAI_COMPLETIONS_API.equalsIgnoreCase(providerApi != null ? providerApi.trim() : null)) {
-                return new PrimaryBackend("custom", "OpenAICompatible", modelId);
+                return new PrimaryBackend("custom", "OpenAICompatible", modelId, provider);
             }
         } catch (IOException e) {
             log.debug("Could not read provider api from openclaw.json: {}", e.getMessage());
@@ -293,13 +304,17 @@ public class OpenClawUtil {
         writeFileAtomic(path, yaml + System.lineSeparator());
     }
 
-    /** Non-null, non-empty trimmed string value for the given key, or false. */
+    /**
+     * Non-null, non-empty trimmed string value for the given key, or false.
+     */
     private static boolean hasNonBlank(Map<String, Object> map, String key) {
         Object v = map.get(key);
         return v != null && !v.toString().trim().isEmpty();
     }
 
-    /** Trimmed model name from map, or null if missing or blank. */
+    /**
+     * Trimmed model name from map, or null if missing or blank.
+     */
     private static String trimmedModelName(Map<?, ?> map) {
         Object n = map.get("name");
         if (n == null) {
@@ -443,12 +458,12 @@ public class OpenClawUtil {
     private static boolean isResponseSupported(String apiUrl) {
         Set<String> allUrl = new HashSet<>();
         allUrl.addAll(RESPONSE_BACKENDS_MAP.keySet());
-        for (String url: RESPONSE_BACKENDS_MAP.values()) {
+        for (String url : RESPONSE_BACKENDS_MAP.values()) {
             if (url != null) {
                 allUrl.add(url);
             }
         }
-        for (String url: allUrl) {
+        for (String url : allUrl) {
             if (apiUrl.contains(url)) {
                 return true;
             }
@@ -482,13 +497,16 @@ public class OpenClawUtil {
         while (providerIterator.hasNext()) {
             Map.Entry<String, JsonNode> providerEntry = providerIterator.next();
             String providerName = providerEntry.getKey();
+            if (!providerName.equals(primaryBackend.getProvider())) {
+                continue;
+            }
             JsonNode providerNode = providerEntry.getValue();
-            if (providerName == null || providerName.trim().isEmpty() || providerNode == null || providerNode.isNull()) {
+            if (providerName.trim().isEmpty() || providerNode == null || providerNode.isNull()) {
                 continue;
             }
 
             JsonNode modelsNode = providerNode.get("models");
-            if (modelsNode == null || !modelsNode.isArray() || modelsNode.size() == 0) {
+            if (modelsNode == null || !modelsNode.isArray() || modelsNode.isEmpty()) {
                 continue;
             }
             JsonNode firstModelNode = modelsNode.get(0);
@@ -508,11 +526,16 @@ public class OpenClawUtil {
             List<String> modelIds = new ArrayList<>();
             for (JsonNode mNode : modelsNode) {
                 String id = getNodeTextValue(mNode, "id");
-                if (id != null && !id.isEmpty()) {
-                    modelIds.add(id);
+                OpenClawModelInfo modelInfo = parseOpenClawModelInfo(id);
+                if (modelInfo == null) {
+                    continue;
                 }
+                modelIds.add(modelInfo.getModelId());
             }
-            String modelValue = modelIds.isEmpty() ? null : String.join(",", modelIds);
+            if (!modelIds.contains(primaryBackend.getModel())) {
+                modelIds.add(0, primaryBackend.getModel());
+            }
+            String modelValue = String.join(",", modelIds);
 
             Map<String, Object> copy = new LinkedHashMap<>();
 
@@ -695,10 +718,18 @@ public class OpenClawUtil {
 
     @Data
     @AllArgsConstructor
+    private static class OpenClawModelInfo {
+        private String provider;
+        private String modelId;
+    }
+
+    @Data
+    @AllArgsConstructor
     private static class PrimaryBackend {
         private String name;
         private String type;
         private String model;
+        private String provider;
     }
 }
 
