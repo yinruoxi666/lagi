@@ -34,8 +34,16 @@ public class OpenClawUtil {
     }
 
     public static void sync(int port) {
+        if (!openClawExists()) {
+            return;
+        }
         syncToOpenClaw(port);
         syncToLinkMind();
+    }
+
+    private static boolean openClawExists() {
+        Path openClawPath = resolveOpenClawJsonPath();
+        return openClawPath != null && Files.exists(openClawPath);
     }
 
     public static void syncToOpenClaw(int port) {
