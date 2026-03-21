@@ -34,6 +34,11 @@ build/
 ### Mac OS ###
 .DS_Store
 
+### Vibe Coding ###
+.claude/
+.codex/
+.cursor/
+
 /lagi-web/samples/
 /lagi-core/src/test/java/zxw/
 /tomcat*
