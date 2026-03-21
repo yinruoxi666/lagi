@@ -192,7 +192,7 @@ If you prefer to use an IDE for development, you can directly open the LinkMind 
 - Start Container Command: 
 
   ```bash
-  docker run -d --name lagi-web -p 8080:8080 landingbj/lagi
+  docker run -d --name lagi-web -p 8080:8080 landingbj/linkmind
   ```
 
 ## Tutorial

@@ -189,7 +189,7 @@ mvn clean package -pl lagi-web -am -DskipTests -U
 - 启动容器：
 
   ```bash
-  docker run -d --name lagi-web -p 8080:8080 landingbj/lagi
+  docker run -d --name lagi-web -p 8080:8080 landingbj/linkmind
   ```
 
 ## 教学演示

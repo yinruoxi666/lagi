@@ -74,7 +74,7 @@ public class SampleIntentServiceImpl implements IntentService {
         }
         intentResult.setStatus(IntentStatusEnum.COMPLETION.getName());
         List<Integer> res = PromptCacheTrigger.analyzeChatBoundariesForIntent(chatCompletionRequest);
-        if (res.size() == 1) {
+        if (res.size() <= 1) {
             return intentResult;
         }
         String lastQ = ChatCompletionUtil.getLastMessage(chatCompletionRequest);
