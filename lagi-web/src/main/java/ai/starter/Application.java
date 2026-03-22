@@ -28,6 +28,13 @@ public class Application {
     private static final String SQLITE_RESOURCE_DIR = "sqlite";
 
     public static void main(String[] args) throws Exception {
+        JdkChecker.JdkCheckResult jdkResult = JdkChecker.check();
+        JdkChecker.printCheckResult(jdkResult);
+
+        if (!jdkResult.isInstalled() || !jdkResult.isVersionOk()) {
+            log.error("No valid Java runtime environment detected, please install JDK and run the program again");
+            System.exit(1);
+        }
         File jarFile = getJarFile();
         boolean devMode = jarFile == null;
 

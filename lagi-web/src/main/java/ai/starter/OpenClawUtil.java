@@ -35,10 +35,34 @@ public class OpenClawUtil {
 
     public static void sync(int port) {
         if (!openClawExists()) {
+            log.warn("OpenClaw is not installed, skipping configuration synchronization");
             return;
         }
-        syncToOpenClaw(port);
-        syncToLinkMind();
+        log.info("OpenClaw environment detected");
+
+        // LinkMind to OpenClaw
+        boolean exportToOpenClaw = ConsolePromptUtil.askYesNo(
+                "Would you like to inject LinkMind into OpenClaw?",
+                true  // Default to yes
+        );
+
+        if (exportToOpenClaw) {
+            syncToOpenClaw(port);
+        } else {
+            log.info("Skipped: LinkMind to OpenClaw configuration synchronization");
+        }
+
+        // OpenClaw to LinkMind
+        boolean importFromOpenClaw = ConsolePromptUtil.askYesNo(
+                "Would you like to import OpenClaw configurations into LinkMind?",
+                true
+        );
+
+        if (importFromOpenClaw) {
+            syncToLinkMind();
+        } else {
+            log.info("Skipped: OpenClaw to LinkMind configuration synchronization");
+        }
     }
 
     private static boolean openClawExists() {
