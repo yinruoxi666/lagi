@@ -2,10 +2,7 @@ package ai.llm.responses;
 
 import ai.common.ModelService;
 import ai.common.exception.RRException;
-import ai.llm.adapter.impl.GPTAdapter;
-import ai.llm.adapter.impl.GPTAzureAdapter;
-import ai.llm.adapter.impl.OpenAIStandardAdapter;
-import ai.llm.adapter.impl.QwenAdapter;
+import ai.llm.adapter.impl.*;
 import ai.llm.utils.LLMErrorConstants;
 import ai.wrapper.impl.AlibabaAdapter;
 import cn.hutool.core.util.StrUtil;
@@ -34,6 +31,7 @@ public final class ResponseProtocolUtil {
         return StrUtil.equals(driver, GPTAdapter.class.getName())
                 || StrUtil.equals(driver, OpenAIStandardAdapter.class.getName())
                 || StrUtil.equals(driver, GPTAzureAdapter.class.getName())
+                || StrUtil.equals(driver, GrokAdapter.class.getName())
                 || StrUtil.equals(driver, QwenAdapter.class.getName())
                 || StrUtil.equals(driver, AlibabaAdapter.class.getName());
     }
