@@ -20,7 +20,7 @@ import java.util.*;
 public class OpenClawUtil {
     private static final String OPEN_CLAW_DIR_NAME = ".openclaw";
     private static final String[] MODELS_JSON_PATH_SEGMENTS = {"agents", "main", "agent", "models.json"};
-    private static final String CONFIG_FILE_PROPERTY = Application.CONFIG_FILE_PROPERTY;
+    private static final String CONFIG_FILE_PROPERTY = InstallerUtil.CONFIG_FILE_PROPERTY;
     private static final String YAML_INDENT = "  ";
     private static final String OPENAI_COMPLETIONS_API = "openai-completions";
     private static final Yaml SNAKE_YAML = createSnakeYaml();
@@ -33,31 +33,16 @@ public class OpenClawUtil {
         RESPONSE_BACKENDS_MAP.put("admin-dgmeta-resource.cognitiveservices.azure.com", null);
     }
 
-    public static void sync(int port) {
+    public static void sync(int port, boolean exportToOpenClaw, boolean importFromOpenClaw) {
         if (!openClawExists()) {
             log.warn("OpenClaw is not installed, skipping configuration synchronization");
             return;
         }
-        log.info("OpenClaw environment detected");
-
-        // LinkMind to OpenClaw
-        boolean exportToOpenClaw = ConsolePromptUtil.askYesNo(
-                "Would you like to inject LinkMind into OpenClaw?",
-                true  // Default to yes
-        );
-
         if (exportToOpenClaw) {
             syncToOpenClaw(port);
         } else {
             log.info("Skipped: LinkMind to OpenClaw configuration synchronization");
         }
-
-        // OpenClaw to LinkMind
-        boolean importFromOpenClaw = ConsolePromptUtil.askYesNo(
-                "Would you like to import OpenClaw configurations into LinkMind?",
-                true
-        );
-
         if (importFromOpenClaw) {
             syncToLinkMind();
         } else {

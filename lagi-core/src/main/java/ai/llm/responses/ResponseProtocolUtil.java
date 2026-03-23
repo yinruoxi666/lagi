@@ -33,6 +33,7 @@ public final class ResponseProtocolUtil {
                 || StrUtil.equals(driver, GPTAzureAdapter.class.getName())
                 || StrUtil.equals(driver, GrokAdapter.class.getName())
                 || StrUtil.equals(driver, QwenAdapter.class.getName())
+                || StrUtil.equals(driver, QwenCompatibleAdapter.class.getName())
                 || StrUtil.equals(driver, AlibabaAdapter.class.getName());
     }
 

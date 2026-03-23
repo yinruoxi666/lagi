@@ -28,7 +28,7 @@ public class FilterConfigServlet extends RestfulServlet {
 
     private String getLagiYmlPath() {
         if (lagiYmlPath == null) {
-            String configFile = System.getProperty(ai.starter.Application.CONFIG_FILE_PROPERTY);
+            String configFile = System.getProperty(ai.starter.InstallerUtil.CONFIG_FILE_PROPERTY);
             if (configFile != null && !configFile.isEmpty()) {
                 File f = new File(configFile);
                 if (f.exists() && f.isFile()) {
