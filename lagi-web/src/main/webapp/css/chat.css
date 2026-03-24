@@ -2619,6 +2619,133 @@ body.home-mode .home-stat-card__hint {
     text-align: center;
 }
 
+/* 让智能体页的首页统计卡也沿用 home-mode 视觉样式 */
+#introduces.stats-compact .grid {
+    gap: 12px;
+    position: relative;
+    padding: 10px 4px;
+}
+
+#introduces.stats-compact .grid::before,
+#introduces.stats-compact .grid::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(15, 23, 42, 0) 0%, rgba(15, 23, 42, 0.22) 12%, rgba(15, 23, 42, 0.22) 88%, rgba(15, 23, 42, 0) 100%);
+}
+
+#introduces.stats-compact .grid::before {
+    top: 0;
+}
+
+#introduces.stats-compact .grid::after {
+    bottom: 0;
+}
+
+#introduces.stats-compact .home-stat-card {
+    border-radius: 14px;
+    background: linear-gradient(180deg, #ffffff 0%, #fcfdfe 100%);
+    border: none;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+    padding: 6px 14px;
+    min-height: 90px;
+    max-height: 96px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 5px;
+}
+
+#introduces.stats-compact .home-stat-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.07);
+}
+
+#introduces.stats-compact .home-stat-card__icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+}
+
+#introduces.stats-compact .home-stat-card__icon svg {
+    width: 15px;
+    height: 15px;
+}
+
+#introduces.stats-compact .home-stat-card__title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #475569;
+    letter-spacing: 0.01em;
+    margin: 0;
+    text-align: center;
+    line-height: 1.34;
+}
+
+#introduces.stats-compact .home-stat-card__value {
+    margin: 0;
+    font-size: clamp(1.52rem, 1.95vw, 1.78rem);
+    background: linear-gradient(180deg, #2671f0 0%, #1251d8 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 5px 12px rgba(17, 81, 216, 0.18);
+    letter-spacing: -0.012em;
+    white-space: nowrap;
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 2px;
+}
+
+#introduces.stats-compact .home-stat-card__value.home-stat-card__value--md .home-stat-card__num {
+    font-size: clamp(1.44rem, 1.85vw, 1.68rem);
+}
+
+#introduces.stats-compact .home-stat-card__value.home-stat-card__value--sm .home-stat-card__num {
+    font-size: clamp(1.32rem, 1.68vw, 1.56rem);
+}
+
+#introduces.stats-compact .home-stat-card__value.home-stat-card__value--xs .home-stat-card__num {
+    font-size: clamp(1.16rem, 1.5vw, 1.36rem);
+}
+
+#introduces.stats-compact .home-stat-card--tokens .home-stat-card__value {
+    font-size: clamp(1.40rem, 1.79vw, 1.64rem);
+}
+
+#introduces.stats-compact .home-stat-card--tokens .home-stat-card__value.home-stat-card__value--md .home-stat-card__num {
+    font-size: clamp(1.32rem, 1.70vw, 1.55rem);
+}
+
+#introduces.stats-compact .home-stat-card--tokens .home-stat-card__value.home-stat-card__value--sm .home-stat-card__num {
+    font-size: clamp(1.21rem, 1.55vw, 1.44rem);
+}
+
+#introduces.stats-compact .home-stat-card--tokens .home-stat-card__value.home-stat-card__value--xs .home-stat-card__num {
+    font-size: clamp(1.07rem, 1.38vw, 1.25rem);
+}
+
+#introduces.stats-compact .home-stat-card__unit {
+    color: #334e81;
+    -webkit-text-fill-color: #334e81;
+    font-size: 0.3em;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+#introduces.stats-compact .home-stat-card__hint {
+    margin: 0;
+    font-size: 0.88rem;
+    color: #475569;
+    white-space: normal;
+    line-height: 1.5;
+    text-align: center;
+}
+
 @media (max-width: 768px) {
     body.home-mode #introduces .grid {
         gap: 10px;
@@ -2669,6 +2796,59 @@ body.home-mode .home-stat-card__hint {
     }
 
     body.home-mode .home-stat-card__hint {
+        font-size: 0.76rem;
+        line-height: 1.46;
+    }
+
+    #introduces.stats-compact .grid {
+        gap: 10px;
+        padding: 8px 2px;
+    }
+
+    #introduces.stats-compact .home-stat-card {
+        min-height: 112px;
+        padding: 10px 12px;
+        gap: 5px;
+    }
+
+    #introduces.stats-compact .home-stat-card__title {
+        font-size: 1.04rem;
+    }
+
+    #introduces.stats-compact .home-stat-card__value {
+        font-size: clamp(1.42rem, 6.2vw, 1.66rem);
+        margin-top: 6px;
+    }
+
+    #introduces.stats-compact .home-stat-card__value.home-stat-card__value--md .home-stat-card__num {
+        font-size: clamp(1.26rem, 5.6vw, 1.5rem);
+    }
+
+    #introduces.stats-compact .home-stat-card__value.home-stat-card__value--sm .home-stat-card__num {
+        font-size: clamp(1.14rem, 5vw, 1.34rem);
+    }
+
+    #introduces.stats-compact .home-stat-card__value.home-stat-card__value--xs .home-stat-card__num {
+        font-size: clamp(1.04rem, 4.6vw, 1.22rem);
+    }
+
+    #introduces.stats-compact .home-stat-card--tokens .home-stat-card__value {
+        font-size: clamp(1.31rem, 5.7vw, 1.53rem);
+    }
+
+    #introduces.stats-compact .home-stat-card--tokens .home-stat-card__value.home-stat-card__value--md .home-stat-card__num {
+        font-size: clamp(1.16rem, 5.15vw, 1.38rem);
+    }
+
+    #introduces.stats-compact .home-stat-card--tokens .home-stat-card__value.home-stat-card__value--sm .home-stat-card__num {
+        font-size: clamp(1.05rem, 4.6vw, 1.23rem);
+    }
+
+    #introduces.stats-compact .home-stat-card--tokens .home-stat-card__value.home-stat-card__value--xs .home-stat-card__num {
+        font-size: clamp(0.96rem, 4.2vw, 1.12rem);
+    }
+
+    #introduces.stats-compact .home-stat-card__hint {
         font-size: 0.76rem;
         line-height: 1.46;
     }
