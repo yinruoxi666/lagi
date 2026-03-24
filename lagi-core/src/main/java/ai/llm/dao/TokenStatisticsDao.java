@@ -1,10 +1,13 @@
 package ai.llm.dao;
 
+import ai.common.db.Conn;
+import ai.common.db.HikariDS;
 import ai.llm.pojo.TokenStatisticsDetail;
 import ai.llm.pojo.TokenStatisticsGuardInfo;
 import ai.llm.pojo.TokenStatisticsPageResult;
 import ai.llm.pojo.TokenStatisticsRange;
 import ai.llm.pojo.TokenStatisticsSummary;
+import ai.utils.AiGlobal;
 import lombok.extern.slf4j.Slf4j;
 
 import java.sql.Connection;
@@ -22,9 +25,6 @@ import java.util.concurrent.ThreadLocalRandom;
 
 @Slf4j
 public class TokenStatisticsDao {
-
-    private static final String DB_URL = "jdbc:sqlite:saas.db";
-
     private static final String CREATE_SQL = ""
             + "CREATE TABLE IF NOT EXISTS llm_token_statistics ("
             + " id INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -41,7 +41,7 @@ public class TokenStatisticsDao {
     static {
         try {
             Class.forName("org.sqlite.JDBC");
-            try (Connection conn = DriverManager.getConnection(DB_URL)) {
+            try (Connection conn = HikariDS.getConnection(AiGlobal.DEFAULT_DB)) {
                 try (PreparedStatement ps = conn.prepareStatement(CREATE_SQL)) {
                     ps.executeUpdate();
                 }
@@ -72,7 +72,7 @@ public class TokenStatisticsDao {
      */
     public long earliestCreatedAtMillis() {
         String sql = "SELECT MIN(created_at) FROM llm_token_statistics";
-        try (Connection conn = DriverManager.getConnection(DB_URL);
+        try (Connection conn = HikariDS.getConnection(AiGlobal.DEFAULT_DB);
              PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
             if (rs.next()) {
@@ -123,7 +123,7 @@ public class TokenStatisticsDao {
 
     public void insert(long promptTokens, long completionTokens, long totalTokens, long savedTokens) {
         String sql = "INSERT INTO llm_token_statistics (created_at, prompt_tokens, completion_tokens, total_tokens, saved_tokens) VALUES (?, ?, ?, ?, ?)";
-        try (Connection conn = DriverManager.getConnection(DB_URL);
+        try (Connection conn = HikariDS.getConnection(AiGlobal.DEFAULT_DB);
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, System.currentTimeMillis());
             ps.setLong(2, promptTokens);
@@ -144,7 +144,7 @@ public class TokenStatisticsDao {
         long start = bounds[0];
         long end = bounds[1];
         String sql = "SELECT COUNT(1), COALESCE(SUM(total_tokens), 0), COALESCE(SUM(saved_tokens), 0) FROM llm_token_statistics WHERE created_at >= ? AND created_at < ?";
-        try (Connection conn = DriverManager.getConnection(DB_URL);
+        try (Connection conn = HikariDS.getConnection(AiGlobal.DEFAULT_DB);
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, start);
             ps.setLong(2, end);
@@ -192,7 +192,7 @@ public class TokenStatisticsDao {
         int offset = (p - 1) * size;
         String sql = "SELECT id, created_at, prompt_tokens, completion_tokens, total_tokens, saved_tokens FROM llm_token_statistics WHERE created_at >= ? AND created_at < ? ORDER BY id DESC LIMIT ? OFFSET ?";
         List<TokenStatisticsDetail> list = new ArrayList<>();
-        try (Connection conn = DriverManager.getConnection(DB_URL);
+        try (Connection conn = HikariDS.getConnection(AiGlobal.DEFAULT_DB);
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, start);
             ps.setLong(2, end);
@@ -232,7 +232,7 @@ public class TokenStatisticsDao {
 
     private long countInRange(long startMs, long endMsExclusive) {
         String sql = "SELECT COUNT(1) FROM llm_token_statistics WHERE created_at >= ? AND created_at < ?";
-        try (Connection conn = DriverManager.getConnection(DB_URL);
+        try (Connection conn = HikariDS.getConnection(AiGlobal.DEFAULT_DB);
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, startMs);
             ps.setLong(2, endMsExclusive);

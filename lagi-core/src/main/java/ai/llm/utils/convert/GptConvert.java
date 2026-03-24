@@ -54,7 +54,7 @@ public class GptConvert {
 
     public static ChatCompletionResult convertSteamLine2ChatCompletionResult(String body) {
         // 打印日志：
-        log.info("Received stream line: {}", body);
+//        log.info("Received stream line: {}", body);
         if (body.equals("[DONE]")) {
             return null;
         }

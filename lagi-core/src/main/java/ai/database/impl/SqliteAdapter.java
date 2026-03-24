@@ -1,6 +1,8 @@
 package ai.database.impl;
 
+import ai.common.db.HikariDS;
 import ai.database.pojo.TableColumnInfo;
+import ai.utils.AiGlobal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -12,7 +14,6 @@ import java.util.List;
 import java.util.Map;
 
 public class SqliteAdapter {
-    private String url;
     public String model;
     private static final Logger log = LoggerFactory.getLogger(SqliteAdapter.class);
 
@@ -21,13 +22,10 @@ public class SqliteAdapter {
     }
 
     private void init() {
-        String tomcatPath = System.getProperty("user.dir");
-        String dbPath = tomcatPath + "/saas.db";
-        url = "jdbc:sqlite:" + dbPath;
         Connection conn = null;
         Statement stmt = null;
         try {
-            conn = getCon(url);
+            conn = getCon();
             stmt = conn.createStatement();
             DatabaseMetaData dbm = conn.getMetaData();
             ResultSet tables = dbm.getTables(null, null, "table_info", null);
@@ -66,8 +64,8 @@ public class SqliteAdapter {
         }
     }
 
-    public Connection getCon() {
-        return getCon(url);
+    public Connection getCon() throws SQLException {
+        return HikariDS.getConnection(AiGlobal.DEFAULT_DB);
     }
 
     /**

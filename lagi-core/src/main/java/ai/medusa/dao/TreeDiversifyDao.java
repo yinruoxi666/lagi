@@ -1,7 +1,9 @@
 package ai.medusa.dao;
 
 
+import ai.common.db.HikariDS;
 import ai.medusa.pojo.TreeDiversifyNode;
+import ai.utils.AiGlobal;
 import lombok.extern.slf4j.Slf4j;
 
 import java.sql.*;
@@ -10,14 +12,9 @@ import java.util.List;
 
 @Slf4j
 public class TreeDiversifyDao {
-
-    private static final String DB_URL = "jdbc:sqlite:saas.db";
-
     static {
         try {
-            Class.forName("org.sqlite.JDBC");
-            // 创建数据库连接
-            Connection conn = DriverManager.getConnection(DB_URL);
+            Connection conn = HikariDS.getConnection(AiGlobal.DEFAULT_DB);
             // 创建表
             String sql = "CREATE TABLE IF NOT EXISTS tree_diversify (\n" +
                     "    id INTEGER PRIMARY KEY AUTOINCREMENT,\n" +
@@ -37,8 +34,6 @@ public class TreeDiversifyDao {
             conn.close();
         } catch (SQLException e) {
             log.error("Error connecting to database", e);
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException(e);
         }
     }
 
@@ -57,7 +52,7 @@ public class TreeDiversifyDao {
                 "       ORDER BY hitCount DESC\n" +
                 "       LIMIT ?\n" +
                 "   ) tdr ON td.id = tdr.child_id;";
-        try (PreparedStatement ps = DriverManager.getConnection(DB_URL).prepareStatement(query)) {
+        try (PreparedStatement ps = HikariDS.getConnection(AiGlobal.DEFAULT_DB).prepareStatement(query)) {
             ps.setInt(1, parentId);
             ps.setInt(2, top);
             ResultSet rs = ps.executeQuery();
@@ -75,7 +70,7 @@ public class TreeDiversifyDao {
     public void saveGraphNode(String text) {
 
         String query = "INSERT INTO tree_diversify (text) VALUES (?) ON CONFLICT(text) DO NOTHING";
-        try (PreparedStatement ps = DriverManager.getConnection(DB_URL).prepareStatement(query)) {
+        try (PreparedStatement ps = HikariDS.getConnection(AiGlobal.DEFAULT_DB).prepareStatement(query)) {
             ps.setString(1, text);
             ps.executeUpdate();
         } catch (SQLException e) {
@@ -100,7 +95,7 @@ public class TreeDiversifyDao {
         }
 
         String query = "INSERT INTO tree_diversify_relations (parent_id, child_id, hitCount) VALUES (?, ?, 1) ON CONFLICT(parent_id, child_id) DO UPDATE SET hitCount = hitCount + 1";
-        try (PreparedStatement ps = DriverManager.getConnection(DB_URL).prepareStatement(query)) {
+        try (PreparedStatement ps = HikariDS.getConnection(AiGlobal.DEFAULT_DB).prepareStatement(query)) {
             ps.setInt(1, lastTextId);
             ps.setInt(2, textId);
             ps.executeUpdate();
@@ -114,7 +109,7 @@ public class TreeDiversifyDao {
     public void saveRelation(Integer pId, Integer cId) {
 
         String query = "INSERT INTO tree_diversify_relations (parent_id, child_id, hitCount) VALUES (?, ?, 1) ON CONFLICT(parent_id, child_id) DO UPDATE SET hitCount = hitCount + 1";
-        try (PreparedStatement ps = DriverManager.getConnection(DB_URL).prepareStatement(query)) {
+        try (PreparedStatement ps = HikariDS.getConnection(AiGlobal.DEFAULT_DB).prepareStatement(query)) {
             ps.setInt(1, pId);
             ps.setInt(2, cId);
             ps.executeUpdate();
@@ -126,7 +121,7 @@ public class TreeDiversifyDao {
 
     public Integer getIdByText(String text) {
         String query = "SELECT id FROM tree_diversify WHERE text = ?";
-        try (PreparedStatement ps = DriverManager.getConnection(DB_URL).prepareStatement(query)) {
+        try (PreparedStatement ps = HikariDS.getConnection(AiGlobal.DEFAULT_DB).prepareStatement(query)) {
             ps.setString(1, text);
             ResultSet rs = ps.executeQuery();
             if (rs.next()) {
@@ -141,7 +136,7 @@ public class TreeDiversifyDao {
     public List<TreeDiversifyNode> getAllNodeTexts() {
         List<TreeDiversifyNode> res = new ArrayList<>();
         String query = "SELECT id, text FROM tree_diversify order by id";
-        try (PreparedStatement ps = DriverManager.getConnection(DB_URL).prepareStatement(query)) {
+        try (PreparedStatement ps = HikariDS.getConnection(AiGlobal.DEFAULT_DB).prepareStatement(query)) {
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
                 TreeDiversifyNode node = new TreeDiversifyNode();
@@ -157,7 +152,7 @@ public class TreeDiversifyDao {
 
     public int getAllNodeCount() {
         String query = "SELECT count(1) as c FROM tree_diversify";
-        try (PreparedStatement ps = DriverManager.getConnection(DB_URL).prepareStatement(query)) {
+        try (PreparedStatement ps = HikariDS.getConnection(AiGlobal.DEFAULT_DB).prepareStatement(query)) {
             ResultSet rs = ps.executeQuery();
             if (rs.next()) {
                 return rs.getInt("c");
@@ -172,7 +167,7 @@ public class TreeDiversifyDao {
     public boolean hasRelation(Integer parentId, Integer childId) {
         boolean result = false;
         String query = "select count(1) as c from tree_diversify_relations where parent_id = ? and child_id = ?";
-        try (PreparedStatement ps = DriverManager.getConnection(DB_URL).prepareStatement(query)) {
+        try (PreparedStatement ps = HikariDS.getConnection(AiGlobal.DEFAULT_DB).prepareStatement(query)) {
             ps.setInt(1, parentId);
             ps.setInt(2, childId);
             ResultSet rs = ps.executeQuery();

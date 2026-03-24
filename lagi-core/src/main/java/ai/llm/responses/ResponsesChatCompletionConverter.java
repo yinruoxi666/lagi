@@ -9,9 +9,12 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
+@Slf4j
 public final class ResponsesChatCompletionConverter {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -21,7 +24,9 @@ public final class ResponsesChatCompletionConverter {
     public static ResponseCreateRequest toRequest(ChatCompletionRequest request,
                                                   ResponseSessionContext sessionContext,
                                                   String modelName) {
-        fixupFunctionCallId(request);
+        if (modelName.toLowerCase().startsWith("gpt")) {
+            fixupFunctionCallId(request);
+        }
         ResponseCreateRequest responseRequest = new ResponseCreateRequest();
         responseRequest.setModel(modelName);
         responseRequest.setInstructions(extractInstructions(sessionContext));
@@ -234,6 +239,7 @@ public final class ResponsesChatCompletionConverter {
 
     private static List<ResponseInputItem> toInputItems(List<ChatMessage> messages) {
         List<ResponseInputItem> items = new ArrayList<>();
+        Set<String> emittedFunctionCallIds = new LinkedHashSet<>();
         if (messages == null) {
             return items;
         }
@@ -254,6 +260,13 @@ public final class ResponsesChatCompletionConverter {
                     items.add(createMessageItem(message.getRole(), message.getContent()));
                 }
                 for (ToolCall toolCall : message.getTool_calls()) {
+                    if (toolCall == null || StrUtil.isBlank(toolCall.getId())) {
+                        continue;
+                    }
+                    if (!emittedFunctionCallIds.add(toolCall.getId())) {
+                        log.warn("Skip duplicated function_call item, call_id={}", toolCall.getId());
+                        continue;
+                    }
                     ResponseInputItem item = new ResponseInputItem();
                     item.setType("function_call");
                     item.setCall_id(toolCall.getId());
@@ -287,6 +300,7 @@ public final class ResponsesChatCompletionConverter {
 
     private static ResponseInputItem createMessageItem(String role, String content) {
         ResponseInputItem item = new ResponseInputItem();
+        item.setType("message");
         item.setRole(role);
         item.setContent(toInputContents(role, content));
         return item;
