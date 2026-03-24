@@ -72,14 +72,6 @@ function formatNumber(value) {
     return Number(value).toLocaleString(locale);
 }
 
-function getGuardDays() {
-    // 这里可以按实际发布时间调整
-    const launchDate = new Date('2026-03-21T00:00:00+08:00');
-    const now = new Date();
-    const days = Math.max(0, Math.floor((now.getTime() - launchDate.getTime()) / (24 * 60 * 60 * 1000)));
-    return days;
-}
-
 function getHomeStatValueSizeClass(rawValue) {
     const n = Math.abs(Number(rawValue) || 0);
     const digits = String(Math.trunc(n)).length;
@@ -96,14 +88,14 @@ function getHomeStatValueSizeClass(rawValue) {
 }
 
 function buildHomeStatsCards() {
-    const guardDays = getGuardDays();
-    const savedTokens = 18789;
+    const guardDays = 0;
+    const savedTokens = 0;
     const filteredCount = 187;
     const stats = [
         {
             title: tFn('home.guardTitle', '平台已稳定守护'),
             rawValue: guardDays,
-            value: `<span class="home-stat-card__num">${formatNumber(guardDays)}</span><span class="home-stat-card__unit">${tFn('home.guardUnit', '天')}</span>`,
+            value: `<span id="homeStatGuardDays" class="home-stat-card__num">${formatNumber(guardDays)}</span><span class="home-stat-card__unit">${tFn('home.guardUnit', '天')}</span>`,
             hint: tFn('home.guardHint', '持续为您提供稳定服务'),
             iconClass: 'home-stat-card__icon--blue',
             icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
@@ -112,7 +104,7 @@ function buildHomeStatsCards() {
             title: tFn('home.savedTitle', '累计为您节省'),
             rawValue: savedTokens,
             cardClass: 'home-stat-card--tokens',
-            value: `<span class="home-stat-card__num">${formatNumber(savedTokens)}</span><span class="home-stat-card__unit">Tokens</span>`,
+            value: `<span id="homeStatSavedTokens" class="home-stat-card__num">${formatNumber(savedTokens)}</span><span class="home-stat-card__unit">Tokens</span>`,
             hint: tFn('home.savedHint', '高效优化，降低成本'),
             iconClass: 'home-stat-card__icon--green',
             icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
@@ -132,12 +124,13 @@ function buildHomeStatsCards() {
         const item = stats[i];
         const valueSizeClass = getHomeStatValueSizeClass(item.rawValue);
         const cardClass = item.cardClass ? ` ${item.cardClass}` : '';
+        const valueWrapperId = i === 0 ? ' id="homeStatGuardValue"' : (i === 1 ? ' id="homeStatSavedValue"' : '');
         html += `
         <div class="home-stat-card${cardClass}">
             <div class="home-stat-card__icon ${item.iconClass}" aria-hidden="true">${item.icon}</div>
             <div class="home-stat-card__content">
                 <div class="home-stat-card__title">${item.title}</div>
-                <div class="home-stat-card__value ${valueSizeClass}">${item.value}</div>
+                <div class="home-stat-card__value ${valueSizeClass}"${valueWrapperId}>${item.value}</div>
                 <div class="home-stat-card__hint">${item.hint}</div>
                 ${item.meta ? `<div class="home-stat-card__meta">${item.meta}</div>` : ''}
             </div>
@@ -152,6 +145,54 @@ function initHomeStatsCards() {
     grid.empty();
     grid.append(buildHomeStatsCards());
     applyHomeStatsLayout();
+    loadHomeGuardDaysStat();
+    loadHomeSavedTokensStat();
+}
+
+/** Guard days: inclusive calendar days from earliest token record to today. */
+function loadHomeGuardDaysStat() {
+    $.getJSON('/v1/token-statistics/guard')
+        .done(function(data) {
+            const n = Number(data && data.guardDays != null ? data.guardDays : 0);
+            const $num = $('#homeStatGuardDays');
+            if (!$num.length) {
+                return;
+            }
+            $num.text(formatNumber(n));
+            const $wrap = $('#homeStatGuardValue');
+            if ($wrap.length) {
+                $wrap.removeClass('home-stat-card__value--xs home-stat-card__value--sm home-stat-card__value--md');
+                $wrap.addClass(getHomeStatValueSizeClass(n));
+            }
+        })
+        .fail(function() {
+            if (window.console && console.warn) {
+                console.warn('token statistics guard failed');
+            }
+        });
+}
+
+/** Total saved tokens from server (all time). */
+function loadHomeSavedTokensStat() {
+    $.getJSON('/v1/token-statistics/overview', { range: 'all' })
+        .done(function(data) {
+            const n = Number(data && data.totalSavedTokens != null ? data.totalSavedTokens : 0);
+            const $num = $('#homeStatSavedTokens');
+            if (!$num.length) {
+                return;
+            }
+            $num.text(formatNumber(n));
+            const $wrap = $('#homeStatSavedValue');
+            if ($wrap.length) {
+                $wrap.removeClass('home-stat-card__value--xs home-stat-card__value--sm home-stat-card__value--md');
+                $wrap.addClass(getHomeStatValueSizeClass(n));
+            }
+        })
+        .fail(function() {
+            if (window.console && console.warn) {
+                console.warn('token statistics overview failed');
+            }
+        });
 }
 
 function applyHomeStatsLayout() {
