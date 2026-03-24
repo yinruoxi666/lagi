@@ -35,9 +35,10 @@ function debounce(fun,wait=1500){
 }
 
 function alert(e){
+    const tText = window.tText || ((s) => s);
     $("#msg").remove();
     $("#alert-box").show();
-    $("#alert-box").append('<div id="msg" class="msg"><div id="msg_top" class="msg_top">信息<span class="msg_close">×</span></div><div id="msg_cont" class="msg_cont">'+e+'</div><div class="msg_clear" id="msg_clear">确定</div></div>');
+    $("#alert-box").append('<div id="msg" class="msg"><div id="msg_top" class="msg_top">'+ tText('信息') +'<span class="msg_close">×</span></div><div id="msg_cont" class="msg_cont">'+ tText(String(e)) +'</div><div class="msg_clear" id="msg_clear">'+ tText('确定') +'</div></div>');
     $(".msg_close").click(function (){
         $("#msg").remove();
         $("#alert-box").hide();
@@ -51,9 +52,10 @@ function alert(e){
 
 
 function confirm(e){
+    const tText = window.tText || ((s) => s);
     $("#confirm-msg").remove();
     $("#confirm-box").show();
-    $("#confirm-box").append('<div id="confirm-msg" class="msg msg-container" ><div id="msg_top"  class="msg_top" >信息<span class="msg_close">×</span></div><div id="msg_cont" class="msg_cont" >'+e+'</div><div id="msg_cancel" class="msg_cancel left" >取消</div><div class="msg_close right" id="msg_sure">确定</div></div>');
+    $("#confirm-box").append('<div id="confirm-msg" class="msg msg-container" ><div id="msg_top"  class="msg_top" >'+ tText('信息') +'<span class="msg_close">×</span></div><div id="msg_cont" class="msg_cont" >'+ tText(String(e)) +'</div><div id="msg_cancel" class="msg_cancel left" >'+ tText('取消') +'</div><div class="msg_close right" id="msg_sure">'+ tText('确定') +'</div></div>');
 
     const confirmBox = document.getElementById('confirm-box');
     const customConfirm = document.getElementById('confirm-msg');

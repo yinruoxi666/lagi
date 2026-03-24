@@ -53,7 +53,7 @@ $(function () {
         touchend: function () {
             clearTimeout(timeOutEvent);
             if (timeOutEvent != 0) {
-                alert("你这是点击，不是长按");
+                alert(tTextSelf("你这是点击，不是长按"));
             }
             Recoder.stop();
             return false;
@@ -94,7 +94,7 @@ forwardButton.addEventListener("click", () => {
     document.body.removeChild(tempTextarea);
 
     // 提示用户复制成功
-    alert("已复制到剪贴板：" + ipAddressAndPort);
+    alert(tTextSelf("已复制到剪贴板：") + ipAddressAndPort);
 });
 
 // 获取当前的IP地址和端口号的示例函数
@@ -106,6 +106,7 @@ function getCurrentIpAddressAndPort() {
 }
 
 var voice_url = '';
+const tTextSelf = window.tText || ((s) => s);
 
 // 播音功能的实现
 function txtTovoice(txt, emotion) {
@@ -162,7 +163,7 @@ function txtTovoice(txt, emotion) {
         xhr.send(JSON.stringify(postData));
 
     } else {
-        alert("当前无内容播放，请先输入对答");
+        alert(tTextSelf("当前无内容播放，请先输入对答"));
     }
 
 }
@@ -248,17 +249,17 @@ fileUploadButton.addEventListener("click", function () {
             if (fileType === "pdf" || fileType === "doc" || fileType === "docx" || fileType === "txt" ||
                 fileType === "xls" || fileType === "xlsx" || fileType === "ppt" || fileType === "pptx"||
                 fileType === "csv") {
-                question = "您所上传的文档文件名称为：" + selectedFile.name;
+                question = tTextSelf("您所上传的文档文件名称为：") + selectedFile.name;
                 formData.append("file", selectedFile); // 使用 "file" 作为文件字段的名称
                 serverEndpoint = "/uploadFile/uploadLearningFile?category=" + window.category;
                 fileStatus = "doc";
             } else if (fileType === "jpg" || fileType === "jpeg" || fileType === "png" || fileType === "heic") {
-                question = "您所上传的图片是：" + selectedFile.name;
+                question = tTextSelf("您所上传的图片是：") + selectedFile.name;
                 serverEndpoint = "/uploadFile/uploadImageFile";
                 formData.append("file", selectedFile);
                 fileStatus = "pic";
             } else if (fileType === "mp3" || fileType === "wav" || fileType === "pcm") {
-                question = "您所上传的音频文件名称为：" + selectedFile.name;
+                question = tTextSelf("您所上传的音频文件名称为：") + selectedFile.name;
                 formData.append("files", selectedFile);
                 formData.append("category", "selectedFile");
                 formData.append("total_epoch", 20);
@@ -267,7 +268,7 @@ fileUploadButton.addEventListener("click", function () {
                 fileStatus = "voice";
             } else if (fileType === "avi" || fileType === "mp4") {
                 formData.append("file", selectedFile);
-                question = "您所上传的视频解析为：";
+                question = tTextSelf("您所上传的视频解析为：");
                 serverEndpoint = "/uploadFile/uploadVideoFile";
                 formData.append("file", selectedFile);
                 fileStatus = "video";
@@ -277,7 +278,7 @@ fileUploadButton.addEventListener("click", function () {
                 // hideHelloContent();
                 let conversation1 = {
                     user: {question: question},
-                    robot: {answer: '鉴于当前资源有限，请适当缩减文件大小，敬请您的谅解！'}
+                    robot: {answer: tTextSelf('鉴于当前资源有限，请适当缩减文件大小，敬请您的谅解！')}
                 }
                 newConversation(conversation1);
                 addConv(conversation1);
@@ -285,7 +286,7 @@ fileUploadButton.addEventListener("click", function () {
             }
 
             if (fileStatus == "") {
-                alert("请选择指定的文件类型")
+                alert(tTextSelf("请选择指定的文件类型"))
                 return;
             }
             // hideHelloContent();
@@ -307,13 +308,13 @@ fileUploadButton.addEventListener("click", function () {
                             var json = JSON.parse(responseText);
                             if (fileStatus == 'pic') {
                                 if (json.status === "success") {
-                                    var question = "您所上传的图片名称为：" + selectedFile.name;
-                                    var result = "已经收到您上传的图片。如果您想生成视频，请输入\"视频生成\"。" +
-                                        "如果您想增强图片，请输入\"图像增强\"。如果您想使用AI描述图片，请输入\"看图说话\"。";
+                                    var question = tTextSelf("您所上传的图片名称为：") + selectedFile.name;
+                                    var result = tTextSelf("已经收到您上传的图片。如果您想生成视频，请输入\"视频生成\"。") +
+                                        tTextSelf("如果您想增强图片，请输入\"图像增强\"。如果您想使用AI描述图片，请输入\"看图说话\"。");
                                     lastFilePath = json.filePath;
                                     textQuery1(question, result, fileStatus);
                                 } else {
-                                    alert("上传失败");
+                                    alert(tTextSelf("上传失败"));
                                     return;
                                 }
                             } else if (fileStatus == "doc") {
@@ -322,18 +323,18 @@ fileUploadButton.addEventListener("click", function () {
                                     // var question = "您所上传的文档文件名称为：" + selectedFile.name;
                                     // var result = "已经收到您的资料文档，您可以在新的会话中，询问与资料中内容相关的问题。"
                                     // textQuery1(question, result, fileStatus);
-                                    var question = "您所上传的文档文件名称为：" + selectedFile.name;
-                                    var result = "已经收到您的资料文档，您可以在新的会话中，询问与资料中内容相关的问题。如果您想生成指令集，请输入\"生成指令集\"。"
+                                    var question = tTextSelf("您所上传的文档文件名称为：") + selectedFile.name;
+                                    var result = tTextSelf("已经收到您的资料文档，您可以在新的会话中，询问与资料中内容相关的问题。如果您想生成指令集，请输入\"生成指令集\"。")
                                     lastFilePath = json.filePath;
                                     console.log("文件为" + lastFilePath)
                                     textQuery1(question, result, fileStatus);
                                 } else {
-                                    alert("上传失败")
+                                    alert(tTextSelf("上传失败"))
                                     return;
                                 }
                             } else if (fileStatus == "voice") {
                                 if (json.status == "success") {
-                                    var question = "您所上传的音频文件名称为：" + selectedFile.name;
+                                    var question = tTextSelf("您所上传的音频文件名称为：") + selectedFile.name;
                                     var voiceToTxtResult = voiceToTxt(selectedFile);
                                     var voiceResult = "";
                                     if (voiceToTxtResult != '') {
@@ -343,29 +344,29 @@ fileUploadButton.addEventListener("click", function () {
 
                                     }
                                     var result = `
-                    已将您的语音素材用于训练声音，稍后积累足够时间，可以模仿您所提供的口音发声。<br><br>
-                    你发送的音频文件的内容为： ${voiceResult}
+                    ${tTextSelf('已将您的语音素材用于训练声音，稍后积累足够时间，可以模仿您所提供的口音发声。')}<br><br>
+                    ${tTextSelf('你发送的音频文件的内容为：')} ${voiceResult}
                     `
                                     textQuery1(question, result, fileStatus);
                                 } else {
-                                    alert("上传失败");
+                                    alert(tTextSelf("上传失败"));
                                     return;
                                 }
                             } else if (fileStatus == "video") {
                                 if (json.status == "success") {
-                                    var question = "您所上传的视频文件名称为：" + selectedFile.name;
-                                    var result = "已经收到您上传的视频。如果您想视频追踪，请输入\"视频追踪\"。" +
-                                        "如果您想视频增强，请输入\"视频增强\"。";
+                                    var question = tTextSelf("您所上传的视频文件名称为：") + selectedFile.name;
+                                    var result = tTextSelf("已经收到您上传的视频。如果您想视频追踪，请输入\"视频追踪\"。") +
+                                        tTextSelf("如果您想视频增强，请输入\"视频增强\"。");
                                     lastFilePath = json.filePath;
                                     textQuery1(question, result, fileStatus);
                                 } else {
-                                    alert("视频解析失败")
+                                    alert(tTextSelf("视频解析失败"))
                                     return;
                                 }
                             }
                         }
                     } else {
-                        textQuery1("文件上传结果", "上传文件失败", "doc");
+                        textQuery1(tTextSelf("文件上传结果"), tTextSelf("上传文件失败"), "doc");
                         return;
                     }
                 }
@@ -384,12 +385,12 @@ fileUploadButton.addEventListener("click", function () {
 
 function textQuery1(questionRel, answerRel, fileStatus) {
     if (queryLock) {
-        alert("有对话正在进行请耐心等待");
+        alert(tTextSelf("有对话正在进行请耐心等待"));
         return;
     }
     let question = questionRel;
     if (isBlank(question)) {
-        alert("请输入有效字符串！！！");
+        alert(tTextSelf("请输入有效字符串！！！"));
         $('#queryBox textarea').val('');
         return;
     }
@@ -405,7 +406,7 @@ function textQuery1(questionRel, answerRel, fileStatus) {
     $(".markdown")[len - 1].innerHTML = answerRel;
 
     answerRel = answerRel.replace(/<[^>]*>/g, "")
-    answerRel = answerRel.replaceAll("分割后的图片：", "")
+    answerRel = answerRel.replaceAll(tTextSelf("分割后的图片："), "")
     // 增加不需要音频文件的判断
     if (fileStatus != 'video') {
         txtTovoice(answerRel, "default");
@@ -440,7 +441,7 @@ async function voiceToTxt(selectedFile) {
                 resolve(responseText); // 上传成功时解决Promise
             } else {
                 voiceResponse = "";
-                reject(new Error("上传失败")); // 上传失败时拒绝Promise
+                reject(new Error(tTextSelf("上传失败"))); // 上传失败时拒绝Promise
             }
         };
 
@@ -532,15 +533,15 @@ function remoteSolve(blob) {
                         $('#queryBox textarea').val(json.msg);
                     }
                 } catch {
-                    alert("转换失败");
+                    alert(tTextSelf("转换失败"));
                 }
             } else {
-                alert("转换失败");
+                alert(tTextSelf("转换失败"));
             }
             console.log(responseText);
         } else {
 
-            alert("转换失败");
+            alert(tTextSelf("转换失败"));
         }
     };
     xhr.send(formData);
@@ -629,10 +630,10 @@ var Recoder = {
                         .then()
                         .catch((info) => {
                             $("#voiceIcon").css("background", "");
-                            alert("无法获取麦克风权限！错误信息：" + info);
+                            alert(tTextSelf("无法获取麦克风权限！错误信息：") + info);
                         });
                 } else {
-                    alert("无法获取麦克风权限");
+                    alert(tTextSelf("无法获取麦克风权限"));
                 }
             }
             permissionStatus.onchange = function () {

@@ -1,5 +1,6 @@
 let queryLock = false;
 var PromptDialog = 0;
+const tTextQuery = window.tText || ((s) => s);
 
 const words = [
     "股票", "天气", "油价", "新闻", "财经", "健康", "医疗",
@@ -60,14 +61,17 @@ function matchingAgents(word) {
 
 async function textQuery() {
     if (queryLock) {
-        alert("有对话正在进行请耐心等待");
+        alert(tTextQuery("有对话正在进行请耐心等待"));
         return;
+    }
+    if (typeof ensureChatBottomBarVisible === 'function') {
+        ensureChatBottomBarVisible();
     }
     queryLock = true;
     disableQueryBtn();
     let question = $('#queryBox textarea').val();
     if (isBlank(question)) {
-        alert("请输入有效字符串！！！");
+        alert(tTextQuery("请输入有效字符串！！！"));
         $('#queryBox textarea').val('');
         enableQueryBtn();
         querying = false;
@@ -142,13 +146,13 @@ function socialAgentsConversation(question) {
 function nextPrompt(action, prompt) {
     if (action === TIMER_WHO) {
         TIMER_DATA["contact"] = prompt;
-        addRobotDialog('请问您想发什么消息？</br>');
+        addRobotDialog(tTextQuery('请问您想发什么消息？</br>'));
         setSocialPromptStepDone(action);
         unlockInput();
         return;
     } else if (action === TIMER_WHAT) {
         TIMER_DATA["message"] = prompt;
-        addRobotDialog('现在吗？还是之后具体什么时间？</br>');
+        addRobotDialog(tTextQuery('现在吗？还是之后具体什么时间？</br>'));
         setSocialPromptStepDone(action);
         unlockInput();
         return;
@@ -202,11 +206,11 @@ function getStandardTime(action, prompt) {
                 TIMER_DATA["sendTime"] = res.data;
                 TIMER_DATA["appId"] = SOCIAL_CHANEL["appId"];
                 TIMER_DATA["channelId"] = SOCIAL_CHANEL["channelId"];
-                addRobotDialog('已收到您的指令，请等待好消息。</br>');
+                addRobotDialog(tTextQuery('已收到您的指令，请等待好消息。</br>'));
                 setSocialPromptStepDone(action);
                 addTimerTask();
             } else {
-                addRobotDialog('现在吗？还是之后具体什么时间？</br>');
+                addRobotDialog(tTextQuery('现在吗？还是之后具体什么时间？</br>'));
             }
             unlockInput();
         },
@@ -230,7 +234,7 @@ function startRobot(prompt, action) {
         data: JSON.stringify(startRobotRequest),
         success: function (res) {
             if (res.status === "success" && res.robotEnable) {
-                addRobotDialog('好的，协助您默认打理半个小时。</br>');
+                addRobotDialog(tTextQuery('好的，协助您默认打理半个小时。</br>'));
             }
             setSocialPromptStepDone(action);
             resetSocialPromptStep();
@@ -252,7 +256,7 @@ function addTimerTask() {
             if (res.status === "failed") {
             } else {
             }
-            addRobotDialog('您需要将后续会话，委托给助理自动答复吗？</br>');
+            addRobotDialog(tTextQuery('您需要将后续会话，委托给助理自动答复吗？</br>'));
         },
         error: function () {
             returnFailedResponse();
@@ -270,7 +274,7 @@ function getLoginQrCode(appId, username) {
             if (res.status === 10) {
                 let appName = SOCIAL_APP_MAP.get(appId);
                 let qrCodeUrl = res.image_url;
-                let html = '<div>请扫描以下' + appName + '的二维码授权：</div></br><img src="' + qrCodeUrl + '" alt="二维码" />';
+                let html = '<div>' + tTextQuery('请扫描以下') + appName + tTextQuery('的二维码授权：') + '</div></br><img src="' + qrCodeUrl + '" alt="QR code" />';
                 addRobotDialog(html + '</br>');
                 getLoginStatus(appId, username);
             }
@@ -282,13 +286,16 @@ function getLoginQrCode(appId, username) {
 }
 
 function returnFailedResponse() {
-    addRobotDialog('调用失败!</br>');
+    addRobotDialog(tTextQuery('调用失败!</br>'));
     unlockInput();
 }
 
 function unlockInput() {
     $('#queryBox textarea').val('');
     queryLock = false;
+    if (typeof ensureChatBottomBarVisible === 'function') {
+        ensureChatBottomBarVisible();
+    }
 }
 
 function getLoginStatus(appId, username) {
@@ -307,7 +314,7 @@ function getLoginStatus(appId, username) {
             } else {
                 setSocialPromptStepDone(GET_QR_CODE);
                 unlockInput();
-                addRobotDialog('请问您想给谁发消息(需要您存在的通讯录中的人名或群名)。</br>');
+                addRobotDialog(tTextQuery('请问您想给谁发消息(需要您存在的通讯录中的人名或群名)。</br>'));
             }
             console.log(res);
         },
@@ -366,15 +373,15 @@ function getTextResult(question, robootAnswerJq, conversation, agentId) {
                 }
                 // 判断图生文
                 else if (res.samUrl != null) {
-                    result = "您所上传的图片的意思是：<br><b>类别</b>：" + res.classification + "<br><b>描述</b>：" + res.caption + "<br>" +
-                        "<b>分割后的图片</b>：  <img src='" + res.samUrl + "' alt='Image'><br>";
+                    result = tTextQuery("您所上传的图片的意思是：") + "<br><b>" + tTextQuery("类别") + "</b>：" + res.classification + "<br><b>" + tTextQuery("描述") + "</b>：" + res.caption + "<br>" +
+                        "<b>" + tTextQuery("分割后的图片") + "</b>：  <img src='" + res.samUrl + "' alt='Image'><br>";
                     robootAnswerJq.html(result);
                     let p = robootAnswerJq.parent().parent().parent();
                     p.children('.idx').children('.appendVoice').children('audio').hide();
                     p.children('.idx').children('.appendVoice').children('select').hide();
                     answer = result;
                 } else if (res.enhanceImageUrl != null) {
-                    result = "加强后的图片如下：<br>" + "<img src='" + res.enhanceImageUrl + "' alt='Image'><br>";
+                    result = tTextQuery("加强后的图片如下：") + "<br><img src='" + res.enhanceImageUrl + "' alt='Image'><br>";
                     robootAnswerJq.html(result);
                     answer = result;
                 } else if (res.svdVideoUrl != null) {
@@ -397,8 +404,8 @@ function getTextResult(question, robootAnswerJq, conversation, agentId) {
                     }
                 }
             } else {
-                robootAnswerJq.html("调用失败！");
-                answer = '调用失败! ';
+                robootAnswerJq.html(tTextQuery("调用失败！"));
+                answer = tTextQuery('调用失败! ');
             }
             $('#queryBox textarea').val('');
             queryLock = false;
@@ -406,15 +413,21 @@ function getTextResult(question, robootAnswerJq, conversation, agentId) {
             querying = false;
             conversation.robot.answer = answer;
             addConv(conversation);
+            if (typeof ensureChatBottomBarVisible === 'function') {
+                ensureChatBottomBarVisible();
+            }
         },
         error: function () {
             $('#queryBox textarea').val('');
             enableQueryBtn();
             querying = false;
             queryLock = false;
-            robootAnswerJq.html("调用失败！");
-            conversation.robot.answer = "调用失败！";
+            robootAnswerJq.html(tTextQuery("调用失败！"));
+            conversation.robot.answer = tTextQuery("调用失败！");
             addConv(conversation);
+            if (typeof ensureChatBottomBarVisible === 'function') {
+                ensureChatBottomBarVisible();
+            }
         }
 
     });
@@ -432,10 +445,16 @@ function generalOutput(paras, question, robootAnswerJq) {
         success: function (res) {
             if (res.choices === undefined) {
                 queryLock = false;
-                robootAnswerJq.html("调用失败！");
+                robootAnswerJq.html(tTextQuery("调用失败！"));
+                if (typeof ensureChatBottomBarVisible === 'function') {
+                    ensureChatBottomBarVisible();
+                }
                 return;
             }
             if (res.choices.length === 0) {
+                if (typeof ensureChatBottomBarVisible === 'function') {
+                    ensureChatBottomBarVisible();
+                }
                 return;
             }
             var chatMessage = res.choices[0].message;
@@ -449,6 +468,9 @@ function generalOutput(paras, question, robootAnswerJq) {
                 }
             }
             if (chatMessage.content === undefined) {
+                if (typeof ensureChatBottomBarVisible === 'function') {
+                    ensureChatBottomBarVisible();
+                }
                 return;
             }
             var fullText = chatMessage.content;
@@ -456,12 +478,24 @@ function generalOutput(paras, question, robootAnswerJq) {
             result = `
                         ${fullText} <br>
                         ${chatMessage.imageList && chatMessage.imageList.length > 0 ? chatMessage.imageList.map(image => `<img src='${image}' alt='Image' style="max-width:100%; height:auto; margin-bottom:10px;">`).join('') : "" }                        
-                        ${chatMessage.filename !== undefined ? `<div style="display: flex;"><div style="width:50px;flex:1">附件:</div><div style="width:600px;flex:17 padding-left:5px">${a}</div></div><br>` : ""}
-                        ${res.source !== undefined ? `<div style="display: flex;"><div style="width:300px;flex:1"><small>来源:${res.source}</small></div></div><br>` : ""}
+                        ${chatMessage.filename !== undefined ? `<div style="display: flex;"><div style="width:50px;flex:1">${tTextQuery('附件:')}</div><div style="width:600px;flex:17 padding-left:5px">${a}</div></div><br>` : ""}
+                        ${res.source !== undefined ? `<div style="display: flex;"><div style="width:300px;flex:1"><small>${tTextQuery('来源:')}${res.source}</small></div></div><br>` : ""}
                         `
             robootAnswerJq.html(result);
             enableQueryBtn();
             querying = false;
+            if (typeof ensureChatBottomBarVisible === 'function') {
+                ensureChatBottomBarVisible();
+            }
+        },
+        error: function () {
+            queryLock = false;
+            if (typeof ensureChatBottomBarVisible === 'function') {
+                ensureChatBottomBarVisible();
+            }
+            enableQueryBtn();
+            querying = false;
+            robootAnswerJq.html(tTextQuery("调用失败！"));
         }
     });
 }
@@ -527,7 +561,7 @@ function streamOutput(paras, question, robootAnswerJq) {
                 let json = JSON.parse(chunk);
                 if (json.choices === undefined) {
                     queryLock = false;
-                    robootAnswerJq.html("调用失败！");
+                    robootAnswerJq.html(tTextQuery("调用失败！"));
                     break
                 }
                 if (json.choices.length === 0) {
@@ -554,9 +588,9 @@ function streamOutput(paras, question, robootAnswerJq) {
                 result = `
                         ${fullText}
                         ${chatMessage.imageList && chatMessage.imageList.length > 0 ? chatMessage.imageList.map(image => `<img src='${image}' alt='Image' style="max-width:100%; height:auto; margin-bottom:10px;">`).join('') : ""}                        
-                        ${chatMessage.filename !== undefined ? `<div style="display: flex;"><div style="width:50px;flex:1">附件:</div><div style="width:600px;flex:17 padding-left:5px">${a}</div></div>` : ""}
-                        ${chatMessage.context || chatMessage.contextChunkIds ? `<div class="context-box"><div class="loading-box">正在索引文档&nbsp;&nbsp;<span></span></div><a style="float: right; cursor: pointer; color:cornflowerblue" onClick="retry(${CONVERSATION_CONTEXT.length + 1})">更多通用回答</a></div>` : ""}
-                        ${json.source !== undefined ? `<div style="display: flex;"><div style="width:300px;flex:1"><small>来源:${json.source}</small></div></div><br>` : ""}`
+                        ${chatMessage.filename !== undefined ? `<div style="display: flex;"><div style="width:50px;flex:1">${tTextQuery('附件:')}</div><div style="width:600px;flex:17 padding-left:5px">${a}</div></div>` : ""}
+                        ${chatMessage.context || chatMessage.contextChunkIds ? `<div class="context-box"><div class="loading-box">${tTextQuery('正在索引文档')}&nbsp;&nbsp;<span></span></div><a style="float: right; cursor: pointer; color:cornflowerblue" onClick="retry(${CONVERSATION_CONTEXT.length + 1})">${tTextQuery('更多通用回答')}</a></div>` : ""}
+                        ${json.source !== undefined ? `<div style="display: flex;"><div style="width:300px;flex:1"><small>${tTextQuery('来源:')}${json.source}</small></div></div><br>` : ""}`
                 // `;
                 if (chatMessage.contextChunkIds) {
                     if (chatMessage.contextChunkIds instanceof Array) {
@@ -569,8 +603,15 @@ function streamOutput(paras, question, robootAnswerJq) {
     }
 
     generateStream(paras).then(r => {
-        let lastAnswer = CONVERSATION_CONTEXT[CONVERSATION_CONTEXT.length - 1]["content"]
-        txtTovoice(lastAnswer, "default");
+        if (typeof ensureChatBottomBarVisible === 'function') {
+            ensureChatBottomBarVisible();
+        }
+        if (CONVERSATION_CONTEXT.length > 0) {
+            const last = CONVERSATION_CONTEXT[CONVERSATION_CONTEXT.length - 1];
+            if (last && last.role === 'assistant' && last.content) {
+                txtTovoice(last.content, "default");
+            }
+        }
         enableQueryBtn();
         querying = false;
         queryLock = false;
@@ -578,10 +619,13 @@ function streamOutput(paras, question, robootAnswerJq) {
         betterResult.show();
     }).catch((err) => {
         console.error(err);
+        if (typeof ensureChatBottomBarVisible === 'function') {
+            ensureChatBottomBarVisible();
+        }
         enableQueryBtn();
         querying = false;
         queryLock = false;
-        robootAnswerJq.html("系统繁忙，请稍后再试！");
+        robootAnswerJq.html(tTextQuery("系统繁忙，请稍后再试！"));
     });
 }
 
@@ -603,13 +647,13 @@ async function filterChunk(filenames, filePaths, contextChunkIds, result, jqObj)
                 jqObj.children('.loading-box').remove();
                 if (res.code !== 0) {
                     console.log(res);
-                    jqObj.apppend(`<div style="float: left; color:red;">未获取到文件截图</div>`);
+                    jqObj.apppend(`<div style="float: left; color:red;">${tTextQuery('未获取到文件截图')}</div>`);
                     return;
                 }
                 let data = res.data;
                 if (!(data instanceof Array)) {
                     console.log(data);
-                    jqObj.apppend(`<div style="float: left;">未获取到截图</div>`);
+                    jqObj.apppend(`<div style="float: left;">${tTextQuery('未获取到截图')}</div>`);
                     return;
                 }
                 let html = `<div  style="float: left;">${(function () {
@@ -656,7 +700,7 @@ async function getCropRect(contextChunkIds, result, jqObj) {
                 let context_jq = jqObj.children('.context-box');
                 if (res.code !== 0) {
                     console.log(res);
-                    context_jq.append(`<div style="float: left; color:red; display:iniline-block;">未获取到文件截图</div><br>`);
+                    context_jq.append(`<div style="float: left; color:red; display:iniline-block;">${tTextQuery('未获取到文件截图')}</div><br>`);
                     return;
                 }
                 if (!context_jq) {
@@ -664,15 +708,15 @@ async function getCropRect(contextChunkIds, result, jqObj) {
                 }
                 let data = res.data;
                 if (!(data instanceof Array)) {
-                    context_jq.append(`<div style="float: left; display:iniline-block;">未获取到截图</div><br>`);
+                    context_jq.append(`<div style="float: left; display:iniline-block;">${tTextQuery('未获取到截图')}</div><br>`);
                     console.log(data);
                     return;
                 }
                 if (data.length == 0) {
-                    context_jq.append(`<div style="float: left; display:iniline-block;">未获取到截图</div><br>`);
+                    context_jq.append(`<div style="float: left; display:iniline-block;">${tTextQuery('未获取到截图')}</div><br>`);
                     return;
                 }
-                let html = `<div class="context-link" style="float: left;"><span>内容定位:</span>${(function () {
+                let html = `<div class="context-link" style="float: left;"><span>${tTextQuery('内容定位:')}</span>${(function () {
                     let h = '';
                     for (let i = 0; i < data.length; i++) {
                         let cropData = data[i];
