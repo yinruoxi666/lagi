@@ -18,7 +18,8 @@ fi
 
 LINKMIND_DIR="$HOME/LinkMind"
 JAR_NAME="LinkMind.jar"
-DOWNLOAD_URL="http://localhost:8000/LinkMind.jar"
+DOWNLOAD_URL="https://downloads.landingbj.com/lagi/installer/LinkMind.jar"
+#DOWNLOAD_URL="http://localhost:8000/LinkMind.jar"
 JAR_PATH="$LINKMIND_DIR/$JAR_NAME"
 
 # 1. Ensure LinkMind directory exists
@@ -58,7 +59,7 @@ echo "Download complete: $JAR_PATH"
 read_yes_no() {
     prompt="$1"
     printf "%s (yes/no) [no]: " "$prompt"
-    read -r answer
+    read -r answer < /dev/tty
     answer=$(echo "$answer" | tr '[:upper:]' '[:lower:]' | xargs)
     if [ "$answer" = "yes" ] || [ "$answer" = "y" ]; then
         return 0
