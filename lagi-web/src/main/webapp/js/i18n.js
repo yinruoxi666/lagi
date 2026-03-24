@@ -1,0 +1,613 @@
+;(function () {
+    const STORAGE_KEY = 'app_lang';
+    const DEFAULT_LANG = 'zh-CN';
+    const SUPPORTED = ['zh-CN', 'en-US'];
+
+    const dict = {
+        'zh-CN': {
+            'page.title': '不倒翁',
+            'nav.share': '分享',
+            'user.login': '登录',
+            'user.logout': '退出登录',
+            'chat.newConversation': '新建对话',
+            'chat.aiAssist': '内容由AI协助',
+            'chat.inputPlaceholder': '请输入文字...',
+            'model.resetAll': '重置所有',
+            'common.save': '保存',
+            'footer.contactEmail': '联系邮箱:',
+            'footer.phone': '联系电话',
+            'footer.icp': '京ICP备',
+            'footer.publicSecurity': '京公网按备号',
+            'footer.icpFull': '京ICP备 2020046697号',
+            'footer.publicSecurityFull': '京公网按备号 11010802033940',
+            'footer.tagline': '一种通用人工智能的实现验证',
+            'agent.socialCircle': '社交圈',
+            'agent.videoStream': '视频流',
+            'agent.audioStream': '语音流',
+            'agent.sensor': '传感器',
+            'agent.industrialLine': '工控线',
+            'agent.title': 'AI智能体',
+            'home.guardTitle': '平台已稳定守护',
+            'home.guardHint': '持续为您提供稳定服务',
+            'home.guardUnit': '天',
+            'home.savedTitle': '累计为您节省',
+            'home.savedHint': '高效优化，降低成本',
+            'home.filteredTitle': '累计安全过滤',
+            'home.filteredHint': '守护安全，纯净交互',
+            'home.filteredUnit': '条',
+            'nav.catalog': '功能大全',
+            'nav.featureIntro': '功能介绍',
+            'nav.operation': '操作方式',
+            'nav.maintenance': '维护中'
+        },
+        'en-US': {
+            'page.title': 'LinkMind',
+            'nav.share': 'Share',
+            'user.login': 'Sign in',
+            'user.logout': 'Sign out',
+            'chat.newConversation': 'New Chat',
+            'chat.aiAssist': 'AI-assisted content',
+            'chat.inputPlaceholder': 'Type your message...',
+            'model.resetAll': 'Reset All',
+            'common.save': 'Save',
+            'footer.contactEmail': 'Email:',
+            'footer.phone': 'Phone',
+            'footer.icp': 'ICP',
+            'footer.publicSecurity': 'Public Security Record',
+            'footer.icpFull': 'ICP 2020046697',
+            'footer.publicSecurityFull': 'Public Security Record 11010802033940',
+            'footer.tagline': 'A validation implementation of general AI',
+            'agent.socialCircle': 'Social Circle',
+            'agent.videoStream': 'Video Stream',
+            'agent.audioStream': 'Audio Stream',
+            'agent.sensor': 'Sensor',
+            'agent.industrialLine': 'Industrial Line',
+            'agent.title': 'AI Agents',
+            'home.guardTitle': 'Stable Service Time',
+            'home.guardHint': 'Reliable service for you',
+            'home.guardUnit': 'days',
+            'home.savedTitle': 'Total Saved',
+            'home.savedHint': 'Higher efficiency, lower cost',
+            'home.filteredTitle': 'Filtered Items',
+            'home.filteredHint': 'Safer and cleaner interactions',
+            'home.filteredUnit': 'items',
+            'nav.catalog': 'Feature Catalog',
+            'nav.featureIntro': 'Feature Intro',
+            'nav.operation': 'How to use',
+            'nav.maintenance': 'Under maintenance'
+        }
+    };
+
+    const textMap = {
+        '大模型': 'LLM',
+        '智能问答': 'Smart Q&A',
+        '文本生成': 'Text Generation',
+        '语音识别': 'Speech Recog',
+        '千人千声': 'Custom Voices',
+        '看图说话': 'Image Caption',
+        '画质增强': 'Quality Enhance',
+        '图片生成': 'Image Gen',
+        '视频追踪': 'Video Track',
+        '视频增强': 'Video Enhance',
+        '视频生成': 'Video Gen',
+        '智能体': 'Agents',
+        '汇率助手': 'Exchange',
+        '元器助手': 'YuanQi',
+        '天气助手': 'Weather',
+        '油价助手': 'Fuel Prices',
+        '翻译助手': 'Translate',
+        '历史今日': 'On This Day',
+        '失信查询': 'Credit Check',
+        '高铁助手': 'HSR',
+        '有道翻译': 'Youdao Trans',
+        '搜狗搜图': 'Sogou Image',
+        '出行路线': 'Travel Route',
+        '热点新闻': 'Hot News',
+        '编排': 'Orchestration',
+        '快捷私训': 'Quick Train',
+        '指令生成': 'Prompt Gen',
+        '图文混排': 'Graphic Mix',
+        '特色': 'Features',
+        '社交接入': 'Social Integration',
+        '电子围栏': 'Security Fence',
+        '安全配置': 'Security Config',
+        '高级测试': 'Advanced Test',
+        '控制': 'Control',
+        'tokens使用情况': 'Token Usage',
+        '安全过滤记录': 'Filter Logs',
+        '设置': 'Settings',
+        '安全过滤配置': 'Security Filter',
+        '信息': 'Info',
+        '确定': 'OK',
+        '取消': 'Cancel',
+        '有对话正在进行请耐心等待': 'A conversation is in progress, please wait.',
+        '请输入有效字符串！！！': 'Please enter valid text.',
+        '调用失败!': 'Call failed!',
+        '调用失败！': 'Call failed!',
+        '调用失败! ': 'Call failed! ',
+        '系统繁忙，请稍后再试！': 'System is busy, please try again later.',
+        '附件:': 'Attachment:',
+        '来源:': 'Source:',
+        '正在索引文档': 'Indexing document',
+        '更多通用回答': 'More general answers',
+        '内容定位:': 'Locate content:',
+        '未获取到文件截图': 'Failed to get file snapshot',
+        '未获取到截图': 'Failed to get snapshot',
+        '您所上传的图片的意思是：': 'The uploaded image means:',
+        '类别': 'Category',
+        '描述': 'Description',
+        '分割后的图片': 'Segmented Image',
+        '加强后的图片如下：': 'Enhanced image:',
+        '请问您想发什么消息？</br>': 'What message would you like to send?</br>',
+        '现在吗？还是之后具体什么时间？</br>': 'Now, or at what exact time later?</br>',
+        '已收到您的指令，请等待好消息。</br>': 'Instruction received, please wait for updates.</br>',
+        '好的，协助您默认打理半个小时。</br>': 'Got it. I will assist for the next 30 minutes by default.</br>',
+        '您需要将后续会话，委托给助理自动答复吗？</br>': 'Would you like to delegate follow-up conversations to the assistant for auto-reply?</br>',
+        '请问您想给谁发消息(需要您存在的通讯录中的人名或群名)。</br>': 'Who would you like to message? (Name or group must exist in your contacts).</br>',
+        '请扫描以下': 'Please scan the following ',
+        '的二维码授权：': ' QR code for authorization:',
+        '使用情况': 'Usage',
+        '查看本地会话的 Tokens 估算与趋势（基于问题+回答字符统计）。': 'View estimated token usage and trend for local conversations (based on question + answer character counts).',
+        '时间范围': 'Time Range',
+        '今天': 'Today',
+        '至': 'to',
+        '费用': 'Cost',
+        '刷新': 'Refresh',
+        '说明：费用为估算值（默认按 0.002 RMB / 1K Tokens）。': 'Note: Cost is estimated (default 0.002 RMB / 1K Tokens).',
+        '总 Tokens': 'Total Tokens',
+        '总会话数': 'Total Sessions',
+        '日均 Tokens': 'Daily Avg Tokens',
+        '估算费用 (RMB)': 'Estimated Cost (RMB)',
+        '按时间趋势': 'Trend Over Time',
+        '暂无趋势数据': 'No trend data',
+        '会话明细': 'Session Details',
+        '范围内 0 条会话': '0 sessions in range',
+        '标题': 'Title',
+        '日期': 'Date',
+        '轮次': 'Turns',
+        '原始 Tokens': 'Original Tokens',
+        '当前 Tokens': 'Current Tokens',
+        '会话 ': 'Session ',
+        '范围内 ': 'In range ',
+        ' 条会话': ' sessions',
+        '暂无会话数据': 'No session data',
+        '电子围栏监控': 'Security Fence Monitor',
+        '自动刷新: 关闭': 'Auto Refresh: Off',
+        '自动刷新: 开启': 'Auto Refresh: On',
+        '总拦截次数': 'Total Blocked',
+        '今日拦截': 'Blocked Today',
+        '近1小时拦截': 'Blocked Last 1h',
+        '拦截趋势图（近24小时）': 'Blocking Trend (Last 24h)',
+        '暂无数据': 'No data',
+        '监控日志': 'Monitor Logs',
+        '时间': 'Time',
+        '过滤器': 'Filter',
+        '操作类型': 'Action',
+        '内容': 'Content',
+        '上一页': 'Prev',
+        '下一页': 'Next',
+        '第 ': 'Page ',
+        ' 页 / 共 ': ' / ',
+        ' 页': '',
+        '暂无监控数据': 'No monitor data',
+        '安全配置管理': 'Security Config Management',
+        '新增过滤器': 'Add Filter',
+        '搜索过滤器...': 'Search filters...',
+        '全部类型': 'All Types',
+        '敏感词': 'Sensitive',
+        '优先级': 'Priority',
+        '停止词': 'Stopping',
+        '继续词': 'Continue',
+        '过滤器类型': 'Filter Type',
+        '请选择过滤器类型': 'Please choose filter type',
+        '注意：只能选择以上4种系统支持的过滤器类型，自定义名称不会生效': 'Note: Only the 4 system-supported filter types are valid. Custom names are ignored.',
+        '规则 (用逗号分隔):': 'Rules (comma-separated):',
+        '例如: car,weather,社*保&#10;多个规则用逗号分隔，支持正则表达式': 'e.g. car,weather,soc*ial&#10;Separate multiple rules by comma; regex is supported.',
+        '提示：多个规则用逗号分隔，支持正则表达式。如果是敏感词过滤器，请在"分组"中配置级别和规则。': 'Tip: Separate multiple rules with commas; regex is supported. For sensitive filters, configure level and rules in "Groups".',
+        '确认删除': 'Confirm Deletion',
+        '确定要删除这个过滤器吗？此操作不可恢复。': 'Are you sure you want to delete this filter? This action cannot be undone.',
+        '未找到匹配的过滤器': 'No matching filters found',
+        '暂无过滤器配置，请点击"新增过滤器"添加': 'No filter config. Click "Add Filter" to create one.',
+        '编辑': 'Edit',
+        '删除': 'Delete',
+        '规则:': 'Rules:',
+        '分组:': 'Groups:',
+        '级别:': 'Level:',
+        '新增过滤器': 'Add Filter',
+        '编辑过滤器': 'Edit Filter',
+        '分组配置 (敏感词需要配置级别和规则):': 'Group Config (Sensitive type requires level and rules):',
+        '级别 (1=删除, 2=掩码, 3=擦除):': 'Level (1=delete, 2=mask, 3=erase):',
+        '1, 2, 或 3': '1, 2, or 3',
+        '例如: 维尼熊,敏感词,规则*': 'e.g. sample,sensitive,rule*',
+        '添加分组': 'Add Group',
+        '过滤器不存在': 'Filter not found',
+        '请选择过滤器类型': 'Please select filter type',
+        '过滤器类型只能是: sensitive(敏感词)、priority(优先级)、stopping(停止词)、continue(继续词)': 'Filter type must be one of: sensitive, priority, stopping, continue',
+        '编辑成功': 'Updated successfully',
+        '保存成功': 'Saved successfully',
+        '保存失败': 'Save failed',
+        '未知错误': 'Unknown error',
+        '确定要删除过滤器 "': 'Are you sure to delete filter "',
+        '" 吗？此操作不可恢复。': '"? This action cannot be undone.',
+        '删除成功': 'Deleted successfully',
+        '删除失败': 'Delete failed'
+        ,
+        '该功能可以针对用户需求帮助用户快速获取信息、解决问题，提高工作效率和便捷性。可用于对话沟通、智能营销、智能客服、情感沟通等需要沟通对话的场景': 'This feature helps users quickly obtain information and solve problems, improving efficiency and convenience. It can be used in dialogue scenarios such as communication, intelligent marketing, customer service, and emotional interaction.',
+        '在输入框内输入您的需求（如“请告诉我康熙皇帝在位几年？”），并点击右侧Logo发送需求，Linkmind将会对您作出响应。': 'Enter your request in the input box (e.g., "How many years did Emperor Kangxi reign?"), then click the logo on the right to send it. LinkMind will respond.',
+        '该功能可以根据用户的需求，生成精准匹配的创作文本。': 'This feature generates creative text that accurately matches user needs.',
+        '在输入框内输入您的需求（如“写一份关于唐朝的故事”），并点击右侧Logo发送需求，Linkmind将会对您作出响应。': 'Enter your request (e.g., "Write a story about the Tang Dynasty"), then click the right logo to send it. LinkMind will respond.',
+        '该功能可使得大模型与用户进行语音交互、用语音识别代替手写或打字转输入。': 'This feature enables voice interaction with large models and uses speech recognition instead of handwriting or typing.',
+        '长按输入框最左侧的话筒按钮，同时开始说话，按钮松手后会自动识别文字到输入框。': 'Press and hold the microphone button on the far left of the input box and speak. Release to auto-recognize text into the input box.',
+        '该功能的语音回答可采用不同情绪音色，可以为个人用户提供更加便捷、高效的交互方式和更加生动形象的语音体验，为企业提供更优质的服务质量和更高效的工作流程。': 'Voice replies in this feature can use different emotional timbres, providing users with a more convenient and vivid voice experience and enterprises with higher-quality service and workflows.',
+        '在Linkmind对您的输入内容作出回应的最右侧，点击“默认”按钮，即可看到多种可供选择的情绪音色。选中其中一个音色后，点击旁边的竖着的三个点，即可选择播放及播放倍速。': 'On the far right of LinkMind responses, click "Default" to view emotional voice options. Select one, then click the vertical three dots beside it to play and adjust speed.',
+        '该功能可自动提取上传图片的信息，并生成对图片的描述，帮助用户理解图片内容。': 'This feature automatically extracts information from uploaded images and generates descriptions to help users understand the content.',
+        '该功能可以提升图像清晰度、色彩表现、对比度，并减少噪声和杂点，从而增强图像的视觉效果和可读性': 'This feature improves image clarity, color, and contrast while reducing noise, enhancing visual quality and readability.',
+        '该功能可根据用户的需求，生成精准匹配的图片，为用户提供配图': 'This feature generates images that accurately match user needs.',
+        '在输入框内输入您的需求（如“生成一张风景图”），并点击右侧Logo发送需求，Linkmind将会对您作出响应。': 'Enter your request (e.g., "Generate a landscape image"), then click the right logo to send it. LinkMind will respond.',
+        '该功能可对上传视频的内容进行搜索、编辑和创作视频。跟踪人物进行轨迹绘制，框选等操作。': 'This feature can search, edit, and create based on uploaded video content, including person tracking, trajectory drawing, and bounding.',
+        '点击输入框最右侧的文件夹图标，选择视频并点击“打开”，即可上传。Linkmind将会自动您的请求做出响应。': 'Click the folder icon at the far right of the input box, select a video and click "Open" to upload. LinkMind will automatically respond.',
+        '该功能可以显著提升视频的质量和观感体验，让观众享受更加清晰、生动、流畅的画面效果。这些技术在影视制作、视频修复、在线视频流等领域具有广泛的应用前景。': 'This feature significantly improves video quality and viewing experience, delivering clearer and smoother visuals. It has broad applications in film production, video restoration, and online streaming.',
+        '该功能可对根据用户输入的提示词，自动生成与之相关的视频。这有助于提高视频的创新性和生产效率，为影视制作、游戏开发、广告创意等领域提供更多的可能性。': 'This feature automatically generates relevant videos based on user prompts, improving creativity and production efficiency across film, games, and advertising.',
+        '如果您想生成视频，请输入"生成一只白色的萨摩耶在草地上玩耍的视频"。Linkmind将会对您的请求作出响应。': 'If you want to generate a video, enter: "Generate a video of a white Samoyed playing on the grass." LinkMind will respond.',
+        '用于执行大模型相关能力测试与验证。': 'Used for testing and validating large-model capabilities.',
+        '选择后可在输入框直接发起测试对话。': 'After selection, you can directly start a test conversation in the input box.',
+        '用于执行智能体能力测试与链路验证。': 'Used for testing and validating agent capabilities and pipelines.',
+        '选择后可在输入框直接发起智能体测试。': 'After selection, you can directly start an agent test in the input box.',
+        '用于执行编排流程测试与运行验证。': 'Used for testing orchestration workflows and runtime verification.',
+        '选择后可在输入框直接发起编排测试。': 'After selection, you can directly start an orchestration test in the input box.',
+        '用于查看当前平台的 tokens 使用情况与消耗趋势。': 'Used to view token usage and consumption trends on the current platform.',
+        '点击后可查看 tokens 相关说明与使用引导。': 'Click to view token-related notes and usage guidance.',
+        '该功能用于监控与 filters 相关的安全数据。': 'This feature is used to monitor security data related to filters.',
+        '点击进入查看详细的监控信息。': 'Click to view detailed monitoring information.',
+        '该功能用于可视化管理 lagi.yml 中的 filters 配置项。': 'This feature is used to visually manage filter settings in lagi.yml.',
+        '支持新增、删除、修改配置项。': 'Supports adding, deleting, and editing configuration items.'
+        ,
+        '找不到对应的信息': 'Cannot find matching information',
+        '找不到对应的子导航': 'Cannot find matching sub-navigation',
+        '保存失败': 'Save failed',
+        '保持成功!!！': 'Saved successfully!',
+        '返回失败': 'Request failed',
+        '清除失败': 'Clear failed',
+        '重置成功!!!': 'Reset successfully!',
+        '请问您想接入哪款社交软件': 'Which social platform would you like to connect?'
+        ,
+        '当前美元对人民币汇率是多少?': 'What is the current USD to CNY exchange rate?',
+        'Dota2推荐一个适合新手玩的英雄': 'Recommend a Dota2 hero suitable for beginners.',
+        '今天北京天气如何?': 'How is the weather in Beijing today?',
+        '请帮我查询一下这个人的失信记录': 'Please help me check this person\'s dishonesty record.',
+        '从北京到上海的高铁票价是多少?': 'What is the high-speed rail fare from Beijing to Shanghai?',
+        '请翻译‘Hello, how are you?’到中文': 'Please translate "Hello, how are you?" into Chinese.',
+        '帮我搜索一下刘亦菲的图片': 'Help me search pictures of Liu Yifei.',
+        '从武汉到北京的出行路线是什么？': 'What is the travel route from Wuhan to Beijing?',
+        '今天的热点新闻有哪些？': 'What are today\'s hot news topics?',
+        '分组配置:': 'Group Config:',
+        '分组配置 (敏感词需要配置级别和规则):': 'Group Config (Sensitive words require level and rules):',
+        '规则 (用逗号分隔):': 'Rules (comma-separated):',
+        '例如: 维尼熊,敏感词,规则*': 'e.g. sample,sensitive,rule*',
+        '级别 (1=删除, 2=掩码, 3=擦除):': 'Level (1=Delete, 2=Mask, 3=Erase):',
+        '添加分组': 'Add Group',
+        '默认': 'Default',
+        '快乐': 'Happy',
+        '生气': 'Angry',
+        '伤心': 'Sad',
+        '害怕': 'Fear',
+        '憎恨': 'Hate',
+        '惊讶': 'Surprised',
+        '今天': 'Today',
+        '本月': 'This Month',
+        '今年': 'This Year',
+        '更早': 'Earlier',
+        '新的对话': 'New Conversation'
+        ,
+        '点击输入框最右侧的文件夹图标，选择图片并点击“打开”，即可上传。': 'Click the folder icon on the far right of the input box, select an image, and click "Open" to upload.',
+        '点击输入框最右侧的文件夹图标，选择视频并点击“打开”，即可上传。': 'Click the folder icon on the far right of the input box, select a video, and click "Open" to upload.',
+        '点击输入框最右侧的文件夹图标，选择文件并点击“打开”，即可上传。': 'Click the folder icon on the far right of the input box, select a file, and click "Open" to upload.',
+        'Linkmind将会根据上载的内容对您作出如下提示：': 'LinkMind will respond with the following prompt based on your upload:',
+        '已经收到您上传的图片。': 'Your uploaded image has been received.',
+        '如果您想增强图片，请输入"图像增强"。': 'If you want to enhance the image, enter "Image Enhancement".',
+        '如果您想使用AI描述图片，请输入"看图说话"。': 'If you want AI to describe the image, enter "Image Description".',
+        '此时请在输入框内输入“看图说话”，Linkmind将会对您的请求作出响应。': 'Now enter "Image Description" in the input box, and LinkMind will respond.',
+        '此时请在输入框内输入“画质增强”，Linkmind将会对您的请求作出响应。': 'Now enter "Image Enhancement" in the input box, and LinkMind will respond.',
+        '已经收到您上传的视频。': 'Your uploaded video has been received.',
+        '如果您想视频追踪，请输入“视频追踪”。': 'If you want video tracking, enter "Video Tracking".',
+        '如果您想视频增强，请输入“视频增强”。': 'If you want video enhancement, enter "Video Enhancement".',
+        '此时请在输入框内输入“视频增强”，Linkmind将会对您的请求作出响应。': 'Now enter "Video Enhancement" in the input box, and LinkMind will respond.',
+        '已经收到您的资料文档，您可以在新的会话中，询问与资料中内容相关的问题。': 'Your document has been received. In a new conversation, you can ask questions related to its content.',
+        '此时请在输入框内输入您的询问内容，Linkmind将会对您的请求作出响应。': 'Now enter your question in the input box, and LinkMind will respond.',
+        '如果您想生成指令集，请输入"帮我生成指令集”。': 'If you want to generate an instruction set, enter "Help me generate an instruction set".',
+        '此时请在输入框内输入“帮我生成指令集”，Linkmind将会对您的请求作出响应。': 'Now enter "Help me generate an instruction set" in the input box, and LinkMind will respond.',
+        '在输入框内输入您的需求（如“知识图谱的概念”），并点击右侧Logo发送需求，Linkmind将会对您作出响应。': 'Enter your request in the input box (e.g., "Concept of Knowledge Graph"), then click the right logo to send it. LinkMind will respond.',
+        '该功能可对用户进行个性化推荐、训练某行业或领域的专业翻译、解决冷启动问题、保护数据隐私等，用户可根据需求和偏好投喂数据，使其能够提供更加个性化和定制化的服务。': 'This feature supports personalized recommendation, domain-specific translation training, cold-start mitigation, and data privacy protection. Users can feed data by need and preference for more customized service.',
+        '该功能是指，当用户提供一篇文档时，大模型能够自动分析文档内容，理解其结构和语义，然后生成与之相关的指令集。这些指令集可以是一系列操作步骤、代码片段、或者是针对特定任务的指导说明。': 'When a user provides a document, the model can analyze its content, understand structure and semantics, and generate related instruction sets such as steps, code snippets, or task guidance.',
+        '该功能可根据用户提出的问题或需求，以图文并茂的方式为用户提供更加直观、形象和生动的信息和服务，在提高信息传达效果的同时，还能增加用户的阅读体验的，提高人们的工作效率和生活品质。': 'This feature presents information with text and visuals for a more intuitive experience, improving communication effectiveness, reading experience, work efficiency, and quality of life.',
+        '资料': 'Document',
+        '社*保': 'soc*ial',
+        '维尼熊*': 'sample*',
+        '通义千问': 'Qwen',
+        '文心一言': 'ERNIE',
+        '智谱清言': 'GLM',
+        '星火': 'Spark',
+        '京ICP备': 'ICP',
+        '京公网按备号': 'Public Security Record',
+        '一种通用人工智能的实现验证': 'A validation implementation of general AI'
+        ,
+        '你这是点击，不是长按': 'This is a tap, not a long press.',
+        '已复制到剪贴板：': 'Copied to clipboard: ',
+        '当前无内容播放，请先输入对答': 'No content to play. Please input dialogue first.',
+        '您所上传的文档文件名称为：': 'Uploaded document filename: ',
+        '您所上传的图片是：': 'Uploaded image: ',
+        '您所上传的音频文件名称为：': 'Uploaded audio filename: ',
+        '您所上传的视频解析为：': 'Uploaded video parsed as:',
+        '鉴于当前资源有限，请适当缩减文件大小，敬请您的谅解！': 'Given current resource limits, please reduce file size. Thanks for your understanding.',
+        '请选择指定的文件类型': 'Please select a supported file type.',
+        '您所上传的图片名称为：': 'Uploaded image filename: ',
+        '上传失败': 'Upload failed',
+        '已经收到您的资料文档，您可以在新的会话中，询问与资料中内容相关的问题。如果您想生成指令集，请输入"生成指令集"。': 'Your document has been received. You can ask questions about it in a new conversation. To generate an instruction set, enter "Generate Instruction Set".',
+        '已将您的语音素材用于训练声音，稍后积累足够时间，可以模仿您所提供的口音发声。': 'Your voice sample has been used for training. After enough accumulation time, the system can imitate your accent.',
+        '你发送的音频文件的内容为：': 'The content of your uploaded audio is:',
+        '您所上传的视频文件名称为：': 'Uploaded video filename: ',
+        '已经收到您上传的视频。如果您想视频追踪，请输入"视频追踪"。': 'Your uploaded video has been received. If you want video tracking, enter "Video Tracking".',
+        '如果您想视频增强，请输入"视频增强"。': 'If you want video enhancement, enter "Video Enhancement".',
+        '视频解析失败': 'Video parsing failed',
+        '文件上传结果': 'File upload result',
+        '上传文件失败': 'File upload failed',
+        '分割后的图片：': 'Segmented image:',
+        '转换失败': 'Conversion failed'
+        ,
+        '无法获取麦克风权限！错误信息：': 'Unable to get microphone permission! Error: ',
+        '无法获取麦克风权限': 'Unable to get microphone permission',
+        '股票': 'Stocks',
+        '天气': 'Weather',
+        '油价': 'Oil Price',
+        '新闻': 'News',
+        '财经': 'Finance',
+        '健康': 'Health',
+        '医疗': 'Medical',
+        '教育': 'Education',
+        '游戏': 'Gaming',
+        '购物': 'Shopping',
+        '电影推荐': 'Movie Recommendations',
+        '美食': 'Food',
+        '食谱': 'Recipes',
+        '旅行': 'Travel',
+        '翻译': 'Translation',
+        '心理咨询': 'Counseling',
+        '投资': 'Investment',
+        '区块链': 'Blockchain',
+        'AI绘画': 'AI Drawing',
+        '编程助手': 'Coding Assistant',
+        '数据分析': 'Data Analysis',
+        '社交媒体': 'Social Media',
+        '聊天': 'Chat',
+        '运动健身': 'Fitness',
+        '租车': 'Car Rental',
+        '交通': 'Transport',
+        '智能家居': 'Smart Home',
+        '宠物护理': 'Pet Care',
+        '时尚': 'Fashion',
+        '工作助手': 'Work Assistant',
+        '营销': 'Marketing',
+        'SEO优化': 'SEO Optimization',
+        '招聘': 'Recruitment',
+        '天气预报': 'Weather Forecast',
+        '空气质量': 'Air Quality',
+        '旅行规划': 'Trip Planning',
+        '导航': 'Navigation',
+        '语音助手': 'Voice Assistant',
+        '虚拟助手': 'Virtual Assistant',
+        '记账': 'Bookkeeping',
+        '理财': 'Wealth Management',
+        '房产估值': 'Property Valuation',
+        '租房助手': 'Rental Assistant',
+        '日程管理': 'Schedule Management',
+        '音乐推荐': 'Music Recommendations',
+        '图书推荐': 'Book Recommendations',
+        '家装设计': 'Interior Design',
+        '电商': 'E-commerce',
+        '促销分析': 'Promotion Analysis',
+        '心理健康': 'Mental Health',
+        '疾病诊断': 'Disease Diagnosis',
+        '运动分析': 'Sports Analytics',
+        '天气提醒': 'Weather Alerts',
+        '历史知识': 'Historical Knowledge',
+        '科学探索': 'Science Exploration',
+        '编程教学': 'Coding Education',
+        '语言学习': 'Language Learning',
+        '语法检查': 'Grammar Check',
+        '面试准备': 'Interview Prep',
+        '写作助手': 'Writing Assistant',
+        '论文查重': 'Plagiarism Check',
+        '考试复习': 'Exam Review',
+        '定制化学习': 'Personalized Learning',
+        '儿童教育': 'Child Education',
+        '旅游翻译': 'Travel Translation',
+        '语音翻译': 'Speech Translation',
+        '多语言沟通': 'Multilingual Communication',
+        '实时翻译': 'Real-time Translation',
+        '新闻追踪': 'News Tracking',
+        '事件提醒': 'Event Alerts',
+        '个人助理': 'Personal Assistant',
+        '学习路径': 'Learning Path',
+        '职业规划': 'Career Planning',
+        '求职简历': 'Job Resume',
+        '招聘筛选': 'Candidate Screening',
+        '游戏攻略': 'Game Guides',
+        '竞技分析': 'Competitive Analysis',
+        '运动战术': 'Sports Tactics',
+        '健身计划': 'Workout Plan',
+        '减脂': 'Fat Loss',
+        '心率监控': 'Heart Rate Monitoring',
+        '血压监控': 'Blood Pressure Monitoring',
+        '睡眠分析': 'Sleep Analysis',
+        '营养摄入': 'Nutrition Intake',
+        '减压助手': 'Stress Relief Assistant',
+        '会议记录': 'Meeting Notes',
+        '在线课堂': 'Online Classes',
+        '绘画教学': 'Art Lessons',
+        '智能合同助手': 'Smart Contract Assistant',
+        '法律顾问': 'Legal Advisor',
+        '税务助手': 'Tax Assistant',
+        '智能财务': 'Smart Finance',
+        '危机预测': 'Crisis Forecasting',
+        '客户服务': 'Customer Service',
+        '自然灾害预警': 'Natural Disaster Alerts',
+        '环保数据': 'Environmental Data',
+        '气候变化': 'Climate Change',
+        '星座运势': 'Horoscope',
+        '心理测试': 'Psychological Test',
+        '名人信息': 'Celebrity Info',
+        '股票助手': 'Stock Assistant',
+        '文心助手': 'ERNIE Assistant',
+        '红书优选': 'Xiaohongshu Picks',
+        '体重指数': 'BMI',
+        '健康饮食': 'Healthy Diet',
+        '图像生成': 'Image Generation',
+        '疯狂星期': 'Crazy Thursday',
+        'ip查询': 'IP Lookup',
+        '动漫图片': 'Anime Images',
+        '今日运势': 'Daily Fortune',
+        '头像生成': 'Avatar Generation',
+        '百度搜图': 'Baidu Image Search',
+        '今日金价': 'Gold Price Today',
+        '段子生成': 'Joke Generation',
+        '美食推荐': 'Food Recommendations',
+        '倒数计时': 'Countdown Timer',
+        '查询车辆': 'Vehicle Lookup',
+        '姓氏排名': 'Surname Ranking',
+        '收益计算': 'Profit Calculator',
+        '驾考题库': 'Driving Test Bank',
+        '血型预测': 'Blood Type Prediction',
+        'Bing搜索': 'Bing Search',
+        '彩票查询': 'Lottery Lookup',
+        '文本纠错': 'Text Correction',
+        '文本对比': 'Text Comparison',
+        '地点搜索': 'Place Search',
+        '芯片查询': 'Chip Lookup',
+        '星火助手': 'Spark Assistant',
+        '文章续写': 'Article Continuation',
+        '菜谱查询': 'Recipe Lookup',
+        '答案之书': 'Book of Answers',
+        '文本转换': 'Text Conversion',
+        '人口数据': 'Population Data',
+        '诗词名言': 'Poetry Quotes',
+        '深度问答': 'Deep Q&A',
+        '商标查询': 'Trademark Lookup',
+        '票房榜单': 'Box Office Ranking',
+        '历史人物': 'Historical Figures',
+        '辟谣前线': 'Fact-check Frontline',
+        '谷歌翻译': 'Google Translate',
+        '对联生成': 'Couplet Generation'
+    };
+
+    function normalizeLang(raw) {
+        if (!raw) return DEFAULT_LANG;
+        const lower = String(raw).toLowerCase();
+        if (lower.startsWith('en')) return 'en-US';
+        if (lower.startsWith('zh')) return 'zh-CN';
+        return DEFAULT_LANG;
+    }
+
+    function getBrowserLang() {
+        return normalizeLang(navigator.language || navigator.userLanguage);
+    }
+
+    function getCurrentLang() {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        const normalized = normalizeLang(saved || getBrowserLang());
+        return SUPPORTED.includes(normalized) ? normalized : DEFAULT_LANG;
+    }
+
+    function setLang(lang, reload = true) {
+        const normalized = normalizeLang(lang);
+        localStorage.setItem(STORAGE_KEY, normalized);
+        document.documentElement.setAttribute('lang', normalized);
+        applyDomI18n();
+        if (reload) {
+            window.location.reload();
+        }
+    }
+
+    function t(key, fallback) {
+        const lang = getCurrentLang();
+        const langDict = dict[lang] || {};
+        if (Object.prototype.hasOwnProperty.call(langDict, key)) {
+            return langDict[key];
+        }
+        return fallback != null ? fallback : key;
+    }
+
+    function tText(source) {
+        if (getCurrentLang() !== 'en-US') return source;
+        return textMap[source] || source;
+    }
+
+    function tHtml(source) {
+        if (getCurrentLang() !== 'en-US' || typeof source !== 'string') return source;
+        let output = source;
+        const keys = Object.keys(textMap).sort((a, b) => b.length - a.length);
+        for (let i = 0; i < keys.length; i++) {
+            const key = keys[i];
+            output = output.split(key).join(textMap[key]);
+        }
+        return output;
+    }
+
+    function localizeDataDeep(value) {
+        if (Array.isArray(value)) {
+            return value.map(localizeDataDeep);
+        }
+        if (value && typeof value === 'object') {
+            const next = {};
+            for (const key in value) {
+                if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
+                next[key] = localizeDataDeep(value[key]);
+            }
+            return next;
+        }
+        if (typeof value === 'string') {
+            return tText(value);
+        }
+        return value;
+    }
+
+    function applyDomI18n() {
+        document.documentElement.setAttribute('lang', getCurrentLang());
+        const ogTitle = document.querySelector('meta[property="og:title"]');
+        if (ogTitle && getCurrentLang() === 'en-US') {
+            ogTitle.setAttribute('content', 'LinkMind');
+        }
+
+        const textNodes = document.querySelectorAll('[data-i18n]');
+        for (let i = 0; i < textNodes.length; i++) {
+            const el = textNodes[i];
+            const key = el.getAttribute('data-i18n');
+            const current = (el.textContent || '').trim();
+            el.textContent = t(key, current);
+        }
+
+        const placeNodes = document.querySelectorAll('[data-i18n-placeholder]');
+        for (let i = 0; i < placeNodes.length; i++) {
+            const el = placeNodes[i];
+            const key = el.getAttribute('data-i18n-placeholder');
+            const current = el.getAttribute('placeholder') || '';
+            el.setAttribute('placeholder', t(key, current));
+        }
+    }
+
+    window.getCurrentLang = getCurrentLang;
+    window.getCurrentLocale = function () {
+        return getCurrentLang() === 'en-US' ? 'en-US' : 'zh-CN';
+    };
+    window.setAppLang = setLang;
+    window.t = t;
+    window.tText = tText;
+    window.tHtml = tHtml;
+    window.localizeDataDeep = localizeDataDeep;
+    window.applyDomI18n = applyDomI18n;
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', applyDomI18n);
+    } else {
+        applyDomI18n();
+    }
+})();

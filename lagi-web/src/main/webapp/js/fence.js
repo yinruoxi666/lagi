@@ -1,5 +1,7 @@
 let fenceData = [];
 let fenceRefreshInterval = null;
+const tTextFence = window.tText || ((s) => s);
+const tHtmlFence = window.tHtml || ((s) => s);
 
 let currentPage = 1;
 let pageSize = 20;
@@ -70,7 +72,7 @@ function loadFencePage() {
             </div>
         </div>
     `;
-    $('#item-content').html(html);
+    $('#item-content').html(tHtmlFence(html));
     refreshFenceData();
 }
 
@@ -121,7 +123,7 @@ function updateFenceDisplay() {
     tbody.empty();
     
     if (fenceData.length === 0) {
-        tbody.append('<tr><td colspan="4" style="padding: 40px; text-align: center; color: #999;">暂无监控数据</td></tr>');
+        tbody.append(`<tr><td colspan="4" style="padding: 40px; text-align: center; color: #999;">${tTextFence('暂无监控数据')}</td></tr>`);
         $('#fencePagination').hide();
         renderChart();
         return;
@@ -149,7 +151,7 @@ function updateFenceDisplay() {
 }
 
 function updatePagination() {
-    $('#pageInfo').text(`第 ${currentPage} 页 / 共 ${totalPages} 页`);
+    $('#pageInfo').text(`${tTextFence('第 ')}${currentPage}${tTextFence(' 页 / 共 ')}${totalPages}${tTextFence(' 页')}`);
     $('#prevPageBtn').prop('disabled', currentPage <= 1);
     $('#nextPageBtn').prop('disabled', currentPage >= totalPages);
     if (totalPages <= 1) {
@@ -252,10 +254,10 @@ function toggleAutoRefresh() {
     autoRefreshEnabled = !autoRefreshEnabled;
     const btn = $('#autoRefreshBtn');
     if (autoRefreshEnabled) {
-        btn.text('自动刷新: 开启');
+        btn.text(tTextFence('自动刷新: 开启'));
         fenceRefreshInterval = setInterval(refreshFenceData, 5000);
     } else {
-        btn.text('自动刷新: 关闭');
+        btn.text(tTextFence('自动刷新: 关闭'));
         if (fenceRefreshInterval) {
             clearInterval(fenceRefreshInterval);
             fenceRefreshInterval = null;

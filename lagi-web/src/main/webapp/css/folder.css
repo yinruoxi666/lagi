@@ -140,3 +140,59 @@
 .folder-content.expanded > .tree-line:last-child > :last-child::before {
     width: 0.75rem;
 }
+
+/* ===== 导航层级排版统一与左移优化 ===== */
+#nav_body .folder-item,
+#nav_body .file-item {
+    padding: 0.32rem 0.38rem;
+}
+
+#nav_body .folder-icon,
+#nav_body .file-icon {
+    margin-right: 0.35rem;
+}
+
+/* 缩小树形缩进，让整体文字稍微左移 */
+#nav_body .tree-line {
+    margin-left: 0.56rem;
+    padding-left: 1rem;
+}
+
+#nav_body .folder-item::before,
+#nav_body .file-item::before {
+    left: -1.05rem;
+    width: 0.8rem;
+}
+
+/* 防止菜单文字换行，尽量单行展示 */
+#nav_body .folder-text,
+#nav_body .file-text {
+    display: block;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.35;
+}
+
+/* 一级菜单：统一字号/字重 */
+#nav_body > .folder-container > .folder-item > .folder-text {
+    font-size: 18px;
+    font-weight: 400;
+    margin-left: 0.4rem;
+}
+
+/* 二级菜单（含可展开项与普通文件项）：统一字号/字重 */
+#nav_body > .folder-container > .tree-line.folder-content > .file-item > .file-text,
+#nav_body > .folder-container > .tree-line.folder-content > .sub-folder-container > .sub-folder-item .folder-text {
+    font-size: 16px;
+    font-weight: 400;
+    margin-left: 0.22rem;
+}
+
+/* 三级菜单：统一字号/字重 */
+#nav_body .sub-folder-content .third-file-item > .file-text {
+    font-size: 14px;
+    font-weight: 400;
+    margin-left: 0.18rem;
+}

@@ -10077,4 +10077,33 @@ a.active {
     background-color: #2a2b32; /* 加深的背景色 */
 }
 
+/* 三级菜单样式 */
+.third-nav {
+    display: block;
+    opacity: 0;
+    transform: translateY(-10px);
+    pointer-events: none;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    padding-left: 16px;
+}
+
+.third-nav.hidden {
+    display: none;
+}
+
+.third-nav:not(.hidden) {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.third-nav .sub-nav-item {
+    margin: 2px 0;
+}
+
+.third-nav .sub-nav-link {
+    font-size: 0.9em;
+    padding: 6px 8px;
+}
+
 

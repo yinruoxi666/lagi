@@ -1,6 +1,8 @@
 // import {isBlank} from './common'
 
 let curConversations = -1;
+const tTextConv = window.tText || ((s) => s);
+const tHtmlConv = window.tHtml || ((s) => s);
 let conversatonsList = [{ title: "你好", dateTime: 500 }, { title: "还行", dateTime: 100 }, { title: "写诗", dateTime: 1500 }]
 
 
@@ -107,13 +109,13 @@ async function newConversation(conv, questionEnable = true, answerEnable = true)
 const SOUNDS_HTML = `
 <div  class="sounds-selector absolute z-50 selector" style="display:none; bottom:24px !important; left:10px; width: 80px;" style="">
 <ul  class="">
-    <li class=" not-available " value="neutral" onclick="selectSound(this, event);">默认</li>
-    <li class=" not-available " value="happy" onclick="selectSound(this, event);">快乐</li>
-    <li class=" not-available " value="angry" onclick="selectSound(this, event);">生气</li>
-    <li class=" not-available " value="sad" onclick="selectSound(this, event);">伤心</li>
-    <li class=" not-available " value="fear" onclick="selectSound(this, event);">害怕</li>
-    <li class=" not-available " value="hate" onclick="selectSound(this, event);">憎恨</li>
-    <li class=" not-available " value="surprise" onclick="selectSound(this, event);">惊讶</li>
+    <li class=" not-available " value="neutral" onclick="selectSound(this, event);">${tTextConv('默认')}</li>
+    <li class=" not-available " value="happy" onclick="selectSound(this, event);">${tTextConv('快乐')}</li>
+    <li class=" not-available " value="angry" onclick="selectSound(this, event);">${tTextConv('生气')}</li>
+    <li class=" not-available " value="sad" onclick="selectSound(this, event);">${tTextConv('伤心')}</li>
+    <li class=" not-available " value="fear" onclick="selectSound(this, event);">${tTextConv('害怕')}</li>
+    <li class=" not-available " value="hate" onclick="selectSound(this, event);">${tTextConv('憎恨')}</li>
+    <li class=" not-available " value="surprise" onclick="selectSound(this, event);">${tTextConv('惊讶')}</li>
 </ul>
 </div>
 `;
@@ -213,6 +215,7 @@ async function addUserDialog(userQuestion) {
 }
 
 function addRobotDialog(robotAnswer) {
+    const normalizedAnswer = tHtmlConv(robotAnswer);
     let chatHtml = `
     <div class="robot-return w-full  group ">
 <div class="text-area  text-base gap-4 md:gap-6 m-auto md:max-w-2xl lg:max-w-2xl xl:max-w-3xl p-4 md:py-6 flex lg:px-0">
@@ -221,7 +224,7 @@ function addRobotDialog(robotAnswer) {
         <div class="">
             <div class="chat-div ">
                 <div class="markdown  w-full break-words  light result-streaming">
-                    ${robotAnswer === '' ? '<p></p>' : robotAnswer} 
+                    ${normalizedAnswer === '' ? '<p></p>' : normalizedAnswer} 
                 </div>
                 <div class="better-result w-full break-words light result-streaming">
                 </div>
@@ -336,6 +339,7 @@ function clearConvs() {
 
 
 function convertByDate(convsList) {
+    const tTextConv = window.tText || ((s) => s);
     let res = [];
     // 当天 
     let days = new Date().getDate();
@@ -351,26 +355,26 @@ function convertByDate(convsList) {
         let ty = tD.getFullYear();
         if (td == days) {
             if (res[0] == undefined) {
-                res[0] = { date: '今天', convs: [convs] };
+                res[0] = { date: tTextConv('今天'), convs: [convs] };
             } else {
                 res[0].convs.push(convs);
             }
         } else if (tm == month) {
             if (res[1] == undefined) {
-                res[1] = { date: '本月', convs: [convs] };
+                res[1] = { date: tTextConv('本月'), convs: [convs] };
             } else {
                 res[1].convs.push(convs);
             }
         }
         else if (ty == year) {
             if (res[2] == undefined) {
-                res[2] = { date: '今年', convs: [convs] };
+                res[2] = { date: tTextConv('今年'), convs: [convs] };
             } else {
                 res[2].convs.push(convs);
             }
         } else {
             if (res[3] == undefined) {
-                res[3] = { date: '更早', convs: [convs] };
+                res[3] = { date: tTextConv('更早'), convs: [convs] };
             } else {
                 res[3].convs.push(convs);
             }
@@ -413,7 +417,7 @@ function newConversationWindow(convsId, title, convs) {
     if (convsId == null && isBlank(title) && convs != null && convs.length != 0) {
         convsId = saveOrUpdateConv(null, convs[0].user.question, null);
     } else {
-        convsId = saveOrUpdateConv(null, '新的对话', null);
+        convsId = saveOrUpdateConv(null, (window.tText ? window.tText('新的对话') : '新的对话'), null);
     }
     setCurConvId(convsId);
     loadConversationNav();

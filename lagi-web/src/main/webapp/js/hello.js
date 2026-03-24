@@ -1,5 +1,7 @@
 let topTile = 'Linkmind';
 let finishedLoadTitle = false;
+const tFn = window.t || ((key, fallback) => fallback || key);
+const tTextFn = window.tText || ((text) => text);
 
 let activeModel = 0;
 
@@ -12,20 +14,38 @@ let introTable = [
     [{title:"测试3", content:"内容3"},{title:"测试4", content:"内容4"},],
 ]
 
-let agent_title = 'AI智能体';
+let agent_title = tFn('agent.title', 'AI智能体');
 let agent_tools = [
-    {name:'社交圈', bind_func: 'socialCircles', available:true},
-    {name:'视频流', bind_func: 'notifyAvailable', available:false},
-    {name:'语音流', bind_func: 'notifyAvailable', available:false},
-    {name:'传感器', bind_func: 'notifyAvailable', available:false},
-    {name:'工控线', bind_func: 'notifyAvailable', available:false},
+    {name:tFn('agent.socialCircle', '社交圈'), bind_func: 'socialCircles', available:true},
+    {name:tFn('agent.videoStream', '视频流'), bind_func: 'notifyAvailable', available:false},
+    {name:tFn('agent.audioStream', '语音流'), bind_func: 'notifyAvailable', available:false},
+    {name:tFn('agent.sensor', '传感器'), bind_func: 'notifyAvailable', available:false},
+    {name:tFn('agent.industrialLine', '工控线'), bind_func: 'notifyAvailable', available:false},
 ]
 
 function initHelloPage() {
     initModelSlide();
-    initIntroduces();
+    initHomeStatsCards();
     initAgentTool();
     $('#model-prefences').hide();
+    setHomeInputVisibility(false);
+}
+
+function setHomeInputVisibility(visible) {
+    const formElement = document.querySelector('#not-content form');
+    const body = document.body;
+    if (!formElement || !body) {
+        return;
+    }
+    if (visible) {
+        formElement.style.display = 'flex';
+        formElement.style.visibility = 'visible';
+        body.classList.remove('home-mode');
+    } else {
+        formElement.style.display = 'none';
+        formElement.style.visibility = 'hidden';
+        body.classList.add('home-mode');
+    }
 }
 
 
@@ -34,6 +54,7 @@ function showHelloContent() {
     $('#introduces').show();
     $('#modelChoices').hide();
     $('#topTitle').show();
+    setHomeInputVisibility(false);
 }
 
 
@@ -43,44 +64,111 @@ function hideHelloContent() {
     $('#topTitle').hide();
     $('#item-content').empty();
     hideBallDiv(); // 隐藏球形 div
+    setHomeInputVisibility(true);
 }
 
-function loadIntroduces() {
-    $.ajax({
-        type: "GET",
-        contentType: "application/json;charset=utf-8",
-        url: "info/getPrompts",
-        async: false,
-        data: {size:4},
-        success: function(reponse) {
-            if(reponse.code != 0) {
-                introTable = [];
-                return ;
-            }
-            introTable = [];
-            introTable.push(reponse.data.slice(0, 2)) ;
-            introTable.push(reponse.data.slice(2, 4)) ;
-        },
-        error: function(){
-            // alert("返回失败");
-
-        }
-    
-    });
+function formatNumber(value) {
+    const locale = window.getCurrentLocale ? window.getCurrentLocale() : 'zh-CN';
+    return Number(value).toLocaleString(locale);
 }
 
-function initIntroduces() {
-    loadIntroduces()
-    let html = '';  
-    for (let i = 0; i < introTable.length; i++) {
-        const row = introTable[i];
-        html += `
-            <div class="flex flex-col gap-3">${addTr(row)}</div>
-            `;
+function getGuardDays() {
+    // 这里可以按实际发布时间调整
+    const launchDate = new Date('2026-03-21T00:00:00+08:00');
+    const now = new Date();
+    const days = Math.max(0, Math.floor((now.getTime() - launchDate.getTime()) / (24 * 60 * 60 * 1000)));
+    return days;
+}
+
+function getHomeStatValueSizeClass(rawValue) {
+    const n = Math.abs(Number(rawValue) || 0);
+    const digits = String(Math.trunc(n)).length;
+    if (digits >= 7) {
+        return 'home-stat-card__value--xs';
     }
-    $('#introduces .grid').empty();
-    $('#introduces .grid').append(html);
-    scroll();
+    if (digits >= 6) {
+        return 'home-stat-card__value--sm';
+    }
+    if (digits >= 5) {
+        return 'home-stat-card__value--md';
+    }
+    return '';
+}
+
+function buildHomeStatsCards() {
+    const guardDays = getGuardDays();
+    const savedTokens = 18789;
+    const filteredCount = 187;
+    const stats = [
+        {
+            title: tFn('home.guardTitle', '平台已稳定守护'),
+            rawValue: guardDays,
+            value: `<span class="home-stat-card__num">${formatNumber(guardDays)}</span><span class="home-stat-card__unit">${tFn('home.guardUnit', '天')}</span>`,
+            hint: tFn('home.guardHint', '持续为您提供稳定服务'),
+            iconClass: 'home-stat-card__icon--blue',
+            icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+        },
+        {
+            title: tFn('home.savedTitle', '累计为您节省'),
+            rawValue: savedTokens,
+            cardClass: 'home-stat-card--tokens',
+            value: `<span class="home-stat-card__num">${formatNumber(savedTokens)}</span><span class="home-stat-card__unit">Tokens</span>`,
+            hint: tFn('home.savedHint', '高效优化，降低成本'),
+            iconClass: 'home-stat-card__icon--green',
+            icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+        },
+        {
+            title: tFn('home.filteredTitle', '累计安全过滤'),
+            rawValue: filteredCount,
+            value: `<span class="home-stat-card__num">${formatNumber(filteredCount)}</span><span class="home-stat-card__unit">${tFn('home.filteredUnit', '条')}</span>`,
+            hint: tFn('home.filteredHint', '守护安全，纯净交互'),
+            iconClass: 'home-stat-card__icon--orange',
+            icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+        }
+    ];
+
+    let html = '';
+    for (let i = 0; i < stats.length; i++) {
+        const item = stats[i];
+        const valueSizeClass = getHomeStatValueSizeClass(item.rawValue);
+        const cardClass = item.cardClass ? ` ${item.cardClass}` : '';
+        html += `
+        <div class="home-stat-card${cardClass}">
+            <div class="home-stat-card__icon ${item.iconClass}" aria-hidden="true">${item.icon}</div>
+            <div class="home-stat-card__content">
+                <div class="home-stat-card__title">${item.title}</div>
+                <div class="home-stat-card__value ${valueSizeClass}">${item.value}</div>
+                <div class="home-stat-card__hint">${item.hint}</div>
+                ${item.meta ? `<div class="home-stat-card__meta">${item.meta}</div>` : ''}
+            </div>
+        </div>`;
+    }
+    return html;
+}
+
+function initHomeStatsCards() {
+    const grid = $('#introduces .grid');
+    grid.empty();
+    grid.append(buildHomeStatsCards());
+    applyHomeStatsLayout();
+}
+
+function applyHomeStatsLayout() {
+    const gridEl = document.querySelector('#introduces .grid');
+    if (!gridEl) {
+        return;
+    }
+    const viewport = window.innerWidth;
+    let columns = 3;
+    if (viewport < 640) {
+        columns = 1;
+    } else if (viewport < 1024) {
+        columns = 2;
+    }
+    gridEl.style.display = 'grid';
+    gridEl.style.gap = '12px';
+    gridEl.style.width = '100%';
+    gridEl.style.gridTemplateColumns = `repeat(${columns}, minmax(0, 1fr))`;
 }
 
 
@@ -268,7 +356,7 @@ function drawTitle(canvasId='title-canvas',  width = 300, height = 120, line1hei
 
 
     // 定义文本内容
-    const text1 = '问';
+    const text1 = (window.getCurrentLang && window.getCurrentLang() === 'en-US') ? 'Ask' : '问';
     // const text2 = 'Lag[i]';
     const text3 = SUB_SYSTEM_TITLE;
 
@@ -570,11 +658,11 @@ function debounce(func, delay) {
 window.addEventListener('load', function(){
     setDivSize();
     loadBall();
+    loadCorners();
 });
 
 const debouncedHandleResize = function() {
-    // setDivSize();
-    // debounce(setDivSize, 50)();
+    applyHomeStatsLayout();
 };
 
 // 监听窗口大小变化事件，并重新设置 div 的大小
@@ -637,33 +725,30 @@ function generateColorGradient(steps, count) {
     return result.reverse();
 }
 
+function formatRankCount(value) {
+    if (typeof value === 'string') {
+        return value;
+    }
+    const n = Number(value);
+    if (isNaN(n)) {
+        return value;
+    }
+    if (n >= 1000000) {
+        return `${(n / 1000000).toFixed(1)}m`;
+    }
+    if (n >= 1000) {
+        return `${(n / 1000).toFixed(1)}k`;
+    }
+    return `${n}`;
+}
+
 function gentRankLi(el) {
-    return `<li class="ball-describe-item"> <span>${el.icon}</span> <span class="scroll-text" style="display:inline-block; overflow:hidden; width:72px; white-space: nowrap;" > ${el.name} </span> <a class="hot-tag">(${el.count})</a></li>`;
+    return `<li class="ball-describe-item"> <span>${el.icon}</span> <span class="scroll-text"> ${el.name} </span> <a class="hot-tag">(${el.count})</a></li>`;
+    //return `<li class="ball-describe-item"><span class="rank-icon">${el.icon}</span><span class="scroll-text">${el.name}</span><a class="hot-tag">(${formatRankCount(el.count)})</a></li>`;
 }
 
 
 function freshRankDom(ulJq, list, colors) {
-    // ulJq.empty();
-    // let lastHeight = 1.3;
-    // let lastFontSize = 0.9;
-    // let bottomMargin = 0.5;
-    // for(let i = 0; i < list.length; i++) {
-    //     let el = list[i];
-    //     let html =  gentRankLi(el);
-    //     ulJq.append(html);
-    //     let li = ulJq.find('li').eq(i);
-    //     let hotTag = li.find('.hot-tag');
-    //     li.css('background-color', colors[i]);
-    //     if (i > 0) {
-    //         lastFontSize = lastFontSize * 0.85;
-    //         bottomMargin = bottomMargin * 0.8;
-    //     }
-    //     li.css('height', `${lastHeight}em`);
-    //     li.css('line-height', `${lastHeight}em`);
-    //     li.css('font-size', `${lastFontSize}em`);
-    //     li.css('margin-bottom', `${bottomMargin}em`);
-    // }
-
     ulJq.empty();
 
     for(let i = 0; i < list.length; i++) {
@@ -672,11 +757,12 @@ function freshRankDom(ulJq, list, colors) {
         ulJq.append(html);
         let li = ulJq.find('li').eq(i);
         li.css('background-color', colors[i]);
+        // li.css('background-color', 'transparent');
+        // li.find('.ball-describe-item').css('background-color', colors[i]);
     }
 }
 
 function freshLeftRankDom(list) {
-    // const colors = generateColorGradient(100, list.length);
     const colors = [
         '#b29aff',
         '#d4e9ff',
@@ -689,7 +775,6 @@ function freshLeftRankDom(list) {
 
 
 function freshRightRankDom(list) {
-    // const colors = generateColorGradient(100, list.length);
     const colors = [
         '#9adaff',
         '#d4ffea',
@@ -704,61 +789,28 @@ const defaultModelIcon= '<svg t="1752984421534" class="icon" viewBox="0 0 1024 1
 const defaultAgentIcon= '<svg t="1752986414845" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="18795" width="26" height="26"><path d="M880.896 328.448c15.274667 32.768 26.197333 65.536 30.549333 109.226667 39.253333 8.789333 69.888 43.690667 69.888 85.333333v43.605333c0 41.557333-30.549333 76.544-69.973333 85.248-4.266667 43.690667-13.056 76.458667-30.464 109.226667-21.845333 41.557333-54.613333 76.544-98.304 98.389333-37.12 19.626667-76.458667 28.416-131.072 32.768a86.698667 86.698667 0 0 1-85.162667 67.754667H478.976c-41.472 0-76.458667-28.416-85.162667-67.754667-54.613333-2.218667-93.866667-13.141333-131.072-32.768A225.024 225.024 0 0 1 164.437333 761.173333a320.512 320.512 0 0 1-30.549333-109.312A88.746667 88.746667 0 0 1 64 566.613333v-43.690666c0-41.557333 30.549333-76.458667 72.106667-85.248 4.266667-43.690667 13.056-76.458667 30.549333-109.226667 21.845333-41.557333 54.613333-76.544 98.304-98.389333 45.824-26.197333 96.085333-34.986667 176.896-34.986667h37.12V107.776c0-24.064 19.626667-43.690667 43.690667-43.690667 24.064 0 43.690667 19.626667 43.690666 43.690667v87.466667h37.12c80.810667 0 131.072 8.704 179.114667 34.986666 41.472 21.76 76.458667 54.613333 98.304 98.304z m-30.634667 253.44h-4.352v-74.24c0-78.677333-10.922667-115.797333-26.197333-146.432q-26.197333-45.909333-72.106667-72.106667c-30.549333-15.36-67.669333-26.197333-146.346666-26.197333H439.637333c-78.592 0-115.712 10.922667-146.346666 26.197333q-45.824 26.197333-72.021334 72.106667c-15.36 30.634667-26.197333 67.754667-26.197333 146.432v74.24c0 80.896 10.922667 115.882667 28.330667 148.650667q26.282667 45.909333 72.106666 72.106666c30.549333 15.36 67.669333 26.197333 146.346667 26.197334h161.621333c80.810667 0 115.712-10.922667 148.48-28.330667 30.634667-17.493333 54.613333-41.557333 72.106667-72.192 15.36-30.549333 26.197333-67.669333 26.197333-146.346667zM347.904 457.386667c0-23.893333 19.626667-43.605333 43.690667-43.605334 24.064 0 43.690667 19.626667 43.690666 43.690667v174.848c0 23.978667-19.626667 43.690667-43.690666 43.690667a43.861333 43.861333 0 0 1-43.690667-43.690667v-174.933333z m262.144 0c0-23.893333 19.626667-43.605333 43.690667-43.605334 23.978667 0 43.690667 19.626667 43.690666 43.690667v174.848c0 23.978667-19.626667 43.690667-43.690666 43.690667a43.861333 43.861333 0 0 1-43.690667-43.690667v-174.933333z" p-id="18796" fill="#1296db"></path></svg>';
 
 const defaultLeftRank = [
-    {name:'通义千问', count: 90, icon: defaultModelIcon},
-    {name:'文心一言', count: 55, icon: defaultModelIcon},
-    {name:'智谱清言', count: 54, icon: defaultModelIcon},
-    {name:'Moonshot', count: 11, icon: defaultModelIcon},
-    {name:'星火', count: 50, icon: defaultModelIcon}
+    {name:tTextFn('通义千问'), count: 90, icon: defaultModelIcon},
+    {name:tTextFn('文心一言'), count: 55, icon: defaultModelIcon},
+    {name:tTextFn('智谱清言'), count: 54, icon: defaultModelIcon},
+    {name:tTextFn('Moonshot'), count: 11, icon: defaultModelIcon},
+    {name:tTextFn('星火'), count: 50, icon: defaultModelIcon}
 ];
 
 const defaultRightRank = [
-    {name:'天气助手', count: 90, icon: defaultAgentIcon},
-    {name:'油价助手', count: 72, icon: defaultAgentIcon},
-    {name:'高铁助手', count: 11, icon: defaultAgentIcon},
-    {name:'翻译助手', count: 11, icon: defaultAgentIcon},
-    {name:'历史今日', count: 9, icon: defaultAgentIcon}
+    {name:tTextFn('天气助手'), count: 90, icon: defaultAgentIcon},
+    {name:tTextFn('油价助手'), count: 72, icon: defaultAgentIcon},
+    {name:tTextFn('高铁助手'), count: 11, icon: defaultAgentIcon},
+    {name:tTextFn('翻译助手'), count: 11, icon: defaultAgentIcon},
+    {name:tTextFn('历史今日'), count: 9, icon: defaultAgentIcon}
 ]
 
 function loadLeftRank() {
-    fetch(`/rank/llmHotRanking?limit=5`)
-    .then(response => {
-        return response.json();
-    })
-    .then(data => {
-        if (data.status === 'success') {
-            for(let el of data.data) {
-                if(!el.icon) {
-                    el.icon = defaultModelIcon;
-                }
-            }
-            freshLeftRankDom(data.data);
-        }
-    })
-    .catch((error)=>{
-        freshLeftRankDom(defaultLeftRank);
-        console.log("loadLeftRank error:", error);
-    });
+    freshLeftRankDom(defaultLeftRank);
 }
 
 
 function loadRightRank() {
-    fetch(`/rank/agentHotRanking?limit=5`)
-    .then(response => {
-        return response.json();
-    })
-    .then(data => {
-        if (data.status === 'success') {
-            for(let el of data.data) {
-                if(!el.icon) {
-                    el.icon = defaultAgentIcon;
-                }
-            }
-            freshRightRankDom(data.data);
-        }
-    }).catch((error)=>{
-        freshRightRankDom(defaultRightRank);
-        console.log("loadRightRank error:", error);
-    });
+    freshRightRankDom(defaultRightRank);
 }
 
 
