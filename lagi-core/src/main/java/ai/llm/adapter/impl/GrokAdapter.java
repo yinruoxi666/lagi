@@ -12,7 +12,6 @@ import ai.llm.utils.convert.GptConvert;
 import ai.openai.pojo.ChatCompletionRequest;
 import ai.openai.pojo.ChatCompletionResult;
 import ai.openai.pojo.ChatMessage;
-import cn.hutool.core.bean.BeanUtil;
 import io.reactivex.Observable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,7 +31,6 @@ public class GrokAdapter extends ModelService implements ILlmAdapter {
     @Override
     public ChatCompletionResult completions(ChatCompletionRequest chatCompletionRequest) {
         setDefaultField(chatCompletionRequest);
-        setNotSupportField(chatCompletionRequest);
         if (ResponseProtocolUtil.isResponseProtocol(this)) {
             ResponseSessionContext sessionContext = SESSION_MANAGER.prepare(chatCompletionRequest, this);
             LlmApiResponse response = OpenAiResponsesApiUtil.createResponse(apiKey, RESPONSES_URL, HTTP_TIMEOUT,
@@ -60,7 +58,6 @@ public class GrokAdapter extends ModelService implements ILlmAdapter {
     @Override
     public Observable<ChatCompletionResult> streamCompletions(ChatCompletionRequest chatCompletionRequest) {
         setDefaultField(chatCompletionRequest);
-        setNotSupportField(chatCompletionRequest);
         if (ResponseProtocolUtil.isResponseProtocol(this)) {
             ResponseSessionContext sessionContext = SESSION_MANAGER.prepare(chatCompletionRequest, this);
             LlmApiResponse response = OpenAiResponsesApiUtil.streamResponse(apiKey, RESPONSES_URL, HTTP_TIMEOUT,
@@ -98,11 +95,12 @@ public class GrokAdapter extends ModelService implements ILlmAdapter {
         return headers;
     }
 
-    private void setNotSupportField(ChatCompletionRequest request) {
-        ChatCompletionRequest chatCompletionRequest = new ChatCompletionRequest();
-        BeanUtil.copyProperties(request, chatCompletionRequest);
-        Integer maxTokens = chatCompletionRequest.getMax_tokens();
-        if(maxTokens != null && chatCompletionRequest.getMax_completion_tokens() ==  null) {
+
+    @Override
+    protected void  setDefaultField(ChatCompletionRequest request) {
+        super.setDefaultField(request);
+        Integer maxTokens = request.getMax_tokens();
+        if(maxTokens != null && request.getMax_completion_tokens() ==  null) {
             request.setMax_completion_tokens(maxTokens);
         }
         request.setPresence_penalty(null);
