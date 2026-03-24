@@ -84,6 +84,19 @@ The following database types are supported but not limited to:
 
 Prerequisites: **JDK 8** must be installed on your machine. If not installed or for detailed steps on each platform, see the [Installation Guide (JDK installation and configuration)](docs/install_en.md).
 
+**Official install script**
+
+Run the command for your platform in a terminal to download and complete installation:
+
+- **Windows (PowerShell):**
+  ```powershell
+  iwr -useb https://downloads.landingbj.com/install.ps1 | iex
+  ```
+- **macOS / Linux:**
+  ```bash
+  curl -fsSL https://downloads.landingbj.com/install.sh | bash
+  ```
+
 **Recommended: Run with JAR**
 
 1. Place `LinkMind.jar` in any directory (e.g. `D:\LinkMind` or `~/LinkMind`).

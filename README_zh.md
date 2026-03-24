@@ -84,6 +84,19 @@ LinkMind（联智）是由北京联动北方科技有限公司精心打造的一
 
 前置要求：本机已安装 **JDK 8**。若未安装或需各平台详细步骤，请参阅 [安装指南（JDK 安装与详细配置）](docs/install_zh.md)。
 
+**使用官方安装脚本**
+
+在终端中执行对应命令即可下载并完成安装：
+
+- **Windows（PowerShell）：**
+  ```powershell
+  iwr -useb https://downloads.landingbj.com/install.ps1 | iex
+  ```
+- **macOS / Linux：**
+  ```bash
+  curl -fsSL https://downloads.landingbj.com/install.sh | bash
+  ```
+
 **推荐方式：使用 JAR 运行**
 
 1. 将 `LinkMind.jar` 放到任意目录（如 `D:\LinkMind` 或 `~/LinkMind`）。
