@@ -2,12 +2,63 @@ let tokenUsageChart = null;
 const tTextToken = window.tText || ((s) => s);
 const tHtmlToken = window.tHtml || ((s) => s);
 
+function getEcharts() {
+    if (typeof echarts !== 'undefined') {
+        return echarts;
+    }
+    if (typeof window.echarts !== 'undefined') {
+        return window.echarts;
+    }
+    return null;
+}
+
+/** jQuery $.when may pass [data, status, jqXHR] or plain data. */
+function firstResolvedPayload(arg) {
+    if (arg == null) {
+        return null;
+    }
+    if (Array.isArray(arg) && arg.length > 0) {
+        return arg[0];
+    }
+    return arg;
+}
+
+function pickRowCreatedAt(row) {
+    if (!row) {
+        return 0;
+    }
+    const v = row.createdAt != null ? row.createdAt : row.created_at;
+    return Number(v) || 0;
+}
+
+function pickRowTotalTokens(row) {
+    if (!row) {
+        return 0;
+    }
+    const v = row.totalTokens != null ? row.totalTokens : row.total_tokens;
+    return Number(v) || 0;
+}
+
+function disposeTokenUsageChart() {
+    if (!tokenUsageChart) {
+        return;
+    }
+    try {
+        tokenUsageChart.dispose();
+    } catch (e) {
+        /* ignore */
+    }
+    tokenUsageChart = null;
+}
+
 /** Active API range from quick buttons; cleared when dates are edited manually. */
 window.__tokenUsageApiRange = 'today';
 window.tokenUsageListPage = 1;
 window.tokenUsageListPageSize = 20;
 
 function loadTokenUsagePage() {
+    disposeTokenUsageChart();
+
     $('#queryBox').hide();
     $('#footer-info').hide();
     $('#introduces').hide();
@@ -233,8 +284,8 @@ function refreshTokenUsageData() {
         $.getJSON('/v1/token-statistics/overview', { range: range }),
         $.getJSON('/v1/token-statistics/details', { range: range, page: page, pageSize: pageSize })
     ).done(function(ovPack, detPack) {
-        const ov = ovPack[0];
-        const det = detPack[0];
+        const ov = firstResolvedPayload(ovPack) || {};
+        const det = firstResolvedPayload(detPack) || {};
         const totalTokens = Number(ov.totalTokens != null ? ov.totalTokens : 0);
         const recordCount = Number(ov.recordCount != null ? ov.recordCount : 0);
         const dailyAvg = Number(ov.dailyAvgTokens != null ? ov.dailyAvgTokens : 0);
@@ -333,11 +384,11 @@ function renderTokenSessionTableFromApi(records, locale) {
     for (let i = 0; i < records.length; i++) {
         const row = records[i] || {};
         const id = row.id != null ? row.id : '';
-        const createdAt = Number(row.createdAt != null ? row.createdAt : 0);
+        const createdAt = pickRowCreatedAt(row);
         const dateLabel = createdAt ? new Date(createdAt).toLocaleString(locale) : '—';
         const pt = Number(row.promptTokens != null ? row.promptTokens : 0);
         const ct = Number(row.completionTokens != null ? row.completionTokens : 0);
-        const tt = Number(row.totalTokens != null ? row.totalTokens : 0);
+        const tt = pickRowTotalTokens(row);
         const st = Number(row.savedTokens != null ? row.savedTokens : 0);
         const cost = ((tt / 1000) * 0.002).toFixed(4);
         const tr = `
@@ -355,11 +406,30 @@ function renderTokenSessionTableFromApi(records, locale) {
     }
 }
 
+function formatDayKeyFromMs(ms) {
+    const d = new Date(ms);
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + m + '-' + day;
+}
+
 function renderTokenUsageChart(rows, start, end, metric) {
     const chartDom = document.getElementById('tokenUsageChart');
     const noDataDom = document.getElementById('tokenUsageNoData');
-    if (!chartDom || typeof echarts === 'undefined') {
+    const ec = getEcharts();
+    if (!chartDom || !ec) {
         return;
+    }
+
+    const sumsByDay = {};
+    for (let r = 0; r < rows.length; r++) {
+        const ca = pickRowCreatedAt(rows[r]);
+        if (!ca) {
+            continue;
+        }
+        const key = formatDayKeyFromMs(ca);
+        const tt = pickRowTotalTokens(rows[r]);
+        sumsByDay[key] = (sumsByDay[key] || 0) + tt;
     }
 
     const points = [];
@@ -373,16 +443,8 @@ function renderTokenUsageChart(rows, start, end, metric) {
     for (let ts = cursor; ts <= endTs; ts += dayMs) {
         const d = new Date(ts);
         const label = `${d.getMonth() + 1}/${d.getDate()}`;
-        const dayStart = ts;
-        const dayEnd = ts + dayMs - 1;
-        let dayTokens = 0;
-        for (let r = 0; r < rows.length; r++) {
-            const row = rows[r] || {};
-            const ca = Number(row.createdAt != null ? row.createdAt : 0);
-            if (ca >= dayStart && ca <= dayEnd) {
-                dayTokens += Number(row.totalTokens != null ? row.totalTokens : 0);
-            }
-        }
+        const key = formatDayKeyFromMs(ts);
+        const dayTokens = sumsByDay[key] || 0;
         points.push({
             label: label,
             tokens: dayTokens,
@@ -396,9 +458,7 @@ function renderTokenUsageChart(rows, start, end, metric) {
         if (noDataDom) {
             noDataDom.style.display = 'block';
         }
-        if (tokenUsageChart) {
-            tokenUsageChart.clear();
-        }
+        disposeTokenUsageChart();
         return;
     }
 
@@ -407,8 +467,20 @@ function renderTokenUsageChart(rows, start, end, metric) {
         noDataDom.style.display = 'none';
     }
 
-    if (!tokenUsageChart) {
-        tokenUsageChart = echarts.init(chartDom);
+    disposeTokenUsageChart();
+    if (typeof ec.getInstanceByDom === 'function') {
+        const existing = ec.getInstanceByDom(chartDom);
+        if (existing) {
+            try {
+                existing.dispose();
+            } catch (e) {
+                /* ignore */
+            }
+        }
+    }
+    tokenUsageChart = ec.init(chartDom);
+    if (!window.__tokenUsageChartResizeBound) {
+        window.__tokenUsageChartResizeBound = true;
         window.addEventListener('resize', function() {
             if (tokenUsageChart) {
                 tokenUsageChart.resize();
@@ -440,4 +512,9 @@ function renderTokenUsageChart(rows, start, end, metric) {
         }]
     };
     tokenUsageChart.setOption(option, true);
+    setTimeout(function() {
+        if (tokenUsageChart) {
+            tokenUsageChart.resize();
+        }
+    }, 0);
 }

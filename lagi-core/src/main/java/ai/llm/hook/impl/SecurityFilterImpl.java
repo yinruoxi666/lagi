@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Queue;
 import java.util.Vector;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Order(1)
 @Component
@@ -47,6 +48,7 @@ public class SecurityFilterImpl implements BeforeModel, AfterModel {
         return Observable.create(emitter -> {
             Queue<ChatCompletionResult> cacheQueue = new ArrayBlockingQueue<>(queueCapacity);
             List<String> contents = new Vector<>(queueCapacity);
+            AtomicBoolean streamSensitiveRecorded = new AtomicBoolean(false);
             processedSource.subscribe(
                     chunk -> {
                         try {
@@ -58,6 +60,9 @@ public class SecurityFilterImpl implements BeforeModel, AfterModel {
                             String totalContent = String.join("", contents);
                             String nullOrReplaceContent = SensitiveWordUtil.getNullOrReplaceContent(totalContent);
                             if(nullOrReplaceContent != null) {
+                                if (streamSensitiveRecorded.compareAndSet(false, true)) {
+                                    SensitiveWordUtil.recordOutputStreamFilter(totalContent);
+                                }
                                 int size = cacheQueue.size();
                                 for (int i = 0; i < size; i++) {
                                     ChatCompletionResult temp = cacheQueue.poll();

@@ -194,6 +194,8 @@
         '监控日志': 'Monitor Logs',
         '时间': 'Time',
         '过滤器': 'Filter',
+        '敏感词（输入）': 'Sensitive (input)',
+        '敏感词（输出）': 'Sensitive (output)',
         '操作类型': 'Action',
         '内容': 'Content',
         '上一页': 'Prev',

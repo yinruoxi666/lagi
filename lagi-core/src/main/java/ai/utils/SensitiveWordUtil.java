@@ -10,7 +10,6 @@ import cn.hutool.core.util.StrUtil;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -26,6 +25,15 @@ public class SensitiveWordUtil {
 
     public static final String INPUT_RULE_TYPE = "input";
     public static final String OUTPUT_RULE_TYPE = "output";
+
+    /** 监控表 filter_name：输入侧敏感规则 */
+    public static final String MONITOR_FILTER_INPUT = "sensitive_input";
+    /** 监控表 filter_name：输出侧敏感规则 */
+    public static final String MONITOR_FILTER_OUTPUT = "sensitive";
+
+    private static String monitorNameForRuleType(String ruleType) {
+        return INPUT_RULE_TYPE.equalsIgnoreCase(ruleType) ? MONITOR_FILTER_INPUT : MONITOR_FILTER_OUTPUT;
+    }
 
     private static final LRUCache<String, String> filterSlidingWindow = new LRUCache<>(10000, 30, TimeUnit.MINUTES);
     private static final LRUCache<String, Boolean> blockMap = new LRUCache<>(10000, 30, TimeUnit.MINUTES);
@@ -95,14 +103,14 @@ public class SensitiveWordUtil {
                     String filterContent = "匹配规则: " + rule + ", 原始内容: " + (message.length() > 500 ? message.substring(0, 500) : message);
                     if (wordRule.getLevel() == 1) {
                         message = "";
-                        FilterMonitorUtil.recordFilterAction("sensitive", "block", filterContent);
+                        FilterMonitorUtil.recordFilterAction(monitorNameForRuleType(ruleType), "block", filterContent);
                         break;
                     } else if (wordRule.getLevel() == 2) {
                         message = message.replaceAll(rule, wordRule.getMask());
-                        FilterMonitorUtil.recordFilterAction("sensitive", "mask", filterContent);
+                        FilterMonitorUtil.recordFilterAction(monitorNameForRuleType(ruleType), "mask", filterContent);
                     } else if (wordRule.getLevel() == 3) {
                         message = message.replaceAll(rule, "");
-                        FilterMonitorUtil.recordFilterAction("sensitive", "erase", filterContent);
+                        FilterMonitorUtil.recordFilterAction(monitorNameForRuleType(ruleType), "erase", filterContent);
                     }
                     count++;
                 }
@@ -115,7 +123,17 @@ public class SensitiveWordUtil {
     }
 
 
-    public static String getNullOrReplaceContent(String message){
+    private static final class OutputRuleMatch {
+        final WordRule wordRule;
+        final String filterContent;
+
+        OutputRuleMatch(WordRule wordRule, String filterContent) {
+            this.wordRule = wordRule;
+            this.filterContent = filterContent;
+        }
+    }
+
+    private static OutputRuleMatch findFirstOutputRuleMatch(String message) {
         Set<String> rules = ruleMap.keySet();
         for (String rule : rules) {
             Pattern p = getCompiledPattern(rule);
@@ -123,17 +141,57 @@ public class SensitiveWordUtil {
             if (matcher.find()) {
                 WordRule wordRule = ruleMap.get(rule);
                 if (wordRule != null) {
-                    if(wordRule.getLevel() == 1) {
-                        return "";
-                    } else if(wordRule.getLevel() == 2) {
-                        return wordRule.getMask();
-                    } else if(wordRule.getLevel() == 3) {
-                        return "";
-                    }
+                    String filterContent = "匹配规则: " + rule + ", 原始内容: "
+                            + (message.length() > 500 ? message.substring(0, 500) : message);
+                    return new OutputRuleMatch(wordRule, filterContent);
                 }
             }
         }
         return null;
+    }
+
+    public static String getNullOrReplaceContent(String message) {
+        OutputRuleMatch m = findFirstOutputRuleMatch(message);
+        if (m == null) {
+            return null;
+        }
+        Integer level = m.wordRule.getLevel();
+        if (level == null) {
+            return null;
+        }
+        if (level == 1) {
+            return "";
+        } else if (level == 2) {
+            return m.wordRule.getMask();
+        } else if (level == 3) {
+            return "";
+        }
+        return null;
+    }
+
+    /**
+     * 流式输出路径（SecurityFilterImpl）在首次命中输出敏感规则时写入监控，与 {@link #getNullOrReplaceContent} 判定一致。
+     */
+    public static void recordOutputStreamFilter(String message) {
+        OutputRuleMatch m = findFirstOutputRuleMatch(message);
+        if (m == null) {
+            return;
+        }
+        Integer level = m.wordRule.getLevel();
+        if (level == null) {
+            return;
+        }
+        String action;
+        if (level == 1) {
+            action = "block";
+        } else if (level == 2) {
+            action = "mask";
+        } else if (level == 3) {
+            action = "erase";
+        } else {
+            return;
+        }
+        FilterMonitorUtil.recordFilterAction(MONITOR_FILTER_OUTPUT, action, m.filterContent);
     }
 
 
@@ -215,15 +273,15 @@ public class SensitiveWordUtil {
                     String replaceContent = "";
                     String filterContent = "匹配规则: " + rule + ", 原始内容: " + (message.length() > 500 ? message.substring(0, 500) : message);
                     if (wordRule.getLevel() == 1) {
-                        FilterMonitorUtil.recordFilterAction("sensitive", "block", filterContent);
+                        FilterMonitorUtil.recordFilterAction(MONITOR_FILTER_OUTPUT, "block", filterContent);
                         blockMap.put(id, true);
                         break;
                     } else if (wordRule.getLevel() == 2) {
                         replaceContent = message.replaceAll(rule, wordRule.getMask());
-                        FilterMonitorUtil.recordFilterAction("sensitive", "mask", filterContent);
+                        FilterMonitorUtil.recordFilterAction(MONITOR_FILTER_OUTPUT, "mask", filterContent);
                     } else if (wordRule.getLevel() == 3) {
                         replaceContent = message.replaceAll(rule, "");
-                        FilterMonitorUtil.recordFilterAction("sensitive", "erase", filterContent);
+                        FilterMonitorUtil.recordFilterAction(MONITOR_FILTER_OUTPUT, "erase", filterContent);
                     }
                     chatMessage.setContent(replaceContent);
                 }

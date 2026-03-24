@@ -3,6 +3,16 @@ let fenceRefreshInterval = null;
 const tTextFence = window.tText || ((s) => s);
 const tHtmlFence = window.tHtml || ((s) => s);
 
+/** 与 lagi_filter_monitor.filter_name 一致：输入/输出敏感词分开展示 */
+function formatFenceFilterName(raw) {
+    if (!raw) return '';
+    const map = {
+        sensitive_input: tTextFence('敏感词（输入）'),
+        sensitive: tTextFence('敏感词（输出）')
+    };
+    return map[raw] || raw;
+}
+
 let currentPage = 1;
 let pageSize = 20;
 let totalPages = 1;
@@ -138,7 +148,7 @@ function updateFenceDisplay() {
         const row = `
             <tr style="border-bottom: 1px solid #eee;">
                 <td style="padding: 12px;">${item.create_time || ''}</td>
-                <td style="padding: 12px;">${item.filter_name || ''}</td>
+                <td style="padding: 12px;">${formatFenceFilterName(item.filter_name)}</td>
                 <td style="padding: 12px;">${item.action_type || ''}</td>
                 <td style="padding: 12px; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.content || ''}">${item.content || ''}</td>
             </tr>
