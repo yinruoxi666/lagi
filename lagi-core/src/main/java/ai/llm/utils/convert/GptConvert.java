@@ -1,7 +1,10 @@
 package ai.llm.utils.convert;
 
 import ai.llm.utils.LLMErrorConstants;
+import ai.openai.pojo.ChatCompletionChoice;
 import ai.openai.pojo.ChatCompletionResult;
+import ai.openai.pojo.ChatMessage;
+import ai.utils.LagiGlobal;
 import com.google.gson.Gson;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.Response;
@@ -56,6 +59,12 @@ public class GptConvert {
             return null;
         }
         ChatCompletionResult result = gson.fromJson(body, ChatCompletionResult.class);
+        if(result.getChoices().isEmpty()) {
+            ChatCompletionChoice choice = new ChatCompletionChoice();
+            ChatMessage message = ChatMessage.builder().role(LagiGlobal.LLM_ROLE_USER).content("").build();
+            choice.setMessage(message);
+            result.getChoices().add( choice);
+        }
         result.getChoices().forEach(choice -> {
             choice.setMessage(choice.getDelta());
 //            choice.setDelta(null);
