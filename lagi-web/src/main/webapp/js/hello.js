@@ -148,6 +148,7 @@ function buildHomeStatsCards() {
 
 function initHomeStatsCards() {
     const grid = $('#introduces .grid');
+    $('#introduces').addClass('stats-compact');
     grid.empty();
     grid.append(buildHomeStatsCards());
     applyHomeStatsLayout();
