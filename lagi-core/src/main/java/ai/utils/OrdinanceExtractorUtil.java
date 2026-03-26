@@ -2,7 +2,6 @@ package ai.utils;
 
 import ai.common.pojo.FileChunkResponse;
 import ai.vector.FileService;
-import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
@@ -90,7 +89,6 @@ public class OrdinanceExtractorUtil {
         return result;
     }
 
-    @Test
     public void vvv() throws IOException {
         String filePath = "C:\\Users\\ruiqing.luo\\Desktop\\rag调优\\材料\\北京地铁\\提供的资料-脱敏\\分公司年度安全考试管理办法\\《公司年度安全考试管理办法》的通知.pdf";
         String documentContent = fileService.getFileContent(new File(filePath));

@@ -2,7 +2,6 @@ package ai.utils;
 
 import ai.common.pojo.FileChunkResponse;
 import ai.vector.FileService;
-import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;

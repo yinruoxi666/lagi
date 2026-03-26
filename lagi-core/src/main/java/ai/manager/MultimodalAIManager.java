@@ -5,6 +5,7 @@ import ai.audio.adapter.IAudioCloneAdapter;
 import ai.common.ModelService;
 import ai.common.pojo.Backend;
 import ai.common.pojo.Driver;
+import ai.config.ContextLoader;
 import ai.config.pojo.ModelFunctions;
 import ai.image.adapter.IImage2TextAdapter;
 import ai.image.adapter.IImageGenerationAdapter;
@@ -164,7 +165,7 @@ public class MultimodalAIManager {
 
     private static boolean doesImplementInterface(String className, String interfaceName) {
         try {
-            Class<?> targetClass = Class.forName(className);
+            Class<?> targetClass = ContextLoader.getaClass(className);
             Class<?> targetInterface = Class.forName(interfaceName);
             Class<?>[] implementedInterfaces = targetClass.getInterfaces();
             return Arrays.asList(implementedInterfaces).contains(targetInterface);
@@ -260,7 +261,7 @@ public class MultimodalAIManager {
         ModelService modelService = null;
         Class<?> clazz = null;
         try {
-            clazz = Class.forName(driver);
+            clazz = ContextLoader.getaClass(driver);
         } catch (Exception e) {
             log.error( "class {} not fount {}", driver,  e.getMessage());
         }

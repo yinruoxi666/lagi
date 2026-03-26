@@ -19,7 +19,7 @@ import ai.utils.*;
 import ai.utils.qa.ChatCompletionUtil;
 import ai.vector.VectorDbService;
 import cn.hutool.core.bean.BeanUtil;
-import org.apache.hadoop.util.Lists;
+import com.google.common.collect.Lists;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
