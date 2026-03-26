@@ -38,7 +38,9 @@ build/
 .claude/
 .codex/
 .cursor/
+/CLAUDE.md
 
+/extension
 /lagi-web/samples/
 /lagi-core/src/test/java/zxw/
 /tomcat*

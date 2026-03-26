@@ -17,8 +17,9 @@ public class Application {
         SLF4JBridgeHandler.install();
         int port = InstallerUtil.resolvePort(args);
         String host = InstallerUtil.resolveHost(args);
+        boolean enableSync = InstallerUtil.resolveEnableSync(args);
 
-        if (!devMode) {
+        if (!devMode && enableSync) {
             OpenClawUtil.sync(port, true, true);
         }
 

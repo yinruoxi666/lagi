@@ -70,6 +70,17 @@ public class InstallerUtil {
         return Boolean.parseBoolean(parseArg(args, IMPORT_FROM_OPENCLAW_ARG));
     }
 
+    public static boolean resolveEnableSync(String[] args) {
+        String val = parseArg(args, "--enable-sync=");
+        if (val == null) {
+            val = System.getProperty("enable.sync", System.getenv("ENABLE_SYNC"));
+        }
+        if (val != null && !val.isEmpty()) {
+            return Boolean.parseBoolean(val);
+        }
+        return true;
+    }
+
     public static File getJarFile() {
         try {
             URL location = InstallerUtil.class.getProtectionDomain().getCodeSource().getLocation();

@@ -8,6 +8,7 @@
     </parent>
 
     <artifactId>lagi-extension</artifactId>
+    <version>1.0.0</version>
     <packaging>jar</packaging>
     <name>lagi-extension</name>
 
@@ -16,15 +17,13 @@
     </properties>
 
     <dependencies>
-        <!-- provided 作用域，assembly插件会自动排除这个jar，符合你的需求 -->
         <dependency>
             <groupId>com.landingbj</groupId>
             <artifactId>lagi-core</artifactId>
-            <version>${project.version}</version>
+            <version>${project.parent.version}</version>
             <scope>provided</scope>
         </dependency>
 
-        <!-- 以下所有依赖都会被打包进最终jar -->
         <dependency>
             <groupId>io.pinecone</groupId>
             <artifactId>pinecone-client</artifactId>
@@ -55,11 +54,6 @@
                 </exclusion>
             </exclusions>
         </dependency>
-<!--        <dependency>-->
-<!--            <groupId>mysql</groupId>-->
-<!--            <artifactId>mysql-connector-java</artifactId>-->
-<!--            <version>5.1.37</version>-->
-<!--        </dependency>-->
         <dependency>
             <groupId>co.elastic.clients</groupId>
             <artifactId>elasticsearch-java</artifactId>
@@ -80,13 +74,11 @@
                 </configuration>
             </plugin>
 
-            <!-- ✅ 修复后的打包插件（核心修改） -->
             <plugin>
                 <artifactId>maven-assembly-plugin</artifactId>
                 <version>3.3.0</version>
                 <executions>
                     <execution>
-                        <!-- 1. 绑定到 package 阶段，执行mvn package时自动运行 -->
                         <phase>package</phase>
                         <goals>
                             <goal>single</goal>
@@ -94,11 +86,9 @@
                     </execution>
                 </executions>
                 <configuration>
-                    <!-- 2. 打包包含所有依赖（自动排除provided） -->
                     <descriptorRefs>
                         <descriptorRef>jar-with-dependencies</descriptorRef>
                     </descriptorRefs>
-                    <!-- 3. 简化打包后的文件名 -->
                     <appendAssemblyId>false</appendAssemblyId>
                     <finalName>${project.artifactId}-${project.version}-with-deps</finalName>
                 </configuration>

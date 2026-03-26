@@ -18,6 +18,8 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class ContextLoader {
 
@@ -31,15 +33,36 @@ public class ContextLoader {
         return PROPERTIES.getProperty(key);
     }
 
-    public static ClassLoader classLoader = null;
+    private static volatile ClassLoader classLoader = null;
+    private static volatile String extensionJarFolder = null;
 
-    public static Class<?> getaClass(String className) throws ClassNotFoundException {
+    private static final Set<String> EXTENSION_LOADABLE_CLASS_NAMES = ConcurrentHashMap.newKeySet();
+
+    static {
+        EXTENSION_LOADABLE_CLASS_NAMES.add("ai.vector.impl.PineconeVectorStore");
+        EXTENSION_LOADABLE_CLASS_NAMES.add("ai.vector.impl.MilvusVectorStore");
+        EXTENSION_LOADABLE_CLASS_NAMES.add("ai.bigdata.impl.ElasticSearchAdapter");
+    }
+
+    public static Class<?> getClass(String className) throws ClassNotFoundException {
         try {
             return Class.forName(className);
         } catch (ClassNotFoundException e) {
-            ClassLoader classLoader = ContextLoader.classLoader;
-            if(classLoader != null) {
-                return classLoader.loadClass(className);
+            if (!EXTENSION_LOADABLE_CLASS_NAMES.contains(className)) {
+                throw new ClassNotFoundException("Class " + className + " not found.", e);
+            }
+            ClassLoader cl = classLoader;
+            if (cl == null) {
+                synchronized (ContextLoader.class) {
+                    cl = classLoader;
+                    if (cl == null && extensionJarFolder != null) {
+                        cl = LoadJarUtil.loadAllJarsFromFolder(extensionJarFolder);
+                        classLoader = cl;
+                    }
+                }
+            }
+            if (cl != null) {
+                return cl.loadClass(className);
             }
         }
         throw new ClassNotFoundException("Class " + className + " not found.");
@@ -52,7 +75,7 @@ public class ContextLoader {
         try {
             InputStreamReader reader = new InputStreamReader(inputStream, StandardCharsets.UTF_8);
             GlobalConfigurations loadedConfiguration = mapper.readValue(reader, GlobalConfigurations.class);
-            classLoader = LoadJarUtil.loadAllJarsFromFolder(extensionJarFolder);
+            ContextLoader.extensionJarFolder = extensionJarFolder;
             loadedConfiguration.init();
             configuration = loadedConfiguration;
             BeanManageUtil.initBeans();
@@ -119,7 +142,7 @@ public class ContextLoader {
             mapper.setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
             try {
                 GlobalConfigurations loadedConfiguration = mapper.readValue(reader, GlobalConfigurations.class);
-                classLoader = LoadJarUtil.loadAllJarsFromFolder(extensionJarFolder);
+                ContextLoader.extensionJarFolder = extensionJarFolder;
                 loadedConfiguration.init();
                 configuration = loadedConfiguration;
                 BeanManageUtil.initBeans();
@@ -151,7 +174,7 @@ public class ContextLoader {
         String configPath = System.getProperty("linkmind.config");
         String extensionJarFolder = System.getProperty("linkmind.extension");
         if(extensionJarFolder == null) {
-            extensionJarFolder = "./extension";
+            extensionJarFolder = "extension";
         }
         if (configPath != null && !configPath.trim().isEmpty()) {
             try {

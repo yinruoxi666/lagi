@@ -165,7 +165,7 @@ public class MultimodalAIManager {
 
     private static boolean doesImplementInterface(String className, String interfaceName) {
         try {
-            Class<?> targetClass = ContextLoader.getaClass(className);
+            Class<?> targetClass = ContextLoader.getClass(className);
             Class<?> targetInterface = Class.forName(interfaceName);
             Class<?>[] implementedInterfaces = targetClass.getInterfaces();
             return Arrays.asList(implementedInterfaces).contains(targetInterface);
@@ -261,7 +261,7 @@ public class MultimodalAIManager {
         ModelService modelService = null;
         Class<?> clazz = null;
         try {
-            clazz = ContextLoader.getaClass(driver);
+            clazz = ContextLoader.getClass(driver);
         } catch (Exception e) {
             log.error( "class {} not fount {}", driver,  e.getMessage());
         }
