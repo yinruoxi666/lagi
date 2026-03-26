@@ -85,6 +85,9 @@ public class CompletionsService implements ChatCompletion {
                     unfreezeAdapter(appointAdapter);
                     return result;
                 } catch (RRException e) {
+                    if (LLMErrorConstants.isContentSafetyBlocked(e.getCode())) {
+                        throw e;
+                    }
                     freezingAdapterByErrorCode(appointAdapter, e.getCode());
                     r = e;
                 }
@@ -144,6 +147,9 @@ public class CompletionsService implements ChatCompletion {
                         unfreezeAdapter(adapter);
                         return result;
                     } catch (RRException e) {
+                        if (LLMErrorConstants.isContentSafetyBlocked(e.getCode())) {
+                            throw e;
+                        }
                         freezingAdapterByErrorCode(adapter, e.getCode());
                         r = e;
                     }
@@ -173,6 +179,9 @@ public class CompletionsService implements ChatCompletion {
                         unfreezeAdapter(adapter);
                         return chatCompletionResultObservable;
                     } catch (RRException e) {
+                        if (LLMErrorConstants.isContentSafetyBlocked(e.getCode())) {
+                            throw e;
+                        }
                         freezingAdapterByErrorCode(adapter, e.getCode());
                         r = e;
                     }
@@ -195,6 +204,9 @@ public class CompletionsService implements ChatCompletion {
                         unfreezeAdapter(appointAdapter);
                         return result;
                     } catch (RRException e) {
+                        if (LLMErrorConstants.isContentSafetyBlocked(e.getCode())) {
+                            throw e;
+                        }
                         freezingAdapterByErrorCode(appointAdapter, e.getCode());
                         r = e;
                     }

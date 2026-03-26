@@ -60,6 +60,9 @@ public class LlmRouteService {
                 FreezingService.unfreezeAdapter(adapter);
                 return result;
             } catch (RRException e) {
+                if (LLMErrorConstants.isContentSafetyBlocked(e.getCode())) {
+                    throw e;
+                }
                 FreezingService.freezingAdapterByErrorCode(adapter, e.getCode());
                 r = e;
             }
@@ -126,6 +129,9 @@ public class LlmRouteService {
                         FreezingService.unfreezeAdapter(adapter);
                         return result;
                     } catch (RRException e) {
+                        if (LLMErrorConstants.isContentSafetyBlocked(e.getCode())) {
+                            throw e;
+                        }
                         FreezingService.freezingAdapterByErrorCode(adapter, e.getCode());
                         r = e;
                     }
@@ -148,6 +154,9 @@ public class LlmRouteService {
                         FreezingService.unfreezeAdapter(appointAdapter);
                         return result;
                     } catch (RRException e) {
+                        if (LLMErrorConstants.isContentSafetyBlocked(e.getCode())) {
+                            throw e;
+                        }
                         FreezingService.freezingAdapterByErrorCode(appointAdapter, e.getCode());
                         r = e;
                     }

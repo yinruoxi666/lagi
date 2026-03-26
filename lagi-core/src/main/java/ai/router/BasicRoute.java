@@ -117,6 +117,9 @@ public class BasicRoute extends Route {
                 double priority = ((ModelService) adapter).getPriority();
                 return RouteCompletionResult.builder().result(result).priority(priority).build();
             } catch (RRException e) {
+                if (LLMErrorConstants.isContentSafetyBlocked(e.getCode())) {
+                    throw e;
+                }
                 FreezingService.freezingAdapterByErrorCode(adapter, e.getCode());
             }
         }

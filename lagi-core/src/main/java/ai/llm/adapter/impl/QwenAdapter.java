@@ -59,7 +59,7 @@ public class QwenAdapter extends ModelService implements ILlmAdapter {
                     QwenConvert::convertByHttpResponse, defaultHeaders());
             if(response.getCode() != 200) {
                 log.error("qwen responses api error {}", response.getMsg());
-                throw new RRException(response.getCode(), response.getMsg());
+                throw QwenConvert.convertResponseException(response.getCode(), response.getMsg());
             }
             SESSION_MANAGER.onSuccess(sessionContext,
                     response.getData() == null ? null : response.getData().getId(),
@@ -90,7 +90,7 @@ public class QwenAdapter extends ModelService implements ILlmAdapter {
                     QwenConvert::convertByHttpResponse, defaultHeaders());
             if(response.getCode() != 200) {
                 log.error("qwen responses stream api error {}", response.getMsg());
-                throw new RRException(response.getCode(), response.getMsg());
+                throw QwenConvert.convertResponseException(response.getCode(), response.getMsg());
             }
             AtomicReference<String> responseId = new AtomicReference<>();
             AtomicReference<ChatMessage> assistantMessage = new AtomicReference<>(ChatMessage.builder().role("assistant").content("").build());
