@@ -11,7 +11,7 @@ import ai.openai.pojo.ToolCallFunction;
 import ai.utils.LagiGlobal;
 import ai.utils.qa.ChatCompletionUtil;
 import cn.hutool.core.util.StrUtil;
-import org.apache.hadoop.util.Lists;
+import com.google.common.collect.Lists;
 
 import java.util.ArrayList;
 import java.util.Collections;

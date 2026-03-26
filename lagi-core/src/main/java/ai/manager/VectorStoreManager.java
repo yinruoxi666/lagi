@@ -4,6 +4,7 @@ import ai.common.ModelService;
 import ai.common.pojo.Backend;
 import ai.common.pojo.EmbeddingConfig;
 import ai.common.pojo.VectorStoreConfig;
+import ai.config.ContextLoader;
 import ai.config.pojo.RAGFunction;
 import ai.embedding.EmbeddingFactory;
 import ai.embedding.Embeddings;
@@ -44,7 +45,7 @@ public class VectorStoreManager {
                 try {
                     String name = v.getName();
                     String driver = v.getDriver();
-                    Class<?> clazz = Class.forName(driver);
+                    Class<?> clazz = ContextLoader.getaClass(driver);
                     Constructor<?> constructor = clazz.getConstructor(VectorStoreConfig.class, Embeddings.class);
                     BaseVectorStore vs = (BaseVectorStore) constructor.newInstance(v, EmbeddingFactory.getEmbedding(embeddings.get(0)));
                     register(name, vs);

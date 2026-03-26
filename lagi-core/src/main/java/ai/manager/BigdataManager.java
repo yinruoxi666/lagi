@@ -3,6 +3,7 @@ package ai.manager;
 
 import ai.bigdata.IBigdata;
 import ai.common.pojo.VectorStoreConfig;
+import ai.config.ContextLoader;
 import ai.config.pojo.BigdataConfig;
 import ai.embedding.Embeddings;
 import cn.hutool.core.bean.BeanUtil;
@@ -38,7 +39,7 @@ public class BigdataManager {
             }
             Class<?> clazz;
             try {
-                clazz = Class.forName(bigdataConfig.getDriver());
+                clazz = ContextLoader.getaClass(bigdataConfig.getDriver());
                 Constructor<?> constructor = clazz.getConstructor(BigdataConfig.class);
                 IBigdata bigdata = (IBigdata) constructor.newInstance(bigdataConfig);
                 BeanUtil.copyProperties(bigdataConfig, bigdata);

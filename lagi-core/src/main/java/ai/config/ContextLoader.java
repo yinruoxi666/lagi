@@ -1,6 +1,7 @@
 package ai.config;
 
 import ai.utils.BeanManageUtil;
+import ai.utils.LoadJarUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
@@ -30,12 +31,28 @@ public class ContextLoader {
         return PROPERTIES.getProperty(key);
     }
 
-    private static void loadContextByInputStream(InputStream inputStream) {
+    public static ClassLoader classLoader = null;
+
+    public static Class<?> getaClass(String className) throws ClassNotFoundException {
+        try {
+            return Class.forName(className);
+        } catch (ClassNotFoundException e) {
+            ClassLoader classLoader = ContextLoader.classLoader;
+            if(classLoader != null) {
+                return classLoader.loadClass(className);
+            }
+        }
+        throw new ClassNotFoundException("Class " + className + " not found.");
+    }
+
+
+    private static void loadContextByInputStream(InputStream inputStream, String extensionJarFolder) {
         ObjectMapper mapper = new YAMLMapper();
         mapper.setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
         try {
             InputStreamReader reader = new InputStreamReader(inputStream, StandardCharsets.UTF_8);
             GlobalConfigurations loadedConfiguration = mapper.readValue(reader, GlobalConfigurations.class);
+            classLoader = LoadJarUtil.loadAllJarsFromFolder(extensionJarFolder);
             loadedConfiguration.init();
             configuration = loadedConfiguration;
             BeanManageUtil.initBeans();
@@ -46,14 +63,14 @@ public class ContextLoader {
         }
     }
 
-    public static void loadContextByResource(String yamlName) {
+    public static void loadContextByResource(String yamlName, String extensionJarFolder) {
         InputStream resourceAsStream = ContextLoader.class.getResourceAsStream("/" + yamlName);
         if (resourceAsStream == null) {
             throw new RuntimeException("classpath resource not found: " + yamlName);
         }
         loadProperties(resourceAsStream);
         InputStream resourceAsStream1 = ContextLoader.class.getResourceAsStream("/" + yamlName);
-        loadContextByInputStream(resourceAsStream1);
+        loadContextByInputStream(resourceAsStream1, extensionJarFolder);
     }
 
     private static void loadProperties(InputStream resourceAsStream)  {
@@ -86,7 +103,7 @@ public class ContextLoader {
         }
     }
 
-    public static void loadContextByFilePath(String filePath) {
+    public static void loadContextByFilePath(String filePath, String extensionJarFolder) {
         try {
             loadProperties(Files.newInputStream(Paths.get(filePath)));
 
@@ -102,6 +119,7 @@ public class ContextLoader {
             mapper.setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
             try {
                 GlobalConfigurations loadedConfiguration = mapper.readValue(reader, GlobalConfigurations.class);
+                classLoader = LoadJarUtil.loadAllJarsFromFolder(extensionJarFolder);
                 loadedConfiguration.init();
                 configuration = loadedConfiguration;
                 BeanManageUtil.initBeans();
@@ -131,9 +149,13 @@ public class ContextLoader {
         if (configuration != null) return;
 
         String configPath = System.getProperty("linkmind.config");
+        String extensionJarFolder = System.getProperty("linkmind.extension");
+        if(extensionJarFolder == null) {
+            extensionJarFolder = "./extension";
+        }
         if (configPath != null && !configPath.trim().isEmpty()) {
             try {
-                loadContextByFilePath(configPath.trim());
+                loadContextByFilePath(configPath.trim(), extensionJarFolder);
                 if (configuration != null) {
                     return;
                 }
@@ -144,21 +166,21 @@ public class ContextLoader {
 
         try {
             if(configuration == null) {
-                loadContextByResource("lagi.yml");
+                loadContextByResource("lagi.yml", extensionJarFolder);
             }
         } catch (Exception e) {
             log.warn(e.getMessage());
         }
         if(configuration == null) {
             try {
-                loadContextByFilePath("lagi-web/src/main/resources/lagi.yml");
+                loadContextByFilePath("lagi-web/src/main/resources/lagi.yml", extensionJarFolder);
             } catch (Exception e) {
                 log.warn(e.getMessage());
             }
         }
         if(configuration == null) {
             try {
-                loadContextByFilePath("../lagi-web/src/main/resources/lagi.yml");
+                loadContextByFilePath("../lagi-web/src/main/resources/lagi.yml", extensionJarFolder);
             } catch (Exception e) {
                 log.warn(e.getMessage());
             }

@@ -3,10 +3,7 @@ package ai.utils;
 import ai.medusa.pojo.InstructionData;
 import ai.vector.VectorStoreService;
 import ai.vector.pojo.UpsertRecord;
-import com.ibm.icu.text.CharsetDetector;
-import com.ibm.icu.text.CharsetMatch;
 import org.apache.commons.io.IOUtils;
-import org.junit.Test;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
@@ -97,26 +94,6 @@ public class QaExtractorUtil {
         }
     }
 
-    private static String readFile1(String file) {
-        String str = "";
-        try {
-            InputStream in = Files.newInputStream(Paths.get(file));
-            BufferedInputStream bis = new BufferedInputStream(in);
-            CharsetDetector cd = new CharsetDetector();
-            cd.setText(bis);
-            CharsetMatch cm = cd.detect();
-            if (cm != null) {
-                Reader reader = cm.getReader();
-                str = IOUtils.toString(reader);
-            } else {
-                str = IOUtils.toString(in, StandardCharsets.UTF_8);
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        return str;
-    }
 
     public static String readFile(String filePath) {
         StringBuilder content = new StringBuilder();

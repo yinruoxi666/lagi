@@ -10,6 +10,7 @@
     <modules>
         <module>lagi-web</module>
         <module>lagi-core</module>
+        <module>lagi-extension</module>
     </modules>
 
     <properties>

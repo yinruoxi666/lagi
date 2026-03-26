@@ -21,8 +21,8 @@ import ai.utils.qa.ChatCompletionUtil;
 import ai.vector.VectorStoreService;
 import ai.vector.pojo.MultiQueryCondition;
 import cn.hutool.core.util.StrUtil;
+import com.google.common.collect.Lists;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
 
 import java.util.ArrayList;
 import java.util.Arrays;
