@@ -16,13 +16,14 @@ public class HikariDS {
     private static final HikariDataSource saasDS;
     private static final String SAAS_CONFIG_PATH = "/hikari-saas.properties";
     private static final String SAAS_DB_FILE = "saas.db";
+    private static final String SQLITE_PARAMS = "enable_load_extension=true&busy_timeout=5000&journal_mode=WAL&synchronous=NORMAL";
 
     static {
         saasConfig = new HikariConfig(SAAS_CONFIG_PATH);
         String dataDir = System.getProperty(DATA_DIR_PROPERTY);
         if (dataDir != null && !dataDir.isEmpty()) {
             Path dbPath = Paths.get(dataDir).resolve(SAAS_DB_FILE).toAbsolutePath().normalize();
-            String jdbcUrl = "jdbc:sqlite:" + dbPath.toString().replace('\\', '/') + "?enable_load_extension=true";
+            String jdbcUrl = "jdbc:sqlite:" + dbPath.toString().replace('\\', '/') + "?" + SQLITE_PARAMS;
             saasConfig.setJdbcUrl(jdbcUrl);
         }
         saasDS = new HikariDataSource(saasConfig);

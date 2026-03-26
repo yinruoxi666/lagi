@@ -360,12 +360,30 @@ public final class ResponsesChatCompletionConverter {
             if (tool.getFunction() != null) {
                 responseTool.setName(tool.getFunction().getName());
                 responseTool.setDescription(tool.getFunction().getDescription());
-                responseTool.setParameters(tool.getFunction().getParameters());
-                responseTool.setStrict(tool.getFunction().getStrict());
+                Parameters parameters = tool.getFunction().getParameters();
+                Boolean strict = tool.getFunction().getStrict();
+                // Azure/OpenAI strict function mode requires required[] to contain every property key.
+                // If incoming schema is not strict-compatible, downgrade strict to avoid hard request failure.
+                if (Boolean.TRUE.equals(strict) && !isStrictCompatible(parameters)) {
+                    strict = Boolean.FALSE;
+                }
+                responseTool.setParameters(parameters);
+                responseTool.setStrict(strict);
             }
             responseTools.add(responseTool);
         }
         return responseTools;
+    }
+
+    private static boolean isStrictCompatible(Parameters parameters) {
+        if (parameters == null || parameters.getProperties() == null || parameters.getProperties().isEmpty()) {
+            return true;
+        }
+        List<String> required = parameters.getRequired();
+        if (required == null) {
+            return false;
+        }
+        return required.containsAll(parameters.getProperties().keySet());
     }
 
     private static Object toToolChoice(String toolChoice) {

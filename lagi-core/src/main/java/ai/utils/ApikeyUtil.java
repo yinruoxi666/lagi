@@ -17,7 +17,7 @@ public class ApikeyUtil {
         headers.put("Authorization", "Bearer " + apiKey);
         boolean result = false;
         try {
-            String json = OkHttpUtil.post(AiGlobal.SAAS_URL + "/isApiKeyValid", headers, new HashMap<>(), "");
+            String json = OkHttpUtil.post(AiGlobal.SAAS_URL + "/isApiKeyValid", headers, new HashMap<>(), "", 3);
             Response response = gson.fromJson(json, Response.class);
             if (response != null && "success".equals(response.getStatus())) {
                 result = true;

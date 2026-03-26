@@ -80,6 +80,10 @@ public class OkHttpUtil {
     }
 
     public static String post(String url, Map<String, String> headers, Map<String, String> params, String json) throws IOException {
+        return post(url, headers, params, json, null);
+    }
+
+    public static String post(String url, Map<String, String> headers, Map<String, String> params, String json, Integer timeoutSeconds) throws IOException {
         MediaType JSON = MediaType.get("application/json; charset=utf-8");
 
         HttpUrl.Builder urlBuilder = HttpUrl.parse(url).newBuilder();
@@ -104,7 +108,14 @@ public class OkHttpUtil {
 
         Request request = requestBuilder.build();
 
-        try (Response response = client.newCall(request).execute()) {
+        OkHttpClient requestClient = client;
+        if (timeoutSeconds != null && timeoutSeconds > 0) {
+            requestClient = client.newBuilder()
+                    .callTimeout(timeoutSeconds, TimeUnit.SECONDS)
+                    .build();
+        }
+
+        try (Response response = requestClient.newCall(request).execute()) {
             if (!response.isSuccessful()) throw new IOException("Unexpected code " + response);
             return response.body().string();
         }

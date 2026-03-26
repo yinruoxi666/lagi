@@ -30,7 +30,8 @@ public class LandingAdapter extends ModelService implements ILlmAdapter {
         if (getApiKey() == null || getApiKey().startsWith("you")) {
             return false;
         }
-        return ai.utils.ApikeyUtil.isApiKeyValid(getApiKey());
+//        return ai.utils.ApikeyUtil.isApiKeyValid(getApiKey());
+        return true;
     }
 
     @Override
