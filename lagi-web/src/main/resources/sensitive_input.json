@@ -31,7 +31,6 @@
 		{"rule":"(?<!\\d)\\d{10}(?!\\d)", "level": 2, "mask": "*", "type": "passport"},
 		{"rule":"(?<!\\d)\\d{18}(?!\\d)|(?<!\\d)\\d{15}(?!\\d)", "level": 2, "mask": "*", "type": "idcard_15_18"},
 		{"rule":"[京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼][A-Z][A-Z0-9]{5}", "level": 2, "mask": "*", "type": "car_plate"},
-		{"rule":"(姓名|name|昵称|nickname)\\s*[=:：]\\s*[\\u4e00-\\u9fa5a-zA-Z]+", "level": 2, "mask": "*", "type": "full_name"},
 		{"rule":"(性别|sex|gender)\\s*[=:：]\\s*(男|女|male|female)", "level": 2, "mask": "*", "type": "gender"},
 		{"rule":"(出生日期|生日|birth)\\s*[=:：]\\s*\\d{4}[-/]\\d{2}[-/]\\d{2}", "level": 2, "mask": "*", "type": "birthday"},
 		{"rule":"(地址|address|住址)\\s*[=:：]\\s*[\\u4e00-\\u9fa5a-zA-Z0-9\\s]+", "level": 2, "mask": "*", "type": "residential_address"},
@@ -50,14 +49,6 @@
 
 		{"rule":"mysql://|postgresql://|mongodb://|redis://", "level": 3, "mask": "***", "type": "db_connection"},
 		{"rule":"root\\s*[=:：]\\s*[^\\s]+|sa\\s*[=:：]\\s*[^\\s]+", "level": 3, "mask": "***", "type": "db_admin_account"},
-
-		{"rule":"serial\\s+number|sn\\s*[=:：]\\s*\\w+", "level": 2, "mask": "*", "type": "device_sn"},
-		{"rule":"bluetooth|wifi\\s+ssid|wifi\\s+password", "level": 2, "mask": "*", "type": "device_wifi"},
-		{"rule":"camera|microphone|gps\\s+module|iot\\s+device", "level": 2, "mask": "*", "type": "iot_device"},
-
-		{"rule":"(?<!\\d)[EeGg]\\d{8}(?!\\d)", "level": 2, "mask": "*", "type": "passport_e"},
-		{"rule":"\\d{12}|\\d{10}", "level": 2, "mask": "*", "type": "military_id"},
-		{"rule":"[A-Z0-9]{12}", "level": 2, "mask": "*", "type": "driver_license"},
 
 		{"rule":"(公司名|企业|统一社会信用代码)\\s*[=:：]\\s*\\w+", "level": 2, "mask": "*", "type": "company_info"},
 		{"rule":"(纳税人识别号|税号)\\s*[=:：]\\s*[A-Z0-9]{18}", "level": 2, "mask": "*", "type": "tax_id"},

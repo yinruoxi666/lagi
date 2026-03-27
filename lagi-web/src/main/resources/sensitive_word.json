@@ -402,24 +402,6 @@
 			"type": "anonymous_network"
 		},
 		{
-			"rule": "serial\\s+number|sn\\s*[=:：]\\s*\\w+",
-			"level": 2,
-			"mask": "*",
-			"type": "device_sn"
-		},
-		{
-			"rule": "bluetooth|wifi\\s+ssid|wifi\\s+password",
-			"level": 2,
-			"mask": "*",
-			"type": "device_wifi"
-		},
-		{
-			"rule": "camera|microphone|gps\\s+module|iot\\s+device",
-			"level": 2,
-			"mask": "*",
-			"type": "iot_device"
-		},
-		{
 			"rule": "phishing|spoof|fake\\s+website|clone\\s+site",
 			"level": 3,
 			"mask": "***",
@@ -436,24 +418,6 @@
 			"level": 3,
 			"mask": "***",
 			"type": "harass_tool"
-		},
-		{
-			"rule": "(?<!\\d)[EeGg]\\d{8}(?!\\d)",
-			"level": 2,
-			"mask": "*",
-			"type": "passport_e"
-		},
-		{
-			"rule": "\\d{12}|\\d{10}",
-			"level": 2,
-			"mask": "*",
-			"type": "military_id"
-		},
-		{
-			"rule": "[A-Z0-9]{12}",
-			"level": 2,
-			"mask": "*",
-			"type": "driver_license"
 		},
 		{
 			"rule": "(公司名|企业|统一社会信用代码)\\s*[=:：]\\s*\\w+",
