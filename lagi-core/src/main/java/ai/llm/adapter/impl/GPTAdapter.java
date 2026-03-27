@@ -128,4 +128,12 @@ public class GPTAdapter extends ModelService implements ILlmAdapter {
             aggregate.setTool_calls(message.getTool_calls());
         }
     }
+
+    @Override
+    protected void setDefaultField(ChatCompletionRequest request) {
+        super.setDefaultField(request);
+        if(request.getModel().startsWith("gpt")) {
+            ResponsesChatCompletionConverter.fixupFunctionCallId(request);
+        }
+    }
 }

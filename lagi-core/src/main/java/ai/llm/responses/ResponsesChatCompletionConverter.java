@@ -7,11 +7,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -24,9 +20,9 @@ public final class ResponsesChatCompletionConverter {
     public static ResponseCreateRequest toRequest(ChatCompletionRequest request,
                                                   ResponseSessionContext sessionContext,
                                                   String modelName) {
-        if (modelName.toLowerCase().startsWith("gpt")) {
-            fixupFunctionCallId(request);
-        }
+//        if (modelName.toLowerCase().startsWith("gpt")) {
+//            fixupFunctionCallId(request);
+//        }
         ResponseCreateRequest responseRequest = new ResponseCreateRequest();
         responseRequest.setModel(modelName);
         responseRequest.setInstructions(extractInstructions(sessionContext));
@@ -58,6 +54,17 @@ public final class ResponsesChatCompletionConverter {
                 String id = chatMessage.getTool_call_id();
                 if(id.startsWith("call") && !id.startsWith("call_")) {
                     chatMessage.setTool_call_id(id.replaceAll("call", "call_"));
+                }
+            }
+        }
+        List<Tool> tools = request.getTools();
+        for (Tool tool : tools) {
+            if (tool.getFunction() != null && tool.getFunction().getParameters() != null) {
+                Set<String> rs = new HashSet<>(tool.getFunction().getParameters().getRequired());
+                Set<String> ps = tool.getFunction().getParameters().getProperties().keySet();
+                boolean b = rs.containsAll(ps);
+                if(!b) {
+                    tool.getFunction().setStrict(false);
                 }
             }
         }
