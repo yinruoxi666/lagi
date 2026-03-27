@@ -64,7 +64,7 @@ public final class ResponsesChatCompletionConverter {
                     if(id.startsWith("call_auto")) {
                         try {
                             int index = Integer.parseInt(id.replace("call_auto", "")) - 1;
-                            if(lastAssistantMessage.getTool_calls() != null) {
+                            if(lastAssistantMessage != null && lastAssistantMessage.getTool_calls() != null) {
                                 String id1 = lastAssistantMessage.getTool_calls().get(index).getId();
                                 chatMessage.setTool_call_id(id1);
                             }
