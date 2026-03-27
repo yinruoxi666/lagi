@@ -1,6 +1,7 @@
 package ai.llm.responses;
 
 import ai.openai.pojo.*;
+import ai.utils.LagiGlobal;
 import cn.hutool.core.util.StrUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -39,7 +40,9 @@ public final class ResponsesChatCompletionConverter {
 
     public static void fixupFunctionCallId(ChatCompletionRequest request) {
         List<ChatMessage> chatMessages = request.getMessages();
+        ChatMessage lastAssistantMessage = null;
         for (ChatMessage chatMessage : chatMessages) {
+            // assistant
             if (chatMessage.getTool_calls() != null && !chatMessage.getTool_calls().isEmpty()) {
                 for (ToolCall toolCall : chatMessage.getTool_calls()) {
                     if (toolCall.getId() != null) {
@@ -49,12 +52,28 @@ public final class ResponsesChatCompletionConverter {
                         }
                     }
                 }
+                List<ToolCall> toolCall = chatMessage.getTool_calls().stream().filter(tl -> !tl.getId().startsWith("call_auto")).collect(Collectors.toList());
+                chatMessage.setTool_calls(toolCall);
             }
+            // tool
             if(chatMessage.getTool_call_id() != null) {
                 String id = chatMessage.getTool_call_id();
                 if(id.startsWith("call") && !id.startsWith("call_")) {
                     chatMessage.setTool_call_id(id.replaceAll("call", "call_"));
+                    id = chatMessage.getTool_call_id();
+                    if(id.startsWith("call_auto")) {
+                        try {
+                            int index = Integer.parseInt(id.replace("call_auto", "")) - 1;
+                            if(lastAssistantMessage.getTool_calls() != null) {
+                                String id1 = lastAssistantMessage.getTool_calls().get(index).getId();
+                                chatMessage.setTool_call_id(id1);
+                            }
+                        } catch (Exception ignored) {}
+                    }
                 }
+            }
+            if(chatMessage.getRole().equals(LagiGlobal.LLM_ROLE_ASSISTANT)) {
+                lastAssistantMessage = chatMessage;
             }
         }
         List<Tool> tools = request.getTools();
