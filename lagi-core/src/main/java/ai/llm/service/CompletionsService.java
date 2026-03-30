@@ -120,6 +120,7 @@ public class CompletionsService implements ChatCompletion {
 
     public Observable<ChatCompletionResult> streamCompletions(ChatCompletionRequest chatCompletionRequest, List<IndexSearchData> indexSearchDataList) {
         RRException r = new RRException(LLMErrorConstants.NO_AVAILABLE_MODEL, "{\"error\":\"Stream backend is not enabled.\"}");
+        String failedModel = null;
         if (chatCompletionRequest.getModel() != null) {
             ILlmAdapter adapter = llmAdapterAIManager.getAdapter(chatCompletionRequest.getModel());
             if (adapter != null && notFreezingAdapter(adapter)) {
@@ -128,6 +129,12 @@ public class CompletionsService implements ChatCompletion {
                     unfreezeAdapter(adapter);
                     return result;
                 } catch (RRException e) {
+                    if (LLMErrorConstants.isContentSafetyBlocked(e.getCode())) {
+                        throw e;
+                    }
+                    if (adapter instanceof ModelService) {
+                        failedModel = ((ModelService) adapter).getModel();
+                    }
                     freezingAdapterByErrorCode(adapter, e.getCode());
                     r = e;
                 }
@@ -136,6 +143,15 @@ public class CompletionsService implements ChatCompletion {
 
         chatCompletionRequest.setModel(null);
         List<ILlmAdapter> adapters = getLlmAdapters(indexSearchDataList);
+        if (failedModel != null) {
+            String finalFailedModel = failedModel;
+            adapters = adapters.stream().filter(item -> {
+                if (!(item instanceof ModelService)) {
+                    return true;
+                }
+                return !finalFailedModel.equals(((ModelService) item).getModel());
+            }).collect(Collectors.toList());
+        }
         String handle = getPolicy().getHandle();
         if (!PolicyConstants.POLLING.equals(handle)) {
             for (ILlmAdapter adapter : adapters) {
