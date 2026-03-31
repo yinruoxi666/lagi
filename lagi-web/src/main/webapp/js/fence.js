@@ -33,7 +33,7 @@ function loadFencePage() {
     autoRefreshEnabled = false;
     currentPage = 1;
     const html = `
-        <div id="fence-container" style="padding: 20px; height: 100%; display: flex; flex-direction: column;">
+        <div id="fence-container" style="padding: 20px; min-height: 100%; background: #fff; display: flex; flex-direction: column;">
             <div style="margin-bottom: 20px;">
                 <h2 style="margin-bottom: 10px;">电子围栏监控</h2>
                 <button id="refreshBtn" onclick="refreshFenceData()" style="padding: 8px 16px; background: #1296db; color: white; border: none; border-radius: 4px; cursor: pointer;">刷新</button>

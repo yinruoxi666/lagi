@@ -30,7 +30,7 @@ public class TokenStatisticsImpl implements AfterModel {
     public ChatCompletionResult apply(ModelContext context) {
         ChatCompletionResult result = context.getResult();
         if (result != null && result.getUsage() != null) {
-            recordUsage(result.getUsage());
+            recordUsage(context, result.getUsage());
         }
         return result;
     }
@@ -46,13 +46,13 @@ public class TokenStatisticsImpl implements AfterModel {
                 Usage u = chunk.getUsage();
                 if (u.getTotal_tokens() > 0) {
                     recorded.set(true);
-                    recordUsage(u);
+                    recordUsage(context, u);
                 }
             }
         });
     }
 
-    private void recordUsage(Usage usage) {
+    private void recordUsage(ModelContext context, Usage usage) {
         long total = usage.getTotal_tokens();
         if (total <= 0) {
             return;
@@ -61,6 +61,37 @@ public class TokenStatisticsImpl implements AfterModel {
         usage.setSaved_tokens(saved);
         long prompt = usage.getPrompt_tokens();
         long completion = usage.getCompletion_tokens();
-        ASYNC_SAVE.execute(() -> tokenStatisticsDao.insert(prompt, completion, total, saved));
+        String provider = resolveProvider(context);
+        String model = resolveModel(context);
+        String sessionId = resolveSessionId(context);
+        ASYNC_SAVE.execute(() -> tokenStatisticsDao.insert(prompt, completion, total, saved, provider, model, sessionId));
+    }
+
+    private String resolveModel(ModelContext context) {
+        if (context == null || context.getRequest() == null) {
+            return null;
+        }
+        return context.getRequest().getModel();
+    }
+
+    private String resolveProvider(ModelContext context) {
+        if (context == null || context.getAdapter() == null) {
+            return null;
+        }
+        String name = context.getAdapter().getClass().getSimpleName();
+        if (name == null || name.isEmpty()) {
+            return null;
+        }
+        if (name.endsWith("Adapter") && name.length() > "Adapter".length()) {
+            return name.substring(0, name.length() - "Adapter".length());
+        }
+        return name;
+    }
+
+    private String resolveSessionId(ModelContext context) {
+        if (context == null || context.getRequest() == null) {
+            return null;
+        }
+        return context.getRequest().getSessionId();
     }
 }

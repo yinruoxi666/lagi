@@ -74,7 +74,7 @@ function loadTokenUsagePage() {
 
     const today = formatTokenDateInput(new Date());
     const html = `
-        <div id="token-usage-container" style="padding: 20px; min-height: 100%; background: #f6f8fb;">
+        <div id="token-usage-container" style="padding: 20px; min-height: 100%; background: #fff;">
             <div style="margin-bottom: 14px;">
                 <h2 style="margin: 0; font-size: 24px;">${tTextToken('使用情况')}</h2>
                 <div style="margin-top: 6px; color: #6b7280; font-size: 13px;">${tTextToken('查看服务端持久化的 LLM Token 用量与趋势（与聊天会话字符估算无关）。')}</div>

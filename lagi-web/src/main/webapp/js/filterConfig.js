@@ -13,7 +13,7 @@ function loadFilterConfigPage() {
     $('#item-content').css('overflow-y', 'auto');
     hideBallDiv();
     const html = `
-        <div id="filter-config-container" style="padding: 20px; height: 100%; overflow-y: auto;">
+        <div id="filter-config-container" style="padding: 20px; min-height: 100%; background: #fff; overflow-y: auto;">
             <div style="margin-bottom: 20px;">
                 <h2 style="margin-bottom: 10px;">安全配置管理</h2>
                 <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
@@ -132,7 +132,7 @@ function renderFilterConfigList() {
                     </div>
                 </div>
                 ${filter.groups ? renderGroups(filter.groups) : ''}
-                ${filter.rules ? `<div style="margin-top: 12px;"><strong>规则:</strong> <div style="margin-top: 8px; padding: 8px; background: #f5f5f5; border-radius: 4px; white-space: pre-wrap;">${filter.rules}</div></div>` : ''}
+                ${filter.rules ? `<div style="margin-top: 12px;"><strong>规则:</strong> <div style="margin-top: 8px; padding: 8px; background: #fff; border: 1px solid #eee; border-radius: 4px; white-space: pre-wrap;">${filter.rules}</div></div>` : ''}
             </div>
         `;
         container.append(tHtmlFilter(card));
@@ -143,7 +143,7 @@ function renderGroups(groups) {
     if (!groups || groups.length === 0) return '';
     let html = '<div style="margin-top: 12px;"><strong>分组:</strong><div style="margin-top: 8px;">';
     groups.forEach((group, idx) => {
-        html += `<div style="padding: 8px; background: #f5f5f5; border-radius: 4px; margin-bottom: 8px;">
+        html += `<div style="padding: 8px; background: #fff; border: 1px solid #eee; border-radius: 4px; margin-bottom: 8px;">
             <div><strong>级别:</strong> ${group.level || ''}</div>
             <div style="margin-top: 4px;"><strong>规则:</strong> <div style="margin-top: 4px; white-space: pre-wrap;">${group.rules || ''}</div></div>
         </div>`;

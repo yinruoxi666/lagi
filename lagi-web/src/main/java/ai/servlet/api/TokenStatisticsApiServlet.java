@@ -5,6 +5,7 @@ import ai.llm.pojo.TokenStatisticsGuardInfo;
 import ai.llm.pojo.TokenStatisticsOverview;
 import ai.llm.pojo.TokenStatisticsPageResult;
 import ai.llm.pojo.TokenStatisticsRange;
+import ai.llm.pojo.TokenStatisticsSessionPageResult;
 import ai.llm.pojo.TokenStatisticsSummary;
 import ai.servlet.BaseServlet;
 
@@ -42,6 +43,8 @@ public class TokenStatisticsApiServlet extends BaseServlet {
                 writeOverview(req, resp);
             } else if (uri.endsWith("/details")) {
                 writeDetails(req, resp);
+            } else if (uri.endsWith("/sessions")) {
+                writeSessions(req, resp);
             } else if (uri.endsWith("/guard")) {
                 writeGuard(resp);
             } else {
@@ -95,6 +98,17 @@ public class TokenStatisticsApiServlet extends BaseServlet {
         writeJson(resp, gson.toJson(pageResult));
     }
 
+    private void writeSessions(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        String rangeParam = req.getParameter("range");
+        TokenStatisticsRange range = TokenStatisticsRange.fromQueryParam(rangeParam);
+        int page = parsePositiveInt(req.getParameter("page"), 1);
+        int pageSize = parsePositiveInt(req.getParameter("pageSize"), 20);
+        Long startMs = parseNullableLong(req.getParameter("startMs"));
+        Long endMs = parseNullableLong(req.getParameter("endMs"));
+        TokenStatisticsSessionPageResult pageResult = tokenStatisticsDao.querySessions(range, page, pageSize, startMs, endMs);
+        writeJson(resp, gson.toJson(pageResult));
+    }
+
     private static int parsePositiveInt(String raw, int defaultValue) {
         if (raw == null || raw.isEmpty()) {
             return defaultValue;
@@ -104,6 +118,13 @@ public class TokenStatisticsApiServlet extends BaseServlet {
             throw new IllegalArgumentException("must be >= 1");
         }
         return v;
+    }
+
+    private static Long parseNullableLong(String raw) {
+        if (raw == null || raw.isEmpty()) {
+            return null;
+        }
+        return Long.parseLong(raw.trim());
     }
 
     private static void writeJson(HttpServletResponse resp, String json) throws IOException {

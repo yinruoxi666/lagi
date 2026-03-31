@@ -194,6 +194,10 @@
         <servlet-name>tokenStatistics</servlet-name>
         <url-pattern>/v1/token-statistics/guard</url-pattern>
     </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>tokenStatistics</servlet-name>
+        <url-pattern>/v1/token-statistics/sessions</url-pattern>
+    </servlet-mapping>
 
     <servlet>
         <servlet-name>asr</servlet-name>

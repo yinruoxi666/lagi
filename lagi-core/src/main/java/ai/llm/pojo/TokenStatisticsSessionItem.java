@@ -9,15 +9,14 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class TokenStatisticsDetail {
-    private long id;
-    /** Record time (epoch millis). */
-    private long createdAt;
+public class TokenStatisticsSessionItem {
+    private String sessionId;
+    private long requestCount;
     private long promptTokens;
     private long completionTokens;
     private long totalTokens;
     private long savedTokens;
-    private String provider;
-    private String model;
-    private String sessionId;
+    private double estimatedCost;
+    private long firstRequestAt;
+    private long lastRequestAt;
 }

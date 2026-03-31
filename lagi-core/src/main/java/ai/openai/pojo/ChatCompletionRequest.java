@@ -1,5 +1,6 @@
 package ai.openai.pojo;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import lombok.Data;
 
 import java.util.List;
@@ -7,6 +8,7 @@ import java.util.Map;
 
 @Data
 public class ChatCompletionRequest {
+    @JsonAlias({"session_id"})
     private String sessionId;
     private String model;
     private double temperature;

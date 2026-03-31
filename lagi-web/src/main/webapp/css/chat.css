@@ -57,6 +57,15 @@
 #hello-page {
     overflow-y: scroll;
     box-sizing: border-box;
+    background-color: #fff !important;
+}
+
+/* 首页主内容区域统一白底，覆盖模板上的 bg-gray-800 / dark:bg-gray-800 */
+#conTab,
+#conTab > div,
+#conTab .flex.flex-col.text-sm,
+#item-content {
+    background-color: #fff !important;
 }
 
 .item-column {
@@ -2441,9 +2450,7 @@ body.home-mode #introduces {
 
 /* ===== LinkMind 首页现代化视觉重构 ===== */
 body.home-mode #item-content {
-    background:
-        radial-gradient(1100px 380px at 50% -120px, rgba(59, 130, 246, 0.18), transparent 70%),
-        linear-gradient(180deg, #f7faff 0%, #f5f8ff 28%, #ffffff 100%);
+    background: #fff !important;
 }
 
 body.home-mode #topTitle {

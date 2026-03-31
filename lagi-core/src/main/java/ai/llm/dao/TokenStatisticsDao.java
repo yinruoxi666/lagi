@@ -6,6 +6,8 @@ import ai.llm.pojo.TokenStatisticsDetail;
 import ai.llm.pojo.TokenStatisticsGuardInfo;
 import ai.llm.pojo.TokenStatisticsPageResult;
 import ai.llm.pojo.TokenStatisticsRange;
+import ai.llm.pojo.TokenStatisticsSessionItem;
+import ai.llm.pojo.TokenStatisticsSessionPageResult;
 import ai.llm.pojo.TokenStatisticsSummary;
 import ai.utils.AiGlobal;
 import lombok.extern.slf4j.Slf4j;
@@ -32,7 +34,10 @@ public class TokenStatisticsDao {
             + " prompt_tokens INTEGER NOT NULL,"
             + " completion_tokens INTEGER NOT NULL,"
             + " total_tokens INTEGER NOT NULL,"
-            + " saved_tokens INTEGER NOT NULL"
+            + " saved_tokens INTEGER NOT NULL,"
+            + " provider TEXT,"
+            + " model TEXT,"
+            + " session_id TEXT"
             + ");";
 
     private static final String INDEX_CREATED_AT = ""
@@ -45,6 +50,12 @@ public class TokenStatisticsDao {
                 try (PreparedStatement ps = conn.prepareStatement(CREATE_SQL)) {
                     ps.executeUpdate();
                 }
+                ensureColumnExists(conn, "llm_token_statistics", "provider",
+                        "ALTER TABLE llm_token_statistics ADD COLUMN provider TEXT");
+                ensureColumnExists(conn, "llm_token_statistics", "model",
+                        "ALTER TABLE llm_token_statistics ADD COLUMN model TEXT");
+                ensureColumnExists(conn, "llm_token_statistics", "session_id",
+                        "ALTER TABLE llm_token_statistics ADD COLUMN session_id TEXT");
                 try (PreparedStatement ps = conn.prepareStatement(INDEX_CREATED_AT)) {
                     ps.executeUpdate();
                 }
@@ -121,8 +132,9 @@ public class TokenStatisticsDao {
                 .build();
     }
 
-    public void insert(long promptTokens, long completionTokens, long totalTokens, long savedTokens) {
-        String sql = "INSERT INTO llm_token_statistics (created_at, prompt_tokens, completion_tokens, total_tokens, saved_tokens) VALUES (?, ?, ?, ?, ?)";
+    public void insert(long promptTokens, long completionTokens, long totalTokens, long savedTokens,
+                       String provider, String model, String sessionId) {
+        String sql = "INSERT INTO llm_token_statistics (created_at, prompt_tokens, completion_tokens, total_tokens, saved_tokens, provider, model, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         try (Connection conn = HikariDS.getConnection(AiGlobal.DEFAULT_DB);
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, System.currentTimeMillis());
@@ -130,6 +142,9 @@ public class TokenStatisticsDao {
             ps.setLong(3, completionTokens);
             ps.setLong(4, totalTokens);
             ps.setLong(5, savedTokens);
+            ps.setString(6, provider);
+            ps.setString(7, model);
+            ps.setString(8, sessionId);
             ps.executeUpdate();
         } catch (SQLException e) {
             log.error("insert token statistics failed", e);
@@ -190,7 +205,7 @@ public class TokenStatisticsDao {
             return TokenStatisticsPageResult.empty(range, p, size);
         }
         int offset = (p - 1) * size;
-        String sql = "SELECT id, created_at, prompt_tokens, completion_tokens, total_tokens, saved_tokens FROM llm_token_statistics WHERE created_at >= ? AND created_at < ? ORDER BY id DESC LIMIT ? OFFSET ?";
+        String sql = "SELECT id, created_at, prompt_tokens, completion_tokens, total_tokens, saved_tokens, provider, model, session_id FROM llm_token_statistics WHERE created_at >= ? AND created_at < ? ORDER BY id DESC LIMIT ? OFFSET ?";
         List<TokenStatisticsDetail> list = new ArrayList<>();
         try (Connection conn = HikariDS.getConnection(AiGlobal.DEFAULT_DB);
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -207,6 +222,9 @@ public class TokenStatisticsDao {
                             .completionTokens(rs.getLong("completion_tokens"))
                             .totalTokens(rs.getLong("total_tokens"))
                             .savedTokens(rs.getLong("saved_tokens"))
+                            .provider(rs.getString("provider"))
+                            .model(rs.getString("model"))
+                            .sessionId(rs.getString("session_id"))
                             .build());
                 }
             }
@@ -247,6 +265,64 @@ public class TokenStatisticsDao {
         return 0;
     }
 
+    public TokenStatisticsSessionPageResult querySessions(TokenStatisticsRange range, int page, int pageSize, Long startMs, Long endMs) {
+        int p = Math.max(1, page);
+        int size = Math.min(500, Math.max(1, pageSize));
+        long[] bounds = millisBounds(range);
+        long start = startMs != null ? Math.max(0L, startMs) : bounds[0];
+        long end = endMs != null ? endMs : bounds[1];
+        if (end <= start) {
+            end = start + 1;
+        }
+        long total = countSessionsInRange(start, end);
+        if (total == 0) {
+            return TokenStatisticsSessionPageResult.empty(range, p, size);
+        }
+        int offset = (p - 1) * size;
+        String sql = "SELECT session_id, COUNT(1) AS request_count, " +
+                "COALESCE(SUM(prompt_tokens),0) AS prompt_tokens, " +
+                "COALESCE(SUM(completion_tokens),0) AS completion_tokens, " +
+                "COALESCE(SUM(total_tokens),0) AS total_tokens, " +
+                "COALESCE(SUM(saved_tokens),0) AS saved_tokens, " +
+                "MIN(created_at) AS first_request_at, MAX(created_at) AS last_request_at " +
+                "FROM llm_token_statistics WHERE created_at >= ? AND created_at < ? " +
+                "AND session_id IS NOT NULL AND session_id <> '' " +
+                "GROUP BY session_id ORDER BY last_request_at DESC LIMIT ? OFFSET ?";
+        List<TokenStatisticsSessionItem> list = new ArrayList<>();
+        try (Connection conn = HikariDS.getConnection(AiGlobal.DEFAULT_DB);
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, start);
+            ps.setLong(2, end);
+            ps.setInt(3, size);
+            ps.setInt(4, offset);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    long totalTokens = rs.getLong("total_tokens");
+                    list.add(TokenStatisticsSessionItem.builder()
+                            .sessionId(rs.getString("session_id"))
+                            .requestCount(rs.getLong("request_count"))
+                            .promptTokens(rs.getLong("prompt_tokens"))
+                            .completionTokens(rs.getLong("completion_tokens"))
+                            .totalTokens(totalTokens)
+                            .savedTokens(rs.getLong("saved_tokens"))
+                            .estimatedCost(Double.parseDouble(String.format("%.4f", (totalTokens / 1000.0) * 0.002)))
+                            .firstRequestAt(rs.getLong("first_request_at"))
+                            .lastRequestAt(rs.getLong("last_request_at"))
+                            .build());
+                }
+            }
+        } catch (SQLException e) {
+            log.error("query token statistics sessions failed", e);
+        }
+        return TokenStatisticsSessionPageResult.builder()
+                .range(range)
+                .page(p)
+                .pageSize(size)
+                .total(total)
+                .records(list)
+                .build();
+    }
+
     /**
      * Time bounds for {@code created_at}: half-open {@code [start, end)}.
      * For {@link TokenStatisticsRange#ALL}, uses {@code [0, Long#MAX_VALUE)}.
@@ -261,5 +337,44 @@ public class TokenStatisticsDao {
         long startMs = first.atStartOfDay(zone).toInstant().toEpochMilli();
         long endMs = today.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli();
         return new long[]{startMs, endMs};
+    }
+
+    private long countSessionsInRange(long startMs, long endMsExclusive) {
+        String sql = "SELECT COUNT(1) FROM (" +
+                "SELECT session_id FROM llm_token_statistics " +
+                "WHERE created_at >= ? AND created_at < ? AND session_id IS NOT NULL AND session_id <> '' " +
+                "GROUP BY session_id)";
+        try (Connection conn = HikariDS.getConnection(AiGlobal.DEFAULT_DB);
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, startMs);
+            ps.setLong(2, endMsExclusive);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getLong(1);
+                }
+            }
+        } catch (SQLException e) {
+            log.error("count token statistics sessions failed", e);
+        }
+        return 0;
+    }
+
+    private static void ensureColumnExists(Connection conn, String table, String column, String ddl) throws SQLException {
+        boolean exists = false;
+        try (PreparedStatement ps = conn.prepareStatement("PRAGMA table_info(" + table + ")");
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                String col = rs.getString("name");
+                if (column.equalsIgnoreCase(col)) {
+                    exists = true;
+                    break;
+                }
+            }
+        }
+        if (!exists) {
+            try (PreparedStatement ps = conn.prepareStatement(ddl)) {
+                ps.executeUpdate();
+            }
+        }
     }
 }

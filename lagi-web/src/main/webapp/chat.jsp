@@ -35,20 +35,8 @@
         try {
             var d = document.documentElement, c = d.classList;
             c.remove('light', 'dark');
-            var e = localStorage.getItem('theme');
-            if ('system' === e || (!e && true)) {
-                var t = '(prefers-color-scheme: dark)', m = window.matchMedia(t);
-                if (m.media !== t || m.matches) {
-                    d.style.colorScheme = 'dark';
-                    c.add('dark')
-                } else {
-                    d.style.colorScheme = 'light';
-                    c.add('light')
-                }
-            } else if (e) {
-                c.add(e || '')
-            }
-            if (e === 'light' || e === 'dark') d.style.colorScheme = e
+            d.style.colorScheme = 'light';
+            c.add('light')
         } catch (e) {
         }
     }()</script>
@@ -347,6 +335,9 @@
 <script src="js/query.js?ver=${initParam.version}"></script>
 <script src="js/ball.js?ver=${initParam.version}"></script>
 <script src="js/tokenUsage.js?ver=${initParam.version}"></script>
+<script src="js/logs.js?ver=${initParam.version}"></script>
+<script src="js/credits.js?ver=${initParam.version}"></script>
+<script src="js/apikeys.js?ver=${initParam.version}"></script>
 <script src="js/fence.js?ver=${initParam.version}"></script>
 <script src="js/filterConfig.js?ver=${initParam.version}"></script>
 </body>
