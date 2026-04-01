@@ -334,7 +334,7 @@ function getTextResult(question, robootAnswerJq, conversation, agentId) {
             {"role": "user", "content": question}
         ]),
         "temperature": 0.8,
-        "max_tokens": 1024,
+        "max_tokens": 4096,
         // "stream": true,
         "stream": true
     };
@@ -855,7 +855,7 @@ function retry(index) {
         "category": window.category,
         "messages": preArr,
         "temperature": 0.8,
-        "max_tokens": 1024,
+        "max_tokens": 4096,
         "stream": true
     };
     let question = preArr[preArr.length - 1]['content']
