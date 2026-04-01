@@ -16,7 +16,6 @@ import lombok.extern.slf4j.Slf4j;
 
 
 @Slf4j
-@LLM(modelNames = {"qwen-turbo","qwen-plus","qwen-max","qwen-max-1201","qwen-max-longcontext", "DeepSeek-R1-Distill-Qwen-32B"})
 public class ProxyLlmAdapter extends ModelService implements ILlmAdapter {
 
     private final ILlmAdapter llmAdapter;
@@ -34,6 +33,10 @@ public class ProxyLlmAdapter extends ModelService implements ILlmAdapter {
                 this.priorityLock = new PriorityLock(modelService.getConcurrency());
             }
         }
+    }
+
+    public ILlmAdapter getLlmAdapter() {
+        return this.llmAdapter;
     }
 
 
