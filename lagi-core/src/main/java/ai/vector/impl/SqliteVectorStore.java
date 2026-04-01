@@ -158,7 +158,7 @@ public class SqliteVectorStore extends BaseVectorStore {
     // ==================== Table Naming ====================
 
     private String vecTableName(String category) {
-        return "vec_" + category.replaceAll("[^a-zA-Z0-9_]", "_");
+        return "vec_" + category.replaceAll("[^a-zA-Z0-9_$]", "_");
     }
 
     private String metadataTableName(String category) {

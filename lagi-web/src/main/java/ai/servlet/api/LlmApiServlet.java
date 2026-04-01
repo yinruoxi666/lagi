@@ -393,7 +393,7 @@ public class LlmApiServlet extends BaseServlet {
     private ChatCompletionRequest setCustomerModel(HttpServletRequest req, HttpSession session) throws IOException {
         ModelPreferenceDto preference = JSONUtil.toBean((String) session.getAttribute("preference"), ModelPreferenceDto.class) ;
         String json = requestToJson(req);
-//        System.out.println("ChatCompletionRequest json: " + json);
+        System.out.println("ChatCompletionRequest json: " + json);
         ChatCompletionRequest chatCompletionRequest = objectMapper.readValue(json, ChatCompletionRequest.class);
         if(chatCompletionRequest.getModel() == null
                 && preference != null

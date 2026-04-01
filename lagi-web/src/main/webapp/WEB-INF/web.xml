@@ -401,10 +401,10 @@
 
     <servlet>
         <servlet-name>OpenClawApiServlet</servlet-name>
-        <servlet-class>ai.servlet.api.OpenClawApiServlet</servlet-class>
+        <servlet-class>ai.servlet.api.openclaw.ContextApiServlet</servlet-class>
     </servlet>
     <servlet-mapping>
         <servlet-name>OpenClawApiServlet</servlet-name>
-        <url-pattern>/v1/openclaw/*</url-pattern>
+        <url-pattern>/v1/openclaw/context/*</url-pattern>
     </servlet-mapping>
 </web-app>
