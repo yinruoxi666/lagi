@@ -258,7 +258,7 @@ OpenClaw 会优先查询 ClawHub，若不可用则自动回退到 npm。
 
 | 字段 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |
-| `apiUrl` | `string` | `https://api.linkmind.dev/v1` | LinkMind 服务的基础 URL |
+| `apiUrl` | `string` | `http://localhost:8080/v1` | LinkMind 服务的基础 URL |
 | `logLevel` | `string` | `info` | 日志级别 |
 
 ## 自由扩展 
