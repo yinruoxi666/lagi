@@ -81,7 +81,7 @@ public class SkillLoaderExtractContentWithImageTest {
             pdfPath = Paths.get(pdfEnv).toAbsolutePath().normalize();
         }
         if (pdfPath == null || !Files.isRegularFile(pdfPath)) {
-            Path fallback = Paths.get("C:\\Users\\Administrator\\Desktop\\知识图谱.pdf").toAbsolutePath().normalize();
+            Path fallback = Paths.get("C:\\Users\\24175\\Desktop\\知识图谱.pdf").toAbsolutePath().normalize();
             if (Files.isRegularFile(fallback)) {
                 pdfPath = fallback;
             }
@@ -109,6 +109,10 @@ public class SkillLoaderExtractContentWithImageTest {
         }
         ExecutionOutput executionOutput = skillContainer.executePythonScript(
                 skillSchema.getScripts().get(0).getPath(), skillSchema.getSkillId(), executionInput);
+        System.out.println("extract_content_with_image stdout:");
+        System.out.println(executionOutput.getStdout());
+        System.err.println("extract_content_with_image stderr:");
+        System.err.println(executionOutput.getStderr());
         assertEquals(0, executionOutput.getExitCode(), "stderr=" + executionOutput.getStderr());
         JsonNode out = JsonUtils.parseJsonObject(executionOutput.getStdout());
         assertNotNull(out, "stdout 应为 JSON: " + executionOutput.getStdout());
