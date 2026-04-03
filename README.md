@@ -222,6 +222,48 @@ In order to help you better understand and use LinkMind, we provide you with det
 
 If you wish to integrate LinkMind into your project, you can refer to our [Integration documentation](https://github.com/landingbj/lagi/blob/main/docs/guide_en.md#quick-integrate-into-your-existing-project). This document will guide you through the process of seamlessly integrating LinkMind into your project. In addition, we provide frequently asked questions and best practices to help you avoid common pitfalls during integration, ensuring a smooth progress of your project. It covers comprehensive guidance from setting up the environment to implementing features. Whether you are a beginner or an experienced developer, you will be able to quickly integrate LinkMind into your project.
 
+## OpenClaw Plugins
+
+### Install from a Published Package
+
+Once the package is published, users can install it with:
+
+```bash
+openclaw plugins install linkmind-context@latest
+```
+
+OpenClaw checks ClawHub first and falls back to npm automatically.
+
+### OpenClaw Configuration
+
+Configure the plugin in your OpenClaw config file and select it as the active context engine:
+
+```json
+{
+  "plugins": {
+    "slots": {
+      "contextEngine": "linkmind-context"
+    },
+    "entries": {
+      "linkmind-context": {
+        "enabled": true,
+        "config": {
+          "apiUrl": "http://localhost:8080/v1",
+          "logLevel": "info"
+        }
+      }
+    }
+  }
+}
+```
+
+### Configuration Reference
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `apiUrl` | `string` | `https://api.linkmind.dev/v1` | Base URL of the LinkMind service |
+| `logLevel` | `string` | `info` | Log Level |
+
 ## Extension
 
 If you are not satisfied with the adapted large model for LinkMind, you can also refer to our [Extension documentation](docs/extend_en.md) to extend LinkMind, adapting it to your preferred large model. This document not only covers the methods for adapting and extending functional models and vector databases but also provides expansion examples to help you quickly grasp the methods for extending LinkMind, meeting your specific requirements.
