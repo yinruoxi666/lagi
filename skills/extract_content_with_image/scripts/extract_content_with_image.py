@@ -1,14 +1,27 @@
+import copy
 import json
 import os
 import random
 import string
+import subprocess
 import sys
 import time
-import subprocess
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 
-OFFICE_EXTS = {".doc", ".docx", ".ppt", ".pptx"}
+CONVERT_TO_PDF_EXTS = {".txt", ".doc", ".docx", ".ppt", ".pptx"}
+
+
+def _configure_stdio() -> None:
+    # SkillContainer reads stdout/stderr as UTF-8, so force Python's streams to match.
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        if stream is None or not hasattr(stream, "reconfigure"):
+            continue
+        try:
+            stream.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
 
 
 def _skill_work_dir() -> str:
@@ -32,7 +45,23 @@ def _resolve_soffice() -> Optional[str]:
     env_path = os.environ.get("SOFFICE_PATH")
     if env_path and os.path.exists(env_path):
         return env_path
-    return _which("soffice") or _which("soffice.exe")
+    direct_hit = _which("soffice") or _which("soffice.exe")
+    if direct_hit:
+        return direct_hit
+
+    candidates: List[str] = []
+    for base in (os.environ.get("ProgramFiles"), os.environ.get("ProgramFiles(x86)")):
+        if not base:
+            continue
+        candidates.extend([
+            os.path.join(base, "LibreOffice", "program", "soffice.exe"),
+            os.path.join(base, "OpenOffice 4", "program", "soffice.exe"),
+        ])
+
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            return candidate
+    return None
 
 
 def _convert_office_to_pdf(soffice: str, src_path: str, out_dir: str) -> str:
@@ -51,18 +80,88 @@ def _convert_office_to_pdf(soffice: str, src_path: str, out_dir: str) -> str:
     return pdf_path
 
 
-def _split_text_chunks_by_len(text: str, max_len: int) -> List[str]:
-    if not text:
-        return []
-    text = " ".join(text.split())
-    if max_len <= 0:
-        return [text]
-    res = []
-    i = 0
-    while i < len(text):
-        res.append(text[i:i + max_len])
-        i += max_len
-    return res
+def _read_text_file(src_path: str) -> str:
+    with open(src_path, "rb") as f:
+        raw = f.read()
+
+    for encoding in ("utf-8-sig", "utf-8", "gb18030", "gbk", "utf-16", "latin-1"):
+        try:
+            return raw.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return raw.decode("utf-8", errors="replace")
+
+
+def _convert_txt_to_pdf(src_path: str, pdf_path: str) -> str:
+    try:
+        import fitz as fitz_mod
+    except Exception as e:
+        raise RuntimeError("PyMuPDF (fitz) is required to convert .txt to pdf") from e
+
+    text = _read_text_file(src_path)
+    doc = fitz_mod.open()
+    page = doc.new_page()
+    margin_x = 50
+    margin_y = 50
+    font_size = 11
+    page_width = page.rect.width
+    page_height = page.rect.height
+    usable_width = max(page_width - margin_x * 2, 50)
+    usable_height = max(page_height - margin_y * 2, 50)
+    cursor_y = margin_y
+    line_height = font_size * 1.5
+
+    for raw_line in text.splitlines() or [""]:
+        line = raw_line.rstrip()
+        words = [line] if not line else line.split()
+        current = ""
+
+        if not words:
+            if cursor_y + line_height > margin_y + usable_height:
+                page = doc.new_page()
+                cursor_y = margin_y
+            page.insert_text((margin_x, cursor_y), "", fontsize=font_size)
+            cursor_y += line_height
+            continue
+
+        for word in words:
+            candidate = word if not current else current + " " + word
+            candidate_width = fitz_mod.get_text_length(candidate, fontsize=font_size)
+            if current and candidate_width > usable_width:
+                if cursor_y + line_height > margin_y + usable_height:
+                    page = doc.new_page()
+                    cursor_y = margin_y
+                page.insert_text((margin_x, cursor_y), current, fontsize=font_size)
+                cursor_y += line_height
+                current = word
+            else:
+                current = candidate
+
+        if cursor_y + line_height > margin_y + usable_height:
+            page = doc.new_page()
+            cursor_y = margin_y
+        page.insert_text((margin_x, cursor_y), current, fontsize=font_size)
+        cursor_y += line_height
+
+    doc.save(pdf_path)
+    doc.close()
+    return pdf_path
+
+
+def _ensure_pdf(filepath: str, extension: str, files_dir: str, soffice: Optional[str] = None) -> str:
+    if extension not in CONVERT_TO_PDF_EXTS:
+        return filepath
+
+    if soffice is None:
+        soffice = _resolve_soffice()
+    if soffice:
+        return _convert_office_to_pdf(soffice, filepath, files_dir)
+
+    if extension == ".txt":
+        pdf_path = os.path.splitext(filepath)[0] + ".pdf"
+        return _convert_txt_to_pdf(filepath, pdf_path)
+
+    raise RuntimeError("soffice not found; cannot convert office document to pdf")
 
 
 def _load_tokenizer_optional():
@@ -86,7 +185,7 @@ def _text_exceeds_chunk_budget(tokenizer, text: str, chunk_size: int) -> bool:
     return len(text) > chunk_size
 
 
-def _mk_page_dir(work_root: str, pdf_path: str) -> (str, str):
+def _mk_page_dir(work_root: str, pdf_path: str) -> Tuple[str, str]:
     """
     Mirror VicunaIndex PdfUtil._mk_page_dir:
       page_dir = FILE_DIR + '/' + filename + '/pages'
@@ -131,6 +230,27 @@ def _image_list_to_str(chunks: List[Dict[str, Any]]):
         chunk["image"] = image_str
 
 
+def _get_text_only_chunks(text: str, chunk_size: int) -> List[Dict[str, Any]]:
+    tokenizer = _load_tokenizer_optional()
+    chunks: List[Dict[str, Any]] = []
+    current_chunk: Dict[str, Any] = {"text": "", "image": []}
+
+    for piece in [line.strip() for line in text.splitlines() if line.strip()]:
+        temp_text = current_chunk["text"] + piece
+        if _text_exceeds_chunk_budget(tokenizer, temp_text, chunk_size):
+            if current_chunk["text"]:
+                chunks.append(copy.deepcopy(current_chunk))
+            current_chunk = {"text": piece, "image": []}
+        else:
+            current_chunk["text"] = temp_text
+
+    if current_chunk["text"]:
+        chunks.append(current_chunk)
+
+    _image_list_to_str(chunks)
+    return chunks
+
+
 def _get_chunks1_equivalent(pdf_path: str, chunk_size: int, work_root: str) -> List[Dict[str, Any]]:
     """
     Equivalent implementation of VicunaIndex PdfUtil.get_chunks1 (core logic).
@@ -169,18 +289,18 @@ def _get_chunks1_equivalent(pdf_path: str, chunk_size: int, work_root: str) -> L
                 if cropped_image.width > 0 and cropped_image.height > 0:
                     cropped_image.save(image_path)
                     classification, caption = "tag", "caption"
-                    rel_path = os.path.relpath(image_path, work_root).replace("\\", "/")
-                    image_info = {"path": rel_path, "tag": classification, "caption": caption}
+                    abs_path = os.path.abspath(image_path).replace("\\", "/")
+                    image_info = {"path": abs_path, "tag": classification, "caption": caption}
 
                     if current_chunk["text"]:
                         current_chunk["image"].append(image_info)
-                        chunks.append(json.loads(json.dumps(current_chunk, ensure_ascii=False)))
+                        chunks.append(copy.deepcopy(current_chunk))
                         current_chunk = {"text": "", "image": []}
                     elif chunks:
                         chunks[-1]["image"].append(image_info)
                     else:
                         current_chunk["image"].append(image_info)
-                        chunks.append(json.loads(json.dumps(current_chunk, ensure_ascii=False)))
+                        chunks.append(copy.deepcopy(current_chunk))
                         current_chunk = {"text": "", "image": []}
 
             elif block_type == 0:
@@ -192,7 +312,7 @@ def _get_chunks1_equivalent(pdf_path: str, chunk_size: int, work_root: str) -> L
                 temp_text = current_chunk["text"] + str(content).strip()
                 if _text_exceeds_chunk_budget(tokenizer, temp_text, chunk_size):
                     if current_chunk["text"]:
-                        chunks.append(json.loads(json.dumps(current_chunk, ensure_ascii=False)))
+                        chunks.append(copy.deepcopy(current_chunk))
                     current_chunk = {"text": str(content).strip(), "image": []}
                 else:
                     current_chunk["text"] = temp_text
@@ -219,6 +339,7 @@ def _get_chunks1_equivalent(pdf_path: str, chunk_size: int, work_root: str) -> L
 
 def main():
     try:
+        _configure_stdio()
         if len(sys.argv) < 2:
             raise ValueError("file_path must be provided as argv[1]")
 
@@ -232,25 +353,22 @@ def main():
         run_id = _rand_id()
         work_dir = os.path.join(_skill_work_dir(), "extract_content_with_image", run_id)
         files_dir = os.path.join(work_dir, "files")
-        images_dir = os.path.join(work_dir, "images")
         os.makedirs(files_dir, exist_ok=True)
-        os.makedirs(images_dir, exist_ok=True)
 
-        local_input_path = os.path.join(files_dir, "input" + extension)
+        local_input_path = os.path.join(files_dir, run_id + extension)
         with open(src_path, "rb") as f_in, open(local_input_path, "wb") as f_out:
             f_out.write(f_in.read())
 
-        filepath = local_input_path
-        if extension in OFFICE_EXTS:
-            soffice = _resolve_soffice()
-            if not soffice:
-                raise RuntimeError("soffice not found; cannot convert office document to pdf")
-            filepath = _convert_office_to_pdf(soffice, local_input_path, files_dir)
+        soffice = _resolve_soffice() if extension in CONVERT_TO_PDF_EXTS else None
+        filepath = _ensure_pdf(local_input_path, extension, files_dir, soffice)
 
         chunk_size = int(os.environ.get("CHUNK_SIZE", "512"))
         # Core logic equivalent to VicunaIndex PdfUtil.get_chunks1
         # Use work_dir as FILE_DIR equivalent for relative image paths.
-        result = _get_chunks1_equivalent(filepath, chunk_size, work_dir)
+        if extension == ".txt" and not soffice:
+            result = _get_text_only_chunks(_read_text_file(local_input_path), chunk_size)
+        else:
+            result = _get_chunks1_equivalent(filepath, chunk_size, work_dir)
         print(
             json.dumps({
                 "status": "success",
