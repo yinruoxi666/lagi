@@ -25,7 +25,8 @@ public class McpManager {
 
     public void register(McpConfig config)
     {
-        if(config == null) {
+        mcpBackendsMap.clear();
+        if (config == null) {
             return;
         }
         String defaultDriver = config.getDriver();
@@ -59,9 +60,13 @@ public class McpManager {
 
     public void register(McpBackend mcpBackend)
     {
-        McpBackend mcpBackend1 = mcpBackendsMap.putIfAbsent(mcpBackend.getName(), mcpBackend);
-        if(mcpBackend1 != null) {
-            log.error("mcpBackend ({}) already exists", mcpBackend.getName());
+        if (mcpBackend == null || mcpBackend.getName() == null) {
+            return;
+        }
+        String name = mcpBackend.getName();
+        McpBackend previous = mcpBackendsMap.put(name, mcpBackend);
+        if (previous != null) {
+            log.debug("mcpBackend ({}) replaced (e.g. config reload)", name);
         }
     }
 

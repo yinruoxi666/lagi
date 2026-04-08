@@ -34,6 +34,8 @@ public class VectorStoreManager {
     private VectorStoreManager(){}
 
     public void register(List<VectorStoreConfig> vectorStoreConfigs, RAGFunction ragFunction, List<EmbeddingConfig> embeddings) {
+        aiMap.clear();
+        LagiGlobal.RAG_ENABLE = false;
         if (vectorStoreConfigs == null || vectorStoreConfigs.isEmpty() || ragFunction == null) {
             return;
         }
@@ -64,9 +66,9 @@ public class VectorStoreManager {
                 adapter = new ProxyVectorStore(baseVectorStore);
             }
         }
-        VectorStore temp = aiMap.putIfAbsent(key, adapter);
-        if (temp != null) {
-            log.error("Adapter {} name {} is already exists!!", adapter.getClass().getName(), key);
+        VectorStore previous = aiMap.put(key, adapter);
+        if (previous != null) {
+            log.debug("VectorStore {} ({}) replaced on re-register", key, adapter.getClass().getName());
         }
     }
 

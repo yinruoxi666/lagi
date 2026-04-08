@@ -6388,6 +6388,15 @@ body {
     transform: rotate(90deg); /* 向下旋转 */
 }
 
+#conversationsNav > div > ol > li > a.active {
+    background-color: #2A2B32;
+}
+
+#conversationsNav .third-nav .sub-nav-link.active,
+#conversationsNav .sub-nav > .sub-nav-item:not([data-sub-nav-id]) > .sub-nav-link.active {
+    background-color: #6b7280;
+}
+
 a.active {
     background-color: #2A2B32; /* 适合的背景色，或者跟hover样式一致 */
 }

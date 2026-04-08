@@ -1,79 +1,39 @@
 package ai.llm.adapter.impl;
 
-import ai.annotation.LLM;
-import ai.common.ModelService;
+
 import ai.common.exception.RRException;
-import ai.llm.adapter.ILlmAdapter;
-import ai.llm.pojo.LlmApiResponse;
-import ai.llm.utils.OpenAiApiUtil;
-import ai.llm.utils.convert.GptConvert;
-import ai.llm.utils.convert.LandingConvert;
 import ai.openai.pojo.ChatCompletionRequest;
 import ai.openai.pojo.ChatCompletionResult;
-import com.google.gson.Gson;
+import ai.utils.ApikeyUtil;
 import io.reactivex.Observable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-
-@LLM(modelNames = "qa")
-public class LandingAdapter extends ModelService implements ILlmAdapter {
-    private static final Logger logger = LoggerFactory.getLogger(LandingAdapter.class);
-    private static final int HTTP_TIMEOUT = 15 * 1000;
-    private static final String API_ADDRESS = "http://ai.landingbj.com/v1/chat/completions";
-
-    @Override
-    public boolean verify() {
-        if (getEndpoint() != null && !getEndpoint().contains("lagi.saasai.top")) {
-            return true;
-        }
-        if (getApiKey() == null || getApiKey().startsWith("you")) {
-            return false;
-        }
-//        return ai.utils.ApikeyUtil.isApiKeyValid(getApiKey());
-        return true;
-    }
+public class LandingAdapter extends OpenAIStandardAdapter {
+    private static final int UNAUTHORIZED_CODE = 401;
+    private static final String INVALID_API_KEY_MSG = "Landing apiKey is invalid";
 
     @Override
     public ChatCompletionResult completions(ChatCompletionRequest chatCompletionRequest) {
-        setDefaultField(chatCompletionRequest);
-        String model = chatCompletionRequest.getModel();
-        String url = API_ADDRESS;
-        if (model.equals("cascade")) {
-            chatCompletionRequest.setModel(null);
-            chatCompletionRequest.setCategory(null);
-            if (getEndpoint() == null) {
-                url = "https://lagi.saasai.top/v1/chat/completions";
-            } else {
-                url = getEndpoint();
-            }
-        }
-        LlmApiResponse completions = OpenAiApiUtil.completions(getApiKey(), url, HTTP_TIMEOUT, chatCompletionRequest,
-                GptConvert::convert2ChatCompletionResult,
-                GptConvert::convertByResponse);
-        if (completions.getCode() != 200) {
-            logger.error("landing api error {}", completions.getMsg());
-            throw new RRException(completions.getCode(), completions.getMsg());
-        }
-        return completions.getData();
+        ensureApiKeyValid();
+        return super.completions(chatCompletionRequest);
     }
 
     @Override
     public Observable<ChatCompletionResult> streamCompletions(ChatCompletionRequest chatCompletionRequest) {
-        setDefaultField(chatCompletionRequest);
-        String url = API_ADDRESS;
-        if (model.equals("cascade")) {
-            chatCompletionRequest.setModel(null);
-            chatCompletionRequest.setCategory(null);
-            url = "https://lagi.saasai.top/v1/chat/completions";
+        ensureApiKeyValid();
+        return super.streamCompletions(chatCompletionRequest);
+    }
+
+    private void ensureApiKeyValid() {
+        if (!ApikeyUtil.validateModelApiKey(getApiKey())) {
+            throw new RRException(UNAUTHORIZED_CODE, INVALID_API_KEY_MSG);
         }
-        LlmApiResponse completions = OpenAiApiUtil.streamCompletions(getApiKey(), url, HTTP_TIMEOUT, chatCompletionRequest,
-                LandingConvert::convertSteamLine2ChatCompletionResult,
-                LandingConvert::convertByResponse);
-        if (completions.getCode() != 200) {
-            logger.error("landing stream api error {}", completions.getMsg());
-            throw new RRException(completions.getCode(), completions.getMsg());
+    }
+
+    @Override
+    public String getApiAddress() {
+        if (apiAddress == null) {
+            apiAddress = "https://lagi.saasai.top/v1/chat/completions";
         }
-        return completions.getStreamData();
+        return apiAddress;
     }
 }

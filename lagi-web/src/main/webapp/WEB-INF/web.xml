@@ -407,4 +407,22 @@
         <servlet-name>OpenClawApiServlet</servlet-name>
         <url-pattern>/v1/openclaw/context/*</url-pattern>
     </servlet-mapping>
+
+    <servlet>
+        <servlet-name>credit</servlet-name>
+        <servlet-class>ai.servlet.CreditServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>credit</servlet-name>
+        <url-pattern>/credit/*</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
+        <servlet-name>apiKey</servlet-name>
+        <servlet-class>ai.servlet.ApiKeyServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>apiKey</servlet-name>
+        <url-pattern>/apiKey/*</url-pattern>
+    </servlet-mapping>
 </web-app>

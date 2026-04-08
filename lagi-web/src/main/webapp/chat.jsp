@@ -59,32 +59,30 @@
             </div>
             <div id="nav_body" class="nav_body w-full decorated-heading">
             </div>
-            <div class="nav_foot w-full decorated-heading">
-                <div class="user-box">
-                    <div id="forwardButton" class="share">
-                        <span class='share-text' data-i18n="nav.share">分享</span>
-                        <span><img src="images/share.png"></span>
-                    </div>
-                    <div class="user-info" onclick="window.open('https://saas.landingbj.com', '_blank');">
-                        <div class="user-left avatar-container" id="user-img">
-                            <img src="images/rj.png" alt="用户头像" class="avatar">
-                            <span class="status-indicator" style="visibility: hidden;"></span>
-                        </div>
-                        <div class="user-middle" id="user_box" data-i18n="user.login">登录</div>
-                        <div class="user-right relative" id="user-more">
-                            <svg t="1752903400975" class="icon" viewBox="0 0 1024 1024" version="1.1"
-                                 xmlns="http://www.w3.org/2000/svg" p-id="3997" width="24" height="24">
-                                <path d="M512 298.6496a85.3504 85.3504 0 1 0 0-170.6496 85.3504 85.3504 0 0 0 0 170.6496z"
-                                      fill="#5A5A68" p-id="3998"></path>
-                                <path d="M512 512m-85.3504 0a85.3504 85.3504 0 1 0 170.7008 0 85.3504 85.3504 0 1 0-170.7008 0Z"
-                                      fill="#5A5A68" p-id="3999"></path>
-                                <path d="M512 896a85.3504 85.3504 0 1 0 0-170.7008 85.3504 85.3504 0 0 0 0 170.7008z"
-                                      fill="#5A5A68" p-id="4000"></path>
-                            </svg>
-                        </div>
-                    </div>
-                </div>
-            </div>
+           <div class="nav_foot w-full decorated-heading">
+             <div class="user-box">
+              <div class="user-info" onclick="toggleUserMenu(event)">
+
+                 <div class="user-left avatar-container" id="user-img">
+                   <img src="images/rj.png" alt="用户头像" class="avatar">
+                   <span class="status-indicator" style="visibility: hidden; position: absolute;top: 0px; right: 0px;width: 20px;height: 20px;
+   "></span>
+                 </div>
+                 <div class="user-middle" id="user_box">登录</div>
+                 <div class="user-right relative login-hidden" id="user-more" aria-hidden="true">
+                   <div id="userMenu"
+                       class="absolute right-0 bottom-full mb-2 w-48 bg-white login-hidden border border-gray-200 rounded-md shadow-lg">
+                     <ul>
+                       <li class="px-4 py-2 hover:bg-gray-100 cursor-pointer" onclick="logout()">
+                         退出登录
+                       </li>
+                     </ul>
+                   </div>
+                   <svg t="1752903400975" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="3997" width="24" height="24"><path d="M512 298.6496a85.3504 85.3504 0 1 0 0-170.6496 85.3504 85.3504 0 0 0 0 170.6496z" fill="#5A5A68" p-id="3998"></path><path d="M512 512m-85.3504 0a85.3504 85.3504 0 1 0 170.7008 0 85.3504 85.3504 0 1 0-170.7008 0Z" fill="#5A5A68" p-id="3999"></path><path d="M512 896a85.3504 85.3504 0 1 0 0-170.7008 85.3504 85.3504 0 0 0 0 170.7008z" fill="#5A5A68" p-id="4000"></path></svg>
+                 </div>
+              </div>
+             </div>
+           </div>
         </div>
 
         <!-- 左边导航条 -->
@@ -95,7 +93,7 @@
                      class="sticky top-0 z-10 flex items-center border-b border-white/20 bg-gray-800 pl-1 pt-1 text-gray-200 sm:pl-3 md:hidden "
                      style="background-color: #023f63;">
                     <div>
-                        <button type="button" onclick="toggleUserMenu()"
+                        <button type="button" onclick="toggleUserMenu(event)"
                                 class="-ml-0.5 -mt-0.5 inline-flex h-10 w-10 items-center justify-center rounded-md hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white dark:hover:text-white">
                             <span class="sr-only">Open sidebar</span>
                             <svg stroke="currentColor" fill="none" stroke-width="1.5" viewBox="0 0 24 24"
@@ -285,7 +283,7 @@
                                     <a href="mailto:service@landingbj.com" style="text-decoration: none;">service@landingbj.com</a>
                                     &nbsp;&nbsp;&nbsp;&nbsp;<span data-i18n="footer.phone">联系电话</span>: 027-87659116
                                     &nbsp;&nbsp;&nbsp;&nbsp;<div>Powered By <a style="color: rgb(35 142 252);"
-                                                                               href="https://github.com/landingbj/lagi">Lag[i]</a>&nbsp;<span data-i18n="footer.tagline">一种通用人工智能的实现验证</span>
+                                                                               href="https://github.com/landingbj/LinkMind">LinkMind</a>&nbsp;<span data-i18n="footer.tagline">一种通用人工智能的实现验证</span>
                                 </div>
                                 </div>
                             </div>
@@ -318,6 +316,84 @@
         class="pointer-events-none fixed inset-0 z-[60] mx-auto my-2 flex max-w-[560px] flex-col items-stretch justify-start md:pb-5"></span>
 </div>
 
+<!-- 登录注册弹框开始 -->
+<div id="overlay" class="overlay">
+  <div class="modal" id="login-form">
+    <div class="close-modal-container" style="position: absolute; right: 10px; z-index: 100;">
+      <button class="close-modal" onclick="closeModal()"
+              style="padding: 10px 15px; font-size: 24px; background-color: transparent; border: none; color: #333; cursor: pointer; transition: color 0.3s;">
+        &times;
+      </button>
+    </div>
+    <h2 style="display: flex; align-items: center; position: relative; width: 100%; justify-content: center;">
+      <img src="images/Small_logo.png" alt="公司 Logo" class="modal-Small_logo" style="max-height: 50px;">
+    </h2>
+    <div
+            style="display: flex; flex-direction: column; align-items: center; width: 80%; max-width: 350px; margin: 0 auto;">
+      <input type="text" placeholder="用户名" id="login-username"
+             style="width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; box-sizing: border-box;">
+      <input type="password" placeholder="密码" id="login-password"
+             style="width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; box-sizing: border-box;">
+      <div class="captcha-container" style="display: flex; align-items: center; width: 100%;">
+        <input type="text" placeholder="验证码" id="login-captcha"
+               style="flex: 1; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; box-sizing: border-box;">
+        <img alt="验证码" class="login-captcha-image" onclick="updateCaptcha(this)"
+             style="width: 30%; margin-left: 10px; cursor: pointer;">
+      </div>
+    </div>
+    <div id="login-error" class="error-message">登录失败，请检查输入信息</div>
+    <div
+            style="display: flex; justify-content: center; gap: 15px; width: 80%; max-width: 350px; margin: 0 auto; margin-top: 20px; align-items: center;">
+      <button onclick="submitLogin()"
+              style="padding: 10px 20px; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; width: 100%;">
+        登录
+      </button>
+      <button onclick="showRegisterPage()"
+              style="padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; width: 100%;">
+        注册
+      </button>
+    </div>
+  </div>
+  <div class="modal login-hidden" id="register-form">
+    <div class="close-modal-container" style="position: absolute; right: 10px; z-index: 100;">
+      <button class="close-modal" onclick="closeModal()"
+              style="padding: 10px 15px; font-size: 24px; background-color: transparent; border: none; color: #333; cursor: pointer; transition: color 0.3s;">
+        &times;
+      </button>
+    </div>
+    <h2 style="display: flex; align-items: center; position: relative; width: 100%; justify-content: center;">
+      <img src="images/Small_logo.png" alt="公司 Logo" class="modal-Small_logo" style="max-height: 50px;">
+    </h2>
+    <div
+            style="display: flex; flex-direction: column; align-items: center; width: 80%; max-width: 350px; margin: 0 auto;">
+      <input type="text" placeholder="用户名" id="register-username"
+             style="width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; box-sizing: border-box;">
+      <input type="password" placeholder="密码" id="register-password"
+             style="width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; box-sizing: border-box;">
+      <input type="password" placeholder="确认密码" id="register-confirm-password"
+             style="width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; box-sizing: border-box;">
+      <div class="captcha-container" style="display: flex; align-items: center; width: 100%;">
+        <input type="text" placeholder="验证码" id="register-captcha"
+               style="flex: 1; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; box-sizing: border-box;">
+        <img alt="验证码" class="register-captcha-image" onclick="updateCaptcha(this)"
+             style="width: 30%; margin-left: 10px; cursor: pointer;">
+      </div>
+    </div>
+    <div id="register-error" class="error-message">注册失败，请检查输入信息</div>
+    <div
+            style="display: flex; justify-content: center; gap: 15px; width: 80%; max-width: 350px; margin: 0 auto; margin-top: 20px; align-items: center;">
+      <button onclick="submitRegister()"
+              style="padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; width: 100%;">
+        注册
+      </button>
+      <button onclick="showLoginPage()"
+              style="padding: 10px 20px; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; width: 100%;">
+        返回登录
+      </button>
+    </div>
+  </div>
+</div>
+<!-- 登录注册弹框结束 -->
 
 <script src="libs/jquery-3.1.1.min.js"></script>
 <script src="libs/fingerprint2.min.js"></script>
@@ -340,5 +416,6 @@
 <script src="js/apikeys.js?ver=${initParam.version}"></script>
 <script src="js/fence.js?ver=${initParam.version}"></script>
 <script src="js/filterConfig.js?ver=${initParam.version}"></script>
+<script src="js/login.js?ver=${initParam.version}"></script>
 </body>
 </html>

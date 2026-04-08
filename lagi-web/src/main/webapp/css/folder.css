@@ -50,6 +50,15 @@
     background-color: var(--neutral-100);
 }
 
+#nav_body .file-item.active {
+    background-color: #d1d5db;
+    color: #374151;
+}
+
+#nav_body .file-item.active .file-text {
+    color: inherit;
+}
+
 .file-text {
     font-size: 16px;
     color: var(--neutral-600);
@@ -101,6 +110,15 @@
 
 .folder-content.expanded {
     max-height: 1000px;
+}
+
+/* #nav_body: expanded panels must grow with nested opens (avoid scrollHeight + transition race with siblings like 控制) */
+#nav_body .folder-content.expanded {
+    max-height: none;
+}
+
+#nav_body .folder-content {
+    transition: none;
 }
 
 .info-text {

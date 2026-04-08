@@ -3,10 +3,6 @@
     var tHtmlLogs = window.tHtml || function (s) { return s; };
     var generationRows = [];
     var jobRows = [];
-    var sessionRows = [];
-    var sessionsPage = 1;
-    var sessionsPageSize = 20;
-    var sessionsTotal = 0;
     var generationPage = 1;
     var pageSize = 20;
     var currentTab = "generations";
@@ -265,107 +261,6 @@
         $("#logsTabBody").html(tHtmlLogs(html));
     }
 
-    function loadSessionsRows(done) {
-        var range = getRangeMs();
-        $.getJSON("/v1/token-statistics/sessions", {
-            range: "all",
-            page: sessionsPage,
-            pageSize: sessionsPageSize,
-            startMs: range.min,
-            endMs: range.max
-        }).done(function (data) {
-            var records = (data && data.records) ? data.records : [];
-            sessionRows = records;
-            sessionsTotal = Number(data && data.total != null ? data.total : 0);
-            sessionsPage = Number(data && data.page != null ? data.page : sessionsPage);
-            done();
-        }).fail(function () {
-            sessionRows = [];
-            sessionsTotal = 0;
-            done();
-        });
-    }
-
-    function renderSessionsTab() {
-        if (!sessionRows.length) {
-            var code = [
-                "fetch('http://127.0.0.1:8080/v1/chat/completions', {",
-                "  method: 'POST',",
-                "  headers: {",
-                "    'Authorization': 'Bearer <YOUR_API_KEY>',",
-                "    'Content-Type': 'application/json'",
-                "  },",
-                "  body: JSON.stringify({",
-                "    model: 'kimi-k2.5',",
-                "    messages: [{ role: 'user', content: 'Hello' }],",
-                "    session_id: 'my-session-123'",
-                "  })",
-                "})"
-            ].join("\n");
-            $("#logsTabBody").html(tHtmlLogs(
-                '<div style="padding:60px 0 20px;text-align:center;">' +
-                '<div style="font-size:36px;font-weight:500;color:#111827;margin-bottom:10px;">暂无会话数据</div>' +
-                '<div style="font-size:24px;color:#6b7280;line-height:1.7;margin-bottom:24px;">你可以通过传入同一个 session_id 来聚合多次请求，<br/>用于跟踪完整会话与多步任务链路。</div>' +
-                '<div style="max-width:760px;margin:0 auto;text-align:left;">' +
-                '<div style="font-size:14px;color:#6b7280;margin-bottom:8px;">session_id 请求示例：</div>' +
-                '<pre style="margin:0;white-space:pre-wrap;color:#111827;font-size:12px;line-height:1.6;background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:12px;">' + code + "</pre>" +
-                "</div></div>"
-            ));
-            return;
-        }
-
-        var totalPages = Math.max(1, Math.ceil(sessionsTotal / sessionsPageSize));
-        var html =
-            '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:10px;">' +
-            '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">' +
-            "<thead><tr>" +
-            '<th style="' + styleTh() + '">Session ID</th>' +
-            '<th style="' + styleTh() + '">请求次数</th>' +
-            '<th style="' + styleTh() + '">输入 Tokens</th>' +
-            '<th style="' + styleTh() + '">输出 Tokens</th>' +
-            '<th style="' + styleTh() + '">Cached Tokens</th>' +
-            '<th style="' + styleTh() + '">Total Tokens</th>' +
-            '<th style="' + styleTh() + '">费用</th>' +
-            '<th style="' + styleTh() + '">首次请求时间</th>' +
-            '<th style="' + styleTh() + '">最后请求时间</th>' +
-            "</tr></thead><tbody>";
-        for (var i = 0; i < sessionRows.length; i++) {
-            var s = sessionRows[i] || {};
-            html += "<tr>" +
-                '<td style="' + styleTd() + '">' + (s.sessionId || "—") + "</td>" +
-                '<td style="' + styleTd() + '">' + (s.requestCount || 0) + "</td>" +
-                '<td style="' + styleTd() + '">' + (s.promptTokens || 0) + "</td>" +
-                '<td style="' + styleTd() + '">' + (s.completionTokens || 0) + "</td>" +
-                '<td style="' + styleTd() + '">' + (s.savedTokens || 0) + "</td>" +
-                '<td style="' + styleTd() + '">' + (s.totalTokens || 0) + "</td>" +
-                '<td style="' + styleTd() + '">¥ ' + Number(s.estimatedCost || 0).toFixed(4) + "</td>" +
-                '<td style="' + styleTd() + '">' + (s.firstRequestAt ? new Date(s.firstRequestAt).toLocaleString() : "—") + "</td>" +
-                '<td style="' + styleTd() + '">' + (s.lastRequestAt ? new Date(s.lastRequestAt).toLocaleString() : "—") + "</td>" +
-                "</tr>";
-        }
-        html += "</tbody></table></div>" +
-            '<div style="display:flex;justify-content:center;align-items:center;gap:8px;margin-top:12px;">' +
-            '<button id="logsSessionsPrevBtn" type="button" style="padding:4px 10px;border:1px solid #e5e7eb;border-radius:6px;background:#fff;cursor:pointer;">‹</button>' +
-            '<span id="logsSessionsPageInfo" style="min-width:16px;text-align:center;color:#6b7280;">' + sessionsPage + " / " + totalPages + "</span>" +
-            '<button id="logsSessionsNextBtn" type="button" style="padding:4px 10px;border:1px solid #e5e7eb;border-radius:6px;background:#fff;cursor:pointer;">›</button>' +
-            "</div></div>";
-        $("#logsTabBody").html(tHtmlLogs(html));
-        $("#logsSessionsPrevBtn").prop("disabled", sessionsPage <= 1);
-        $("#logsSessionsNextBtn").prop("disabled", sessionsPage >= totalPages);
-        $("#logsSessionsPrevBtn").on("click", function () {
-            if (sessionsPage > 1) {
-                sessionsPage--;
-                renderTabBody();
-            }
-        });
-        $("#logsSessionsNextBtn").on("click", function () {
-            if (sessionsPage < totalPages) {
-                sessionsPage++;
-                renderTabBody();
-            }
-        });
-    }
-
     function renderGenerationsTab() {
         var body =
             '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:12px;">' +
@@ -402,13 +297,6 @@
             renderJobsTab();
             return;
         }
-        if (currentTab === "sessions") {
-            $("#logsTabBody").html(tHtmlLogs('<div style="padding:20px;color:#6b7280;">正在加载...</div>'));
-            loadSessionsRows(function () {
-                renderSessionsTab();
-            });
-            return;
-        }
         renderGenerationsTab();
     }
 
@@ -416,7 +304,6 @@
         $(".logs-tab-btn").on("click", function () {
             currentTab = String($(this).data("tab"));
             generationPage = 1;
-            sessionsPage = 1;
             $(".logs-tab-btn").each(function () {
                 var active = String($(this).data("tab")) === currentTab;
                 $(this).attr("style", tabBtnStyle(active));
@@ -425,12 +312,10 @@
         });
         $("#logsDateFrom,#logsDateTo").on("change", function () {
             generationPage = 1;
-            sessionsPage = 1;
             renderTabBody();
         });
         $("#logsRefreshBtn").on("click", function () {
             generationPage = 1;
-            sessionsPage = 1;
             loadAllDataAndRender();
         });
     }
@@ -455,7 +340,6 @@
             '<div style="display:flex;gap:6px;align-items:center;">' +
             '<button class="logs-tab-btn" data-tab="generations" style="' + tabBtnStyle(true) + '">调用日志</button>' +
             '<button class="logs-tab-btn" data-tab="jobs" style="' + tabBtnStyle(false) + '">过滤日志</button>' +
-            '<button class="logs-tab-btn" data-tab="sessions" style="' + tabBtnStyle(false) + '">会话</button>' +
             "</div>" +
             '<button id="logsRefreshBtn" type="button" style="padding:4px 8px;border:none;background:#fff;color:#6b7280;cursor:pointer;">⟳</button>' +
             "</div>" +

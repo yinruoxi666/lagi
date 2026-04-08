@@ -24,8 +24,6 @@ public class BaiduAdapter extends CommonAdapter implements IWrapper {
         modelDriverMap.put("translate", "ai.translate.adapter.impl.BaiduTranslateAdapter");
 
         modelDriverMap.put("enhance", "ai.image.adapter.impl.BaiduAiImageAdapter");
-
-        modelDriverMap.put("aiVideo", "ai.video.adapter.impl.BaiduVideoAdapter");
         return modelDriverMap;
     }
 }

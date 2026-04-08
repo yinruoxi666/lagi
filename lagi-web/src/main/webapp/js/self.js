@@ -71,31 +71,25 @@ function longPress() {
 
 const forwardButton = document.getElementById("forwardButton");
 
-// 点击事件处理程序
-forwardButton.addEventListener("click", () => {
-    // 获取当前的IP地址和端口号，这里假设你已经有一个函数来获取它
-    const ipAddressAndPort = getCurrentIpAddressAndPort();
+if (forwardButton) {
+    forwardButton.addEventListener("click", () => {
+        const ipAddressAndPort = getCurrentIpAddressAndPort();
 
-    // 创建一个临时的textarea元素
-    const tempTextarea = document.createElement("textarea");
-    tempTextarea.value = ipAddressAndPort;
+        const tempTextarea = document.createElement("textarea");
+        tempTextarea.value = ipAddressAndPort;
 
-    // 将textarea元素添加到DOM中
-    document.body.appendChild(tempTextarea);
+        document.body.appendChild(tempTextarea);
 
-    // 选中textarea中的文本
-    tempTextarea.select();
-    tempTextarea.setSelectionRange(0, 99999); // 选中所有文本，兼容不同浏览器
+        tempTextarea.select();
+        tempTextarea.setSelectionRange(0, 99999);
 
-    // 复制选中的文本到剪贴板
-    document.execCommand("copy");
+        document.execCommand("copy");
 
-    // 从DOM中移除临时的textarea元素
-    document.body.removeChild(tempTextarea);
+        document.body.removeChild(tempTextarea);
 
-    // 提示用户复制成功
-    alert(tTextSelf("已复制到剪贴板：") + ipAddressAndPort);
-});
+        alert(tTextSelf("已复制到剪贴板：") + ipAddressAndPort);
+    });
+}
 
 // 获取当前的IP地址和端口号的示例函数
 function getCurrentIpAddressAndPort() {

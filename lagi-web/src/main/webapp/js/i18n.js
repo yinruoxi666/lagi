@@ -111,7 +111,7 @@
         '社交接入': 'Social Integration',
         '电子围栏': 'Security Fence',
         '安全配置': 'Security Config',
-        '高级测试': 'Advanced Test',
+        '聊天': 'Chat',
         '控制': 'Control',
         'tokens使用情况': 'Token Usage',
         '安全过滤记录': 'Filter Logs',

@@ -33,6 +33,7 @@ import ai.medusa.pojo.PromptInput;
 import ai.medusa.MedusaMonitor;
 import ai.medusa.utils.PromptCacheTrigger;
 import ai.medusa.utils.PromptInputUtil;
+import ai.migrate.service.TokenUsageService;
 import ai.openai.pojo.ChatCompletionChoice;
 import ai.router.pojo.LLmRequest;
 import ai.servlet.BaseServlet;
@@ -41,8 +42,8 @@ import ai.vector.VectorDbService;
 import ai.openai.pojo.ChatCompletionRequest;
 import ai.openai.pojo.ChatCompletionResult;
 import ai.openai.pojo.ChatMessage;
+import ai.utils.ApikeyUtil;
 import ai.utils.MigrateGlobal;
-import ai.utils.SensitiveWordUtil;
 import ai.utils.qa.ChatCompletionUtil;
 import ai.vector.VectorCacheLoader;
 import ai.worker.DefaultWorker;
@@ -71,9 +72,12 @@ public class LlmApiServlet extends BaseServlet {
     private Boolean RAG_ENABLE = null;
     private Boolean MEDUSA_ENABLE = null;
     private final Boolean enableQueueHandle = ContextLoader.configuration.getFunctions().getChat().getEnableQueueHandle();
+    private final Boolean authApiKey = ContextLoader.configuration.getFunctions().getChat().getAuthApiKey();
+    private final Boolean tokenCharge = ContextLoader.configuration.getFunctions().getChat().getTokenCharge();
     private final QueueSchedule queueSchedule = enableQueueHandle ? new QueueSchedule() : null;
     private final DefaultWorker defaultWorker = new DefaultWorker();
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final TokenUsageService tokenUsageService = TokenUsageService.getInstance();
 
     private static MedusaMonitor medusaMonitor;
 
@@ -214,6 +218,9 @@ public class LlmApiServlet extends BaseServlet {
 
     private void completions(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         resp.setContentType("application/json;charset=utf-8");
+
+        String apikey = ApikeyUtil.extractBearerToken(req.getHeader("Authorization"));
+
         PrintWriter out = resp.getWriter();
         HttpSession session = req.getSession();
         if (RAG_ENABLE == null){
@@ -249,6 +256,7 @@ public class LlmApiServlet extends BaseServlet {
             chatCompletionResult = medusaService.locate(promptInput);
             if (chatCompletionResult != null) {
                 outPrintChatCompletion(resp, chatCompletionRequest, chatCompletionResult);
+                enqueueUsageRecord(apikey, chatCompletionResult);
                 logger.info("Cache hit: {}", PromptInputUtil.getNewestPrompt(promptInput));
                 promptInput.getMedusaMetadata().setCacheHit(true);
                 medusaService.triggerCachePutAndDiversify(promptInput, true);
@@ -302,7 +310,7 @@ public class LlmApiServlet extends BaseServlet {
                     result = completionsService.streamCompletions(chatCompletionRequest, indexSearchDataList);
                 }
                 resp.setHeader("Content-Type", "text/event-stream;charset=utf-8");
-                streamOutPrint(medusaService.getPromptInput(chatCompletionRequest), result, context, indexSearchDataList, out);
+                streamOutPrint(medusaService.getPromptInput(chatCompletionRequest), result, context, indexSearchDataList, out, apikey);
             } catch (RRException e) {
                 resp.setStatus(e.getCode());
                 responsePrint(resp, e.getMsg());
@@ -324,6 +332,7 @@ public class LlmApiServlet extends BaseServlet {
                     medusaMonitor.put(medusaService.getPromptInput(chatCompletionRequest), result);
                 }
                 responsePrint(resp, toJson(result));
+                enqueueUsageRecord(apikey, result);
             } catch (RRException e) {
                 resp.setStatus(e.getCode());
                 responsePrint(resp, e.getMsg());
@@ -393,7 +402,7 @@ public class LlmApiServlet extends BaseServlet {
     private ChatCompletionRequest setCustomerModel(HttpServletRequest req, HttpSession session) throws IOException {
         ModelPreferenceDto preference = JSONUtil.toBean((String) session.getAttribute("preference"), ModelPreferenceDto.class) ;
         String json = requestToJson(req);
-//        System.out.println("ChatCompletionRequest json: " + json);
+        System.out.println("ChatCompletionRequest json: " + json);
         ChatCompletionRequest chatCompletionRequest = objectMapper.readValue(json, ChatCompletionRequest.class);
         if(chatCompletionRequest.getModel() == null
                 && preference != null
@@ -423,7 +432,7 @@ public class LlmApiServlet extends BaseServlet {
         return medusaRequest;
     }
 
-    private void streamOutPrint(PromptInput promptInput, Observable<ChatCompletionResult> observable, GetRagContext context, List<IndexSearchData> indexSearchDataList, PrintWriter out) {
+    private void streamOutPrint(PromptInput promptInput, Observable<ChatCompletionResult> observable, GetRagContext context, List<IndexSearchData> indexSearchDataList, PrintWriter out, String apiKey) {
         final ChatCompletionResult[] lastResult = {null};
         String key = UUID.randomUUID().toString();
         observable.subscribe(
@@ -476,6 +485,7 @@ public class LlmApiServlet extends BaseServlet {
                         return;
                     }
                     extracted(lastResult,indexSearchDataList,context, out);
+                    enqueueUsageRecord(apiKey, lastResult[0]);
                     out.flush();
                     out.close();
                     if (medusaMonitor != null && promptInput != null && lastResult[0] != null) {
@@ -484,6 +494,13 @@ public class LlmApiServlet extends BaseServlet {
                     }
                 }
         );
+    }
+
+    private void enqueueUsageRecord(String apiKey, ChatCompletionResult result) {
+        if (!Boolean.TRUE.equals(tokenCharge) || result == null || result.getUsage() == null) {
+            return;
+        }
+        tokenUsageService.recordUsage(apiKey, result);
     }
 
     private void outputChunk(PrintWriter out, String msg) {

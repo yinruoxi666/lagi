@@ -159,6 +159,29 @@ public class ContextLoader {
         }
     }
 
+    /**
+     * Reloads {@link GlobalConfigurations} and beans from the given lagi.yml file.
+     * If loading fails, the previous {@link #configuration} is restored when it was cleared by a failed attempt.
+     */
+    public static synchronized void reloadLagiYmlFromFile(String filePath) {
+        if (filePath == null || filePath.trim().isEmpty()) {
+            log.warn("reloadLagiYmlFromFile: empty file path, skip");
+            return;
+        }
+        String extensionJarFolder = System.getProperty("linkmind.extension");
+        if (extensionJarFolder == null) {
+            extensionJarFolder = "extension";
+        }
+        GlobalConfigurations previous = configuration;
+        try {
+            loadContextByFilePath(filePath.trim(), extensionJarFolder);
+            log.info("reloadLagiYmlFromFile success for {}", filePath);
+        } catch (RuntimeException e) {
+            configuration = previous;
+            log.error("reloadLagiYmlFromFile failed for {}, keeping previous configuration", filePath, e);
+        }
+    }
+
     private static String detectEncoding(String filePath) {
         try {
             return ai.utils.EncodingDetector.detectEncoding(filePath);

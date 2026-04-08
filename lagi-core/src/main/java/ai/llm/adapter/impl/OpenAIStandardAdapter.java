@@ -146,6 +146,16 @@ public class OpenAIStandardAdapter extends ModelService implements ILlmAdapter {
         if(request.getModel().startsWith("gpt")) {
             ResponsesChatCompletionConverter.fixupFunctionCallId(request);
         }
+        if(Boolean.TRUE.equals(request.getStream())) {
+            Map<String, Object> streamOptions = request.getStream_options();
+            if(streamOptions != null) {
+                streamOptions.put("include_usage", true);
+            } else {
+                streamOptions = new HashMap<>();
+                streamOptions.put("include_usage", true);
+            }
+            request.setStream_options(streamOptions);
+        }
     }
 
 }

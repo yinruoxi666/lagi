@@ -23,12 +23,13 @@ public class OSSManager {
         return INSTANCE;
     }
 
-    public void  register(List<OSSConfig> ossConfigs) {
-        if(ossConfigs == null) {
+    public void register(List<OSSConfig> ossConfigs) {
+        ossMap.clear();
+        if (ossConfigs == null) {
             return;
         }
         ossConfigs.forEach(ossConfig -> {
-            if(!Boolean.TRUE.equals(ossConfig.getEnable())) {
+            if (!Boolean.TRUE.equals(ossConfig.getEnable())) {
                 return;
             }
             Class<?> clazz = null;
@@ -36,9 +37,9 @@ public class OSSManager {
                 clazz = Class.forName(ossConfig.getDriver());
                 UniversalOSS oss = (UniversalOSS) clazz.newInstance();
                 BeanUtil.copyProperties(ossConfig, oss);
-                UniversalOSS temp = ossMap.putIfAbsent(ossConfig.getName(), oss);
-                if(temp != null) {
-                    log.error("oss {} name {} is already exists!!", oss.getClass().getName(), ossConfig.getName());
+                UniversalOSS previous = ossMap.put(ossConfig.getName(), oss);
+                if (previous != null) {
+                    log.debug("OSS {} ({}) replaced on re-register", ossConfig.getName(), oss.getClass().getName());
                 }
             } catch (Exception e) {
                 log.error("oss {} name {} register failed error : {}", ossConfig.getDriver(), ossConfig.getName(), e.getMessage());

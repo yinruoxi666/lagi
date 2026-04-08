@@ -2867,3 +2867,44 @@ body.home-mode .home-stat-card__hint {
         margin-bottom: 2px;
     }
 }
+
+/* Login / register: hide secondary form, overlay when closed, or user menu when logged out */
+.login-hidden {
+    display: none !important;
+}
+
+#overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.45);
+}
+
+/* Login / register dialog panels */
+#overlay .modal {
+    position: relative;
+    box-sizing: border-box;
+    width: 92%;
+    max-width: 420px;
+    margin: 0 auto;
+    padding: 1.5rem 1.25rem 1.75rem;
+    background-color: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+/* Error hints: hidden until login.js shows them with inline display */
+#overlay #login-error,
+#overlay #register-error {
+    display: none;
+    margin-top: 0.5rem;
+    font-size: 14px;
+    color: #c0392b;
+    text-align: center;
+    line-height: 1.4;
+}

@@ -13,21 +13,6 @@ public class HunYuanAdapter extends OpenAIStandardAdapter {
     private static final Logger logger = LoggerFactory.getLogger(HunYuanAdapter.class);
 
     @Override
-    protected void setDefaultField(ChatCompletionRequest request) {
-        super.setDefaultField(request);
-        if(Boolean.TRUE.equals(request.getStream())) {
-            Map<String, Object> streamOptions = request.getStream_options();
-            if(streamOptions != null) {
-                streamOptions.put("include_usage", true);
-            } else {
-                streamOptions = new HashMap<>();
-                streamOptions.put("include_usage", true);
-            }
-            request.setStream_options(streamOptions);
-        }
-    }
-
-    @Override
     public String getApiAddress() {
         if (apiAddress == null) {
             apiAddress = "https://api.hunyuan.cloud.tencent.com/v1/chat/completions";
