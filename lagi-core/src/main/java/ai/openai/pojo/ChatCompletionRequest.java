@@ -1,6 +1,7 @@
 package ai.openai.pojo;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
+import com.google.gson.annotations.Expose;
 import lombok.Data;
 
 import java.util.List;
@@ -26,6 +27,7 @@ public class ChatCompletionRequest {
     private ResponseFormat response_format;
     private Map<String, Object> stream_options;
     private Boolean logprobs;
-    private Boolean enableHook;
+    private  transient Boolean enableHook = true;
+    private  transient Boolean enableAfter = true;
     private Boolean store;
 }

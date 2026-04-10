@@ -53,6 +53,5 @@ public class ModelService implements ModelVerify{
             request.setTool_choice(null);
             request.setParallel_tool_calls(null);
         }
-        request.setEnableHook(null);
     }
 }

@@ -36,10 +36,11 @@ public class GlobalConfigurations extends AbstractConfiguration {
     private StoreConfig stores;
     private ModelFunctions functions;
     private List<AgentConfig> agents;
-    private List<PnpConfig> pnps;
 
-    private List<WorkerConfig> workers;
     private List<RouterConfig> routers;
+
+    private SkillsConfig skills;
+
     private List<FilterConfig> filters;
 
     private McpConfig mcps;
@@ -62,11 +63,11 @@ public class GlobalConfigurations extends AbstractConfiguration {
         PromptCacheConfig.init(stores.getVectors(), stores.getMedusa());
         OcrConfig.init(functions.getImage2ocr());
         AgentManager.getInstance().register(agents);
-        Routers.getInstance().register(workers, routers);
+        Routers.getInstance().register(skills.getWorkers(), routers);
         Routers.getInstance().register(functions, routers);
-        WorkerManager.getInstance().register(workers);
+        WorkerManager.getInstance().register(skills.getWorkers());
         McpManager.getInstance().register(mcps);
-        PnpManager.getInstance().register(pnps);
+        PnpManager.getInstance().register(skills.getPnps());
         registerFilter();
     }
 
@@ -140,17 +141,17 @@ public class GlobalConfigurations extends AbstractConfiguration {
         }catch (Exception ignored) {}
 
         try {
-            if(pnps == null) {
-                pnps = YmlPropertiesLoader.loaderProperties(getIncludePnps(), "pnps", new cn.hutool.core.lang.TypeReference<List<PnpConfig>>(){});
+            if(skills.getPnps() == null) {
+                skills.setPnps(YmlPropertiesLoader.loaderProperties(getIncludePnps(), "skill", new cn.hutool.core.lang.TypeReference<List<PnpConfig>>(){}));
             } else {
-                List<PnpConfig> pnps2 = YmlPropertiesLoader.loaderProperties(getIncludePnps(), "pnps", new cn.hutool.core.lang.TypeReference<List<PnpConfig>>(){});
-                if (pnps2 != null && pnps != null) {
-                    pnps.addAll(pnps2);
+                List<PnpConfig> pnps2 = YmlPropertiesLoader.loaderProperties(getIncludePnps(), "skill", new cn.hutool.core.lang.TypeReference<List<PnpConfig>>(){});
+                if (pnps2 != null && skills.getPnps() != null) {
+                    skills.getPnps().addAll(pnps2);
                 }
             }
-            if(pnps != null) {
-                Set<String> pnpNames = pnps.stream().map(PnpConfig::getName).collect(Collectors.toSet());
-                pnps = pnps.stream().filter(model -> pnpNames.contains(model.getName())).collect(Collectors.toList());
+            if(skills.getPnps() != null) {
+                Set<String> pnpNames = skills.getPnps().stream().map(PnpConfig::getName).collect(Collectors.toSet());
+                skills.setPnps(skills.getPnps().stream().filter(model -> pnpNames.contains(model.getName())).collect(Collectors.toList()));
             }
         } catch (Exception ignored) {}
     }
@@ -440,7 +441,7 @@ public class GlobalConfigurations extends AbstractConfiguration {
                 .videoGeneration(VideoGeneration.builder().backends(functions.getImage2video()).build())
                 .videoTrack(VideoTrack.builder().backends(functions.getVideo2Track()).build())
                 .agents(agents)
-                .workers(workers)
+                .workers(skills.getWorkers())
                 .build();
     }
 

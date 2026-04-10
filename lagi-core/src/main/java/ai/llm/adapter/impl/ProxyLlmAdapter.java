@@ -1,6 +1,5 @@
 package ai.llm.adapter.impl;
 
-import ai.annotation.LLM;
 import ai.common.ModelService;
 import ai.llm.adapter.ILlmAdapter;
 import ai.llm.hook.HookService;
@@ -11,6 +10,7 @@ import ai.openai.pojo.ChatCompletionRequest;
 import ai.openai.pojo.ChatCompletionResult;
 import cn.hutool.core.bean.BeanUtil;
 import io.reactivex.Observable;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 
@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class ProxyLlmAdapter extends ModelService implements ILlmAdapter {
 
+    @Getter
     private final ILlmAdapter llmAdapter;
 
 
@@ -35,22 +36,30 @@ public class ProxyLlmAdapter extends ModelService implements ILlmAdapter {
         }
     }
 
-    public ILlmAdapter getLlmAdapter() {
-        return this.llmAdapter;
+
+    private Observable<ChatCompletionResult> applyStreamHookOnce(ChatCompletionRequest request, ModelContext context) {
+        if(Boolean.TRUE.equals(request.getEnableAfter())) {
+            request.setEnableAfter(null);
+            return hookService != null ? hookService.streamApply(context) : context.getStreamResult();
+        }
+        return context.getStreamResult();
     }
 
-
-
-    private Observable<ChatCompletionResult> applyStreamHook(ModelContext context) {
-        return hookService != null ? hookService.streamApply(context) : context.getStreamResult();
+    private ChatCompletionResult applyAfterHookOnce(ChatCompletionRequest request, ModelContext context, ChatCompletionResult completions) {
+        if(Boolean.TRUE.equals(request.getEnableAfter())) {
+            request.setEnableAfter(null);
+            context.setResult(completions);
+            return hookService != null ? hookService.AfterModel(context) : completions;
+        }
+        return completions;
     }
 
     @Override
     public ChatCompletionResult completions(ChatCompletionRequest request) {
         // Prevent stack overflow caused by calling large models within the hook function
         ModelContext context = ModelContext.builder().request(request).adapter(this.llmAdapter).build();
-        if(!Boolean.TRUE.equals(request.getEnableHook())) {
-            request.setEnableHook(true);
+        if(Boolean.TRUE.equals(request.getEnableHook())) {
+            request.setEnableHook(null);
             if (hookService != null) {
                 ChatCompletionRequest afterHook = hookService.beforeModel(context);
                 if (afterHook != null) {
@@ -60,19 +69,16 @@ public class ProxyLlmAdapter extends ModelService implements ILlmAdapter {
         }
         if(!(request instanceof EnhanceChatCompletionRequest)) {
             ChatCompletionResult completions = llmAdapter.completions(request);
-            context.setResult(completions);
-            return hookService != null ? hookService.AfterModel(context) : completions;
+            return applyAfterHookOnce(request, context, completions);
         }
         if(this.priorityLock == null) {
             ChatCompletionResult completions = llmAdapter.completions(request);
-            context.setResult(completions);
-            return hookService != null ? hookService.AfterModel(context) : completions;
+            return applyAfterHookOnce(request, context, completions);
         }
         Integer priority = ((EnhanceChatCompletionRequest) request).getPriority();
         if(priority == null) {
             ChatCompletionResult completions = llmAdapter.completions(request);
-            context.setResult(completions);
-            return hookService != null ? hookService.AfterModel(context) : completions;
+            return applyAfterHookOnce(request, context, completions);
         }
         try {
 //            log.info("locking priority {}", priority);
@@ -80,9 +86,7 @@ public class ProxyLlmAdapter extends ModelService implements ILlmAdapter {
 //            log.info("get lock priority {}", priority);
             ((EnhanceChatCompletionRequest) request).setPriority(null);
             ChatCompletionResult completions = llmAdapter.completions(request);
-            context.setResult(completions);
-            completions = hookService != null ? hookService.AfterModel(context) : completions;
-            return completions;
+            return applyAfterHookOnce(request, context, completions);
         } finally {
 //            log.info("Unlocking priority {}", priority);
             this.priorityLock.unlock(priority);
@@ -96,8 +100,8 @@ public class ProxyLlmAdapter extends ModelService implements ILlmAdapter {
     public Observable<ChatCompletionResult> streamCompletions(ChatCompletionRequest chatCompletionRequest) {
         // Prevent stack overflow caused by calling large models within the hook function
         ModelContext context = ModelContext.builder().request(chatCompletionRequest).adapter(this.llmAdapter).build();
-        if(!Boolean.TRUE.equals(chatCompletionRequest.getEnableHook())) {
-            chatCompletionRequest.setEnableHook(true);
+        if(Boolean.TRUE.equals(chatCompletionRequest.getEnableHook())) {
+            chatCompletionRequest.setEnableHook(null);
             if (hookService != null) {
                 ChatCompletionRequest afterHook = hookService.beforeModel(context);
                 if (afterHook != null) {
@@ -108,18 +112,18 @@ public class ProxyLlmAdapter extends ModelService implements ILlmAdapter {
         if(!(chatCompletionRequest instanceof EnhanceChatCompletionRequest)) {
             Observable<ChatCompletionResult> chatCompletionResultObservable = llmAdapter.streamCompletions(chatCompletionRequest);
             context.setStreamResult(chatCompletionResultObservable);
-            return applyStreamHook(context);
+            return applyStreamHookOnce(chatCompletionRequest, context);
         }
         if(this.priorityLock == null) {
             Observable<ChatCompletionResult> chatCompletionResultObservable = llmAdapter.streamCompletions(chatCompletionRequest);
             context.setStreamResult(chatCompletionResultObservable);
-            return applyStreamHook(context);
+            return applyStreamHookOnce(chatCompletionRequest, context);
         }
         Integer priority = ((EnhanceChatCompletionRequest) chatCompletionRequest).getPriority();
         if(priority == null) {
             Observable<ChatCompletionResult> chatCompletionResultObservable = llmAdapter.streamCompletions(chatCompletionRequest);
             context.setStreamResult(chatCompletionResultObservable);
-            return applyStreamHook(context);
+            return applyStreamHookOnce(chatCompletionRequest, context);
         }
         Observable<ChatCompletionResult> completions = null;
         try {
@@ -129,7 +133,7 @@ public class ProxyLlmAdapter extends ModelService implements ILlmAdapter {
             ((EnhanceChatCompletionRequest) chatCompletionRequest).setPriority(null);
             completions = llmAdapter.streamCompletions(chatCompletionRequest);
             context.setStreamResult(completions);
-            completions = applyStreamHook(context);
+            completions = applyStreamHookOnce(chatCompletionRequest, context);
             if(completions != null) {
                 return completions.doFinally(() -> {
 //                    log.info("stream Unlocking priority {}", priority);
