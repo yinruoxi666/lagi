@@ -60,11 +60,13 @@ public class HookService {
         if (result == null || BeanManageUtil.getBeansByType(AfterModel.class) == null) {
             return result;
         }
+        context.setStreamResult(result);
         for (AfterModel afterModel : BeanManageUtil.getBeansByType(AfterModel.class)) {
             try {
                 Observable<ChatCompletionResult> next = afterModel.stream(context);
                 if (next != null) {
                     result = next;
+                    context.setStreamResult(result);
                 }
             } catch (Exception e) {
                 log.error("HookService afterModel error", e);

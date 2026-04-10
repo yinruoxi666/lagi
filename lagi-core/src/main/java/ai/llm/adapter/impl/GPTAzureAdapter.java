@@ -17,8 +17,8 @@ import ai.openai.pojo.ChatCompletionResult;
 import ai.openai.pojo.ChatMessage;
 import cn.hutool.core.util.StrUtil;
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
 import io.reactivex.Observable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -143,11 +143,7 @@ public class GPTAzureAdapter extends ModelService implements ILlmAdapter {
     }
 
     private String toJson(Object payload) {
-        try {
-            return mapper.writeValueAsString(payload);
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
-        }
+        return new Gson().toJson(payload);
     }
 
     private ChatMessage extractAssistantMessage(ChatCompletionResult result) {
