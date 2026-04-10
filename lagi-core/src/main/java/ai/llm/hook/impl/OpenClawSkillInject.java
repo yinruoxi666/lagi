@@ -58,7 +58,6 @@ public class OpenClawSkillInject implements BeforeModel, AfterModel {
                 skills = Collections.emptyList();
             } else {
                 skills = skillLoader.load(configuredRoots);
-                System.out.println("Loaded skills: " + skills);
             }
             List<SkillEntry> configSkills = skillsConfig == null || skillsConfig.getSkills() == null
                     ? Collections.emptyList()
