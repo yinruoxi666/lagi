@@ -47,7 +47,12 @@ public class OpenClawSkillUtil {
                     description == null ? "" : description,
                     null,
                     location == null || location.trim().isEmpty() ? null : Paths.get(location),
-                    Collections.emptyMap()
+                    Collections.emptyMap(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    "cli"
             ));
         }
         return extracted;

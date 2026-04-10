@@ -19,6 +19,7 @@ import ai.pnps.skills.pojo.SkillsAgentResult;
 import ai.pnps.skills.util.SkillsJsons;
 import ai.utils.LagiGlobal;
 import ai.utils.qa.ChatCompletionUtil;
+import cn.hutool.core.bean.BeanUtil;
 import io.reactivex.Observable;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -62,7 +63,15 @@ public class OpenClawSkillInject implements BeforeModel, AfterModel {
             List<SkillEntry> configSkills = skillsConfig == null || skillsConfig.getSkills() == null
                     ? Collections.emptyList()
                     : skillsConfig.getSkills();
-
+            configSkills.forEach(skill -> {
+                if(skill.getRule() == null) {
+                    if (skillsConfig != null && skillsConfig.getRule() != null) {
+                        skill.setRule(skillsConfig.getRule());
+                    } else {
+                        skill.setRule("cli");
+                    }
+                }
+            });
             this.serverSkills = retainSkill(configSkills, skills);
         } else {
             this.serverSkills = Collections.emptyList();
@@ -108,7 +117,7 @@ public class OpenClawSkillInject implements BeforeModel, AfterModel {
         List<SkillEntry> retainSkills = new ArrayList<>();
         for (SkillEntry configSkill : configSkills) {
             for (SkillEntry skill : skills) {
-                if (Objects.equals(skill.getName(), configSkill.getName()) && Objects.equals(skill.getDescription(), configSkill.getDescription())) {
+                if (Objects.equals(skill.getName(), configSkill.getName())) {
                     skill.setRule(configSkill.getRule());
                     retainSkills.add(skill);
                     break;
@@ -147,12 +156,14 @@ public class OpenClawSkillInject implements BeforeModel, AfterModel {
             // only openClaw skill
             if (cfg == null) {
                 merged.add(oc);
+                oc.setRule("cli");
                 continue;
             }
+            // server skill
             String rule = normalizeMergeRule(cfg.getRule());
             if ("server".equals(rule)) {
-                cfg.setRule("server");
-                merged.add(cfg);
+                oc.setRule("server");
+                merged.add(oc);
             } else if ("cli".equals(rule)) {
                 oc.setRule("cli");
                 merged.add(oc);
@@ -163,7 +174,10 @@ public class OpenClawSkillInject implements BeforeModel, AfterModel {
                 continue;
             }
             if (!openClawNames.contains(cfg.getName())) {
-                merged.add(cfg);
+                SkillEntry skillEntry = new SkillEntry();
+                BeanUtil.copyProperties(cfg, skillEntry);
+                skillEntry.setRule("server");
+                merged.add(skillEntry);
             }
         }
         return merged;
@@ -518,6 +532,7 @@ public class OpenClawSkillInject implements BeforeModel, AfterModel {
     private void classifyTools(ToolCall toolCall, String argument, List<SkillEntry> skills1, List<ToolClassification> serverTool, List<ToolClassification> cliTool) throws IOException {
         String path = SkillsJsons.getArg(toolCall.getFunction().getArguments(), argument);
         if (path == null || path.trim().isEmpty()) {
+            cliTool.add(new ToolClassification(toolCall, "cli", null));
             return;
         }
         String toolPath = Paths.get(path).toAbsolutePath().normalize().toString();
@@ -529,7 +544,7 @@ public class OpenClawSkillInject implements BeforeModel, AfterModel {
             String skillPath = skillMdPath.toAbsolutePath().normalize().toString();
             boolean sameFile = skillPath.equals(toolPath);
             if(sameFile) {
-                if(skillEntry.getRule().equals("server")) {
+                if("server".equals(skillEntry.getRule())) {
                     serverTool.add(new ToolClassification(toolCall, "server", skillEntry));
                     return;
                 }
