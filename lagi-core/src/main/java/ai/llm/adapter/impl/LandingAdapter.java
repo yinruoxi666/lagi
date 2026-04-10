@@ -13,14 +13,33 @@ public class LandingAdapter extends OpenAIStandardAdapter {
 
     @Override
     public ChatCompletionResult completions(ChatCompletionRequest chatCompletionRequest) {
+        normalizeModelNameIfSlashSeparated(chatCompletionRequest);
         ensureApiKeyValid();
         return super.completions(chatCompletionRequest);
     }
 
     @Override
     public Observable<ChatCompletionResult> streamCompletions(ChatCompletionRequest chatCompletionRequest) {
+        normalizeModelNameIfSlashSeparated(chatCompletionRequest);
         ensureApiKeyValid();
         return super.streamCompletions(chatCompletionRequest);
+    }
+
+    /**
+     * If model is like {@code Alibaba/qwen3-max}, keep only the part after the slash ({@code qwen3-max}).
+     */
+    private void normalizeModelNameIfSlashSeparated(ChatCompletionRequest chatCompletionRequest) {
+        if (chatCompletionRequest == null || chatCompletionRequest.getModel() == null) {
+            return;
+        }
+        String model = chatCompletionRequest.getModel().trim();
+        int slash = model.indexOf('/');
+        if (slash >= 0 && slash < model.length() - 1) {
+            String after = model.substring(slash + 1).trim();
+            if (!after.isEmpty()) {
+                chatCompletionRequest.setModel(after);
+            }
+        }
     }
 
     private void ensureApiKeyValid() {

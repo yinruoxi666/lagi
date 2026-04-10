@@ -4,11 +4,11 @@ import ai.openai.pojo.ChatCompletionResult;
 import ai.openai.pojo.Usage;
 import ai.utils.AiGlobal;
 import ai.utils.OkHttpUtil;
+import ai.utils.OkHttpUtil.HttpPostResult;
 import com.google.gson.Gson;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -20,18 +20,22 @@ import java.util.concurrent.TimeUnit;
 public class TokenUsageService {
     private static final Gson gson = new Gson();
     private static final TokenUsageService INSTANCE = new TokenUsageService();
-    private static final String TOKEN_USAGE_REPORT_URL = AiGlobal.SAAS_URL + "/saas/api/token/usage/report/mock";
+    /** JAX-RS {@code @POST @Path("/calculateUsage")} under SAAS base. */
+    private static final String CALCULATE_USAGE_URL = AiGlobal.SAAS_URL + "/saas/api/apikey/calculateUsage";
     private static final long RETRY_INTERVAL_MILLIS = 3000L;
     private static final int CONSUMER_THREADS = 3;
     private final TokenUsageQueue tokenUsageQueue = TokenUsageQueue.getInstance();
+    private final ExecutorService reportExecutor = Executors.newFixedThreadPool(CONSUMER_THREADS, new ThreadFactory() {
+        @Override
+        public Thread newThread(Runnable r) {
+            Thread thread = new Thread(r, "token-usage-report");
+            thread.setDaemon(true);
+            return thread;
+        }
+    });
 
     private TokenUsageService() {
         for (int i = 0; i < CONSUMER_THREADS; i++) {
-            ExecutorService reportExecutor = Executors.newFixedThreadPool(CONSUMER_THREADS, r -> {
-                Thread thread = new Thread(r, "token-usage-report");
-                thread.setDaemon(true);
-                return thread;
-            });
             reportExecutor.submit(this::reportUsageToSaasAsync);
         }
     }
@@ -40,18 +44,25 @@ public class TokenUsageService {
         return INSTANCE;
     }
 
-    public void recordUsage(String apiKey, Usage usage) {
-        boolean offered = tokenUsageQueue.enqueue(apiKey, usage);
+    public void recordUsage(String apiKey, String modelName, Usage usage) {
+        if (isBlank(apiKey) || isBlank(modelName) || usage == null) {
+            return;
+        }
+        boolean offered = tokenUsageQueue.enqueue(apiKey.trim(), modelName.trim(), usage);
         if (!offered) {
             log.warn("Token usage enqueue skipped");
         }
     }
 
     public void recordUsage(String apiKey, ChatCompletionResult result) {
-        if (result == null) {
+        if (result == null || result.getUsage() == null) {
             return;
         }
-        recordUsage(apiKey, result.getUsage());
+        String modelName = result.getModel() == null ? null : result.getModel().trim();
+        if (isBlank(modelName)) {
+            return;
+        }
+        recordUsage(apiKey, modelName, result.getUsage());
     }
 
     public void reportUsageToSaasAsync() {
@@ -60,34 +71,48 @@ public class TokenUsageService {
             if (record == null) {
                 continue;
             }
-            String body = buildPayload(record.getApiKey(), record.getUsage());
+            String body = buildCalculateUsagePayload(record);
             while (true) {
                 try {
-                    log.info("Sending token usage report: {}", body);
-                    OkHttpUtil.post(TOKEN_USAGE_REPORT_URL, body);
-                    break;
-                } catch (Exception e) {
-                    log.warn("Token usage report failed, retrying until success", e);
+                    log.info("Sending calculateUsage request: {}", body);
+                    HttpPostResult res = OkHttpUtil.postJsonWithStatus(CALCULATE_USAGE_URL, body);
+                    if (res.getCode() == 200) {
+                        log.debug("calculateUsage success: {}", res.getBody());
+                        break;
+                    }
+                    if (res.getCode() == 400) {
+                        log.warn("calculateUsage client error (no retry): {} {}", res.getCode(), res.getBody());
+                        break;
+                    }
+                    log.warn("calculateUsage failed, retrying: {} {}", res.getCode(), res.getBody());
+                    sleepSilently(RETRY_INTERVAL_MILLIS);
+                } catch (IOException e) {
+                    log.warn("calculateUsage request error, retrying until success", e);
                     sleepSilently(RETRY_INTERVAL_MILLIS);
                 }
             }
         }
     }
 
-    private String buildPayload(String apiKey, Usage usage) {
+    private String buildCalculateUsagePayload(TokenUsageQueue.TokenUsageRecord record) {
         Map<String, Object> payload = new HashMap<String, Object>();
-        payload.put("apiKey", apiKey);
-        payload.put("promptTokens", usage == null ? 0L : usage.getPrompt_tokens());
-        payload.put("completionTokens", usage == null ? 0L : usage.getCompletion_tokens());
-        payload.put("totalTokens", usage == null ? 0L : usage.getTotal_tokens());
+        payload.put("apiKey", record.getApiKey());
+        payload.put("modelName", record.getModelName());
+        Usage u = record.getUsage();
+        payload.put("inputTokens", u == null ? 0L : u.getPrompt_tokens());
+        payload.put("outputTokens", u == null ? 0L : u.getCompletion_tokens());
         return gson.toJson(payload);
+    }
+
+    private static boolean isBlank(String s) {
+        return s == null || s.trim().isEmpty();
     }
 
     private void sleepSilently(long millis) {
         try {
             TimeUnit.MILLISECONDS.sleep(millis);
         } catch (InterruptedException ignored) {
-            // Ignore interruption to keep background consumer alive.
+            // Keep background consumer alive.
         }
     }
 

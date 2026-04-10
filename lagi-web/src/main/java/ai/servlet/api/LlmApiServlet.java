@@ -72,7 +72,6 @@ public class LlmApiServlet extends BaseServlet {
     private Boolean RAG_ENABLE = null;
     private Boolean MEDUSA_ENABLE = null;
     private final Boolean enableQueueHandle = ContextLoader.configuration.getFunctions().getChat().getEnableQueueHandle();
-    private final Boolean authApiKey = ContextLoader.configuration.getFunctions().getChat().getAuthApiKey();
     private final Boolean tokenCharge = ContextLoader.configuration.getFunctions().getChat().getTokenCharge();
     private final QueueSchedule queueSchedule = enableQueueHandle ? new QueueSchedule() : null;
     private final DefaultWorker defaultWorker = new DefaultWorker();
@@ -256,7 +255,7 @@ public class LlmApiServlet extends BaseServlet {
             chatCompletionResult = medusaService.locate(promptInput);
             if (chatCompletionResult != null) {
                 outPrintChatCompletion(resp, chatCompletionRequest, chatCompletionResult);
-                enqueueUsageRecord(apikey, chatCompletionResult);
+                enqueueUsageRecord(apikey, chatCompletionRequest, chatCompletionResult);
                 logger.info("Cache hit: {}", PromptInputUtil.getNewestPrompt(promptInput));
                 promptInput.getMedusaMetadata().setCacheHit(true);
                 medusaService.triggerCachePutAndDiversify(promptInput, true);
@@ -310,7 +309,7 @@ public class LlmApiServlet extends BaseServlet {
                     result = completionsService.streamCompletions(chatCompletionRequest, indexSearchDataList);
                 }
                 resp.setHeader("Content-Type", "text/event-stream;charset=utf-8");
-                streamOutPrint(medusaService.getPromptInput(chatCompletionRequest), result, context, indexSearchDataList, out, apikey);
+                streamOutPrint(medusaService.getPromptInput(chatCompletionRequest), result, context, indexSearchDataList, out, apikey, chatCompletionRequest);
             } catch (RRException e) {
                 resp.setStatus(e.getCode());
                 responsePrint(resp, e.getMsg());
@@ -332,7 +331,7 @@ public class LlmApiServlet extends BaseServlet {
                     medusaMonitor.put(medusaService.getPromptInput(chatCompletionRequest), result);
                 }
                 responsePrint(resp, toJson(result));
-                enqueueUsageRecord(apikey, result);
+                enqueueUsageRecord(apikey, chatCompletionRequest, result);
             } catch (RRException e) {
                 resp.setStatus(e.getCode());
                 responsePrint(resp, e.getMsg());
@@ -402,7 +401,7 @@ public class LlmApiServlet extends BaseServlet {
     private ChatCompletionRequest setCustomerModel(HttpServletRequest req, HttpSession session) throws IOException {
         ModelPreferenceDto preference = JSONUtil.toBean((String) session.getAttribute("preference"), ModelPreferenceDto.class) ;
         String json = requestToJson(req);
-        System.out.println("ChatCompletionRequest json: " + json);
+//        System.out.println("ChatCompletionRequest json: " + json);
         ChatCompletionRequest chatCompletionRequest = objectMapper.readValue(json, ChatCompletionRequest.class);
         if(chatCompletionRequest.getModel() == null
                 && preference != null
@@ -432,7 +431,7 @@ public class LlmApiServlet extends BaseServlet {
         return medusaRequest;
     }
 
-    private void streamOutPrint(PromptInput promptInput, Observable<ChatCompletionResult> observable, GetRagContext context, List<IndexSearchData> indexSearchDataList, PrintWriter out, String apiKey) {
+    private void streamOutPrint(PromptInput promptInput, Observable<ChatCompletionResult> observable, GetRagContext context, List<IndexSearchData> indexSearchDataList, PrintWriter out, String apiKey, ChatCompletionRequest chatCompletionRequest) {
         final ChatCompletionResult[] lastResult = {null};
         String key = UUID.randomUUID().toString();
         observable.subscribe(
@@ -485,7 +484,7 @@ public class LlmApiServlet extends BaseServlet {
                         return;
                     }
                     extracted(lastResult,indexSearchDataList,context, out);
-                    enqueueUsageRecord(apiKey, lastResult[0]);
+                    enqueueUsageRecord(apiKey, chatCompletionRequest, lastResult[0]);
                     out.flush();
                     out.close();
                     if (medusaMonitor != null && promptInput != null && lastResult[0] != null) {
@@ -496,11 +495,25 @@ public class LlmApiServlet extends BaseServlet {
         );
     }
 
-    private void enqueueUsageRecord(String apiKey, ChatCompletionResult result) {
+    private void enqueueUsageRecord(String apiKey, ChatCompletionRequest request, ChatCompletionResult result) {
         if (!Boolean.TRUE.equals(tokenCharge) || result == null || result.getUsage() == null) {
             return;
         }
-        tokenUsageService.recordUsage(apiKey, result);
+        String modelName = resolveModelNameForUsage(request, result);
+        if (StrUtil.isBlank(modelName)) {
+            return;
+        }
+        tokenUsageService.recordUsage(apiKey, modelName, result.getUsage());
+    }
+
+    private String resolveModelNameForUsage(ChatCompletionRequest request, ChatCompletionResult result) {
+        if (result != null && StrUtil.isNotBlank(result.getModel())) {
+            return result.getModel().trim();
+        }
+        if (request != null && StrUtil.isNotBlank(request.getModel())) {
+            return request.getModel().trim();
+        }
+        return null;
     }
 
     private void outputChunk(PrintWriter out, String msg) {

@@ -1,14 +1,11 @@
 package ai.migrate.service;
 
 import ai.openai.pojo.Usage;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class TokenUsageQueue {
-    private static final Logger logger = LoggerFactory.getLogger(TokenUsageQueue.class);
     private static final TokenUsageQueue INSTANCE = new TokenUsageQueue();
     private final BlockingQueue<TokenUsageRecord> queue = new LinkedBlockingQueue<TokenUsageRecord>();
 
@@ -19,12 +16,15 @@ public class TokenUsageQueue {
         return INSTANCE;
     }
 
-    public boolean enqueue(String apiKey, Usage usage) {
+    public boolean enqueue(String apiKey, String modelName, Usage usage) {
         if (usage == null) {
             return false;
         }
+        if (modelName == null || modelName.trim().isEmpty()) {
+            return false;
+        }
         // offer is non-blocking; it returns immediately.
-        return queue.offer(new TokenUsageRecord(apiKey, usage));
+        return queue.offer(new TokenUsageRecord(apiKey, modelName.trim(), usage));
     }
 
     public TokenUsageRecord poll() {
@@ -35,28 +35,23 @@ public class TokenUsageQueue {
         return queue.take();
     }
 
-    private String maskApiKey(String apiKey) {
-        if (apiKey == null || apiKey.trim().isEmpty()) {
-            return "-";
-        }
-        String value = apiKey.trim();
-        if (value.length() <= 8) {
-            return value;
-        }
-        return value.substring(0, 4) + "..." + value.substring(value.length() - 4);
-    }
-
     public static class TokenUsageRecord {
         private final String apiKey;
+        private final String modelName;
         private final Usage usage;
 
-        public TokenUsageRecord(String apiKey, Usage usage) {
+        public TokenUsageRecord(String apiKey, String modelName, Usage usage) {
             this.apiKey = apiKey;
+            this.modelName = modelName;
             this.usage = usage;
         }
 
         public String getApiKey() {
             return apiKey;
+        }
+
+        public String getModelName() {
+            return modelName;
         }
 
         public Usage getUsage() {

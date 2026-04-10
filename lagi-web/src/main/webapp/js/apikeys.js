@@ -44,7 +44,7 @@
 
     function renderApiKeysRows(rows) {
         if (!rows || !rows.length) {
-            return `<tr><td colspan="5" style="padding:24px;text-align:center;color:#9ca3af;">暂无数据</td></tr>`;
+            return `<tr><td colspan="5" style="padding:24px;text-align:center;color:#9ca3af;">${tTextOpenRouter("暂无数据")}</td></tr>`;
         }
         return rows.map(function(row) {
             return `
@@ -54,8 +54,8 @@
                     <td style="${openRouterTdStyle()}">${maskApiKey(row.api_key)}</td>
                     <td style="${openRouterTdStyle()}">${row.api_address || "—"}</td>
                     <td style="${openRouterTdStyle()}">
-                        ${row.provider === LANDING ? "" : `<a href="javascript:void(0)" class="api-key-edit-link" data-name="${row.name}" style="margin-right:12px;color:#6366f1;">编辑</a>`}
-                        <a href="javascript:void(0)" class="api-key-delete-link" data-name="${row.name}" style="color:#ef4444;">删除</a>
+                        ${row.provider === LANDING ? "" : `<a href="javascript:void(0)" class="api-key-edit-link" data-name="${row.name}" style="margin-right:12px;color:#6366f1;">${tTextOpenRouter("编辑")}</a>`}
+                        <a href="javascript:void(0)" class="api-key-delete-link" data-name="${row.name}" style="color:#ef4444;">${tTextOpenRouter("删除")}</a>
                     </td>
                 </tr>
             `;
@@ -336,15 +336,14 @@
                 <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
                     <div>
                         <h2 style="margin:0;font-size:28px;font-weight:700;">API 密钥</h2>
-                        <div style="margin-top:6px;color:#6b7280;font-size:13px;">管理 lagi.yml 中模型的 API Key</div>
+                        <div style="margin-top:6px;color:#6b7280;font-size:13px;">管理模型的 API Key</div>
                     </div>
                     <button type="button" id="apiKeysCreateBtn" style="padding:10px 18px;border:none;border-radius:8px;background:#6366f1;color:#fff;font-size:14px;cursor:pointer;">新增配置</button>
                 </div>
-                <div style="color:#6b7280;font-size:13px;margin-bottom:12px;">字段来源：name / provider / api_key / api_address</div>
                 <div style="border:1px solid #e5e7eb;border-radius:10px;background:#fff;overflow:hidden;">
                     <div style="overflow-x:auto;">
                         <table style="width:100%;border-collapse:collapse;font-size:13px;">
-                            <thead><tr style="background:#fff;"><th style="${openRouterThStyle()}">name</th><th style="${openRouterThStyle()}">provider</th><th style="${openRouterThStyle()}">api_key</th><th style="${openRouterThStyle()}">api_address</th><th style="${openRouterThStyle()}">操作</th></tr></thead>
+                            <thead><tr style="background:#fff;"><th style="${openRouterThStyle()}">名称</th><th style="${openRouterThStyle()}">提供商</th><th style="${openRouterThStyle()}">API 密钥</th><th style="${openRouterThStyle()}">API 地址</th><th style="${openRouterThStyle()}">操作</th></tr></thead>
                             <tbody id="apiKeysTbody">${renderApiKeysRows(st.rows)}</tbody>
                         </table>
                     </div>

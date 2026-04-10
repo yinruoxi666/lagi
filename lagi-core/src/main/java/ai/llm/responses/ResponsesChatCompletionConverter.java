@@ -77,13 +77,15 @@ public final class ResponsesChatCompletionConverter {
             }
         }
         List<Tool> tools = request.getTools();
-        for (Tool tool : tools) {
-            if (tool.getFunction() != null && tool.getFunction().getParameters() != null) {
-                Set<String> rs = new HashSet<>(tool.getFunction().getParameters().getRequired());
-                Set<String> ps = tool.getFunction().getParameters().getProperties().keySet();
-                boolean b = rs.containsAll(ps);
-                if(!b) {
-                    tool.getFunction().setStrict(false);
+        if (tools != null) {
+            for (Tool tool : tools) {
+                if (tool.getFunction() != null && tool.getFunction().getParameters() != null) {
+                    Set<String> rs = new HashSet<>(tool.getFunction().getParameters().getRequired());
+                    Set<String> ps = tool.getFunction().getParameters().getProperties().keySet();
+                    boolean b = rs.containsAll(ps);
+                    if(!b) {
+                        tool.getFunction().setStrict(false);
+                    }
                 }
             }
         }

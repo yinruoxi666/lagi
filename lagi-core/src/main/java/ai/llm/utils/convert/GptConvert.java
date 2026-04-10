@@ -53,21 +53,15 @@ public class GptConvert {
     }
 
     public static ChatCompletionResult convertSteamLine2ChatCompletionResult(String body) {
-        // 打印日志：
-//        log.info("Received stream line: {}", body);
         if (body.equals("[DONE]")) {
             return null;
         }
         ChatCompletionResult result = gson.fromJson(body, ChatCompletionResult.class);
-        if(result.getChoices().isEmpty()) {
-            ChatCompletionChoice choice = new ChatCompletionChoice();
-            ChatMessage message = ChatMessage.builder().role(LagiGlobal.LLM_ROLE_USER).content("").build();
-            choice.setMessage(message);
-            result.getChoices().add( choice);
+        if (result.getChoices() == null || result.getChoices().isEmpty()) {
+            return result;
         }
         result.getChoices().forEach(choice -> {
             choice.setMessage(choice.getDelta());
-//            choice.setDelta(null);
         });
         return result;
     }

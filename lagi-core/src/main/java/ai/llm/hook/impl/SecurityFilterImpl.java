@@ -45,16 +45,20 @@ public class SecurityFilterImpl implements BeforeModel, AfterModel {
     public Observable<ChatCompletionResult> stream(ModelContext context) {
         Observable<ChatCompletionResult> source = context.getStreamResult();
         Observable<ChatCompletionResult> processedSource = source.filter(result -> true);
-        return Observable.create(emitter -> {
-            Queue<ChatCompletionResult> cacheQueue = new ArrayBlockingQueue<>(queueCapacity);
-            List<String> contents = new Vector<>(queueCapacity);
-            AtomicBoolean streamSensitiveRecorded = new AtomicBoolean(false);
-            processedSource.subscribe(
-                    chunk -> {
-                        try {
-                            if (chunk.getChoices() == null || chunk.getChoices().isEmpty()) {
-                                return;
+    return Observable.create(emitter -> {
+        Queue<ChatCompletionResult> cacheQueue = new ArrayBlockingQueue<>(queueCapacity);
+        List<String> contents = new Vector<>(queueCapacity);
+        AtomicBoolean streamSensitiveRecorded = new AtomicBoolean(false);
+        final ChatCompletionResult[] pendingUsageChunk = {null};
+        processedSource.subscribe(
+                chunk -> {
+                    try {
+                        if (chunk.getChoices() == null || chunk.getChoices().isEmpty()) {
+                            if (chunk.getUsage() != null) {
+                                pendingUsageChunk[0] = chunk;
                             }
+                            return;
+                        }
                             String content = chunk.getChoices().get(0).getMessage().getContent();
                             contents.add(content);
                             String totalContent = String.join("", contents);
@@ -93,20 +97,22 @@ public class SecurityFilterImpl implements BeforeModel, AfterModel {
                     },
                     emitter::onError,
                     () -> {
-                        while (!cacheQueue.isEmpty()) {
-                            ChatCompletionResult remaining = cacheQueue.poll();
-                            if (remaining != null) {
-                                if (remaining.getChoices() == null || remaining.getChoices().isEmpty()) {
-                                    continue;
-                                }
-                                if(remaining.getChoices().get(0).getDelta() == null) {
-                                    remaining.getChoices().get(0).setDelta(remaining.getChoices().get(0).getMessage());
-                                }
-                                emitter.onNext(remaining);
-//                                System.out.println("send: " + remaining.getChoices().get(0).getMessage().getContent());
+                    while (!cacheQueue.isEmpty()) {
+                        ChatCompletionResult remaining = cacheQueue.poll();
+                        if (remaining != null) {
+                            if (remaining.getChoices() == null || remaining.getChoices().isEmpty()) {
+                                continue;
                             }
+                            if(remaining.getChoices().get(0).getDelta() == null) {
+                                remaining.getChoices().get(0).setDelta(remaining.getChoices().get(0).getMessage());
+                            }
+                            emitter.onNext(remaining);
                         }
-                        emitter.onComplete();
+                    }
+                    if (pendingUsageChunk[0] != null) {
+                        emitter.onNext(pendingUsageChunk[0]);
+                    }
+                    emitter.onComplete();
                     }
             );
 

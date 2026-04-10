@@ -81,7 +81,7 @@ public class OpenClawSkillInject implements BeforeModel, AfterModel {
     public ChatCompletionRequest beforeModel(ModelContext context) {
         ChatCompletionRequest request = context.getRequest();
         // only support COMPLETION
-        ((ModelService) context.getAdapter()).setProtocol(ResponseProtocolConstants.COMPLETION);
+//        ((ModelService) context.getAdapter()).setProtocol(ResponseProtocolConstants.COMPLETION);
         context.setOriginalMessages(request.getMessages());
         if (request.getMessages() == null || request.getMessages().isEmpty()) {
             return request;
@@ -273,11 +273,13 @@ public class OpenClawSkillInject implements BeforeModel, AfterModel {
                             return;
                         }
                         try {
-                            if (chunk == null || chunk.getChoices() == null) {
+                            if (chunk == null) {
                                 return;
                             }
-                            if(chunk.getChoices().isEmpty() && chunk.getUsage() != null) {
-                                emitter.onNext(chunk);
+                            if (chunk.getChoices() == null || chunk.getChoices().isEmpty()) {
+                                if (chunk.getUsage() != null) {
+                                    emitter.onNext(chunk);
+                                }
                                 return;
                             }
                             List<ToolCall> toolCalls = getDeltaToolCalls(chunk);

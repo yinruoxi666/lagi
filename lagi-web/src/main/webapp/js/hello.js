@@ -784,8 +784,40 @@ function formatRankCount(value) {
     return `${n}`;
 }
 
+/** Max characters for rank name in ball corners; overflow shown as "..." (full name in title tooltip). */
+const RANK_NAME_DISPLAY_MAX_LENGTH = 8;
+
+function escapeHtmlAttr(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+function escapeHtmlText(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+function truncateRankDisplayName(str, maxLen) {
+    if (str == null || str === '') {
+        return '';
+    }
+    const s = String(str);
+    if (s.length <= maxLen) {
+        return s;
+    }
+    return s.slice(0, maxLen) + '...';
+}
+
 function gentRankLi(el) {
-    return `<li class="ball-describe-item"> <span>${el.icon}</span> <span class="scroll-text"> ${el.name} </span> <a class="hot-tag">(${el.count})</a></li>`;
+    const rawName = el.name;
+    const displayName = truncateRankDisplayName(rawName, RANK_NAME_DISPLAY_MAX_LENGTH);
+    const titleAttr = rawName !== displayName ? ` title="${escapeHtmlAttr(rawName)}"` : '';
+    return `<li class="ball-describe-item"> <span>${el.icon}</span> <span class="scroll-text"${titleAttr}> ${escapeHtmlText(displayName)} </span> <a class="hot-tag">(${el.count})</a></li>`;
     //return `<li class="ball-describe-item"><span class="rank-icon">${el.icon}</span><span class="scroll-text">${el.name}</span><a class="hot-tag">(${formatRankCount(el.count)})</a></li>`;
 }
 
@@ -838,13 +870,14 @@ const defaultLeftRank = [
     {name:tTextFn('星火'), count: 50, icon: defaultModelIcon}
 ];
 
+// Matches skills.items order in lagi.yml (homepage right-corner rank; display count is fixed, not live stats).
 const defaultRightRank = [
-    {name:tTextFn('天气助手'), count: 90, icon: defaultAgentIcon},
-    {name:tTextFn('油价助手'), count: 72, icon: defaultAgentIcon},
-    {name:tTextFn('高铁助手'), count: 11, icon: defaultAgentIcon},
-    {name:tTextFn('翻译助手'), count: 11, icon: defaultAgentIcon},
-    {name:tTextFn('历史今日'), count: 9, icon: defaultAgentIcon}
-]
+    {name: 'extract_content_with_image', count: 12, icon: defaultAgentIcon},
+    {name: 'pdf', count: 8, icon: defaultAgentIcon},
+    {name: 'cn-web-search-2.2.0', count: 5, icon: defaultAgentIcon},
+    {name: 'pptx', count: 3, icon: defaultAgentIcon},
+    {name: 'skill-finder-1.1.5', count: 1, icon: defaultAgentIcon}
+];
 
 function loadLeftRank() {
     freshLeftRankDom(defaultLeftRank);

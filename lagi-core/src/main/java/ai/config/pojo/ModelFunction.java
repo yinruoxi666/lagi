@@ -26,8 +26,6 @@ public class ModelFunction extends Backend {
     private Integer maxGen;
     @JsonProperty("context_length")
     private Integer contextLength;
-    @JsonProperty("auth_api_key")
-    private Boolean authApiKey;
     @JsonProperty("token_charge")
     private Boolean tokenCharge;
 
@@ -38,7 +36,6 @@ public class ModelFunction extends Backend {
             @JsonProperty("grace_time") Integer graceTime,
             @JsonProperty("maxgen") Integer maxGen,
             @JsonProperty("context_length") Integer contextLength,
-            @JsonProperty("auth_api_key") Boolean authApiKey,
             @JsonProperty("token_charge") Boolean tokenCharge
     ) {
         this.enableQueueHandle = enableQueueHandle != null && enableQueueHandle;
@@ -46,7 +43,6 @@ public class ModelFunction extends Backend {
         this.graceTime = graceTime == null ? 3600 : graceTime;
         this.maxGen = maxGen == null ? Integer.MAX_VALUE : maxGen ;
         this.contextLength = contextLength == null ? 4096 : contextLength;
-        this.authApiKey = authApiKey == null ? false : authApiKey;
         this.tokenCharge = tokenCharge == null ? false : tokenCharge;
     }
 }
