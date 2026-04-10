@@ -10,6 +10,7 @@ import java.util.Map;
 @ToString
 @NoArgsConstructor
 @Builder
+@Data
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class SkillEntry {
     private String key;
@@ -22,8 +23,6 @@ public final class SkillEntry {
     private SkillExposure exposure;
     private OpenClawSkillMetadata metadata;
     private String source;
-    @Setter
-    @Getter
     private String rule;
 
     public SkillEntry(String key,
@@ -56,7 +55,7 @@ public final class SkillEntry {
         this.exposure = exposure;
         this.metadata = metadata;
         this.source = source;
-        this.rule = rule == null ? "cli" : rule;
+        this.rule = rule == null ? "server" : rule;
     }
 
     public String getKey() {
