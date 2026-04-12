@@ -59,7 +59,7 @@ public class SecurityFilterImpl implements BeforeModel, AfterModel {
                             }
                             return;
                         }
-                            String content = chunk.getChoices().get(0).getMessage().getContent();
+                            String content = chunk.getChoices().get(0).getDelta().getContent();
                             contents.add(content);
                             String totalContent = String.join("", contents);
                             String nullOrReplaceContent = SensitiveWordUtil.getNullOrReplaceContent(totalContent);
@@ -71,14 +71,14 @@ public class SecurityFilterImpl implements BeforeModel, AfterModel {
                                 for (int i = 0; i < size; i++) {
                                     ChatCompletionResult temp = cacheQueue.poll();
                                     if (temp != null && i != 0) {
-                                        temp.getChoices().get(0).getMessage().setContent(nullOrReplaceContent);
+                                        temp.getChoices().get(0).getDelta().setContent(nullOrReplaceContent);
                                     }
                                     cacheQueue.offer(temp);
                                 }
                                 for (int i = contents.size() - size; i < contents.size(); i++) {
                                     contents.set(i, nullOrReplaceContent);
                                 }
-                                chunk.getChoices().get(0).getMessage().setContent(nullOrReplaceContent);
+                                chunk.getChoices().get(0).getDelta().setContent(nullOrReplaceContent);
                             }
                             if(cacheQueue.size() < queueCapacity) {
                                 cacheQueue.offer(chunk);
@@ -86,10 +86,10 @@ public class SecurityFilterImpl implements BeforeModel, AfterModel {
                                 ChatCompletionResult toEmit = cacheQueue.poll();
                                 cacheQueue.offer(chunk);
                                 if(toEmit.getChoices().get(0).getDelta() == null) {
-                                    toEmit.getChoices().get(0).setDelta(toEmit.getChoices().get(0).getMessage());
+                                    toEmit.getChoices().get(0).setDelta(toEmit.getChoices().get(0).getDelta());
                                 }
                                 emitter.onNext(toEmit);
-//                                System.out.println("send: " + toEmit.getChoices().get(0).getMessage().getContent());
+//                                System.out.println("send: " + toEmit.getChoices().get(0).getDelta().getContent());
                             }
                         } catch (Exception e) {
                             emitter.onError(e);
@@ -104,7 +104,7 @@ public class SecurityFilterImpl implements BeforeModel, AfterModel {
                                 continue;
                             }
                             if(remaining.getChoices().get(0).getDelta() == null) {
-                                remaining.getChoices().get(0).setDelta(remaining.getChoices().get(0).getMessage());
+                                remaining.getChoices().get(0).setDelta(remaining.getChoices().get(0).getDelta());
                             }
                             emitter.onNext(remaining);
                         }
