@@ -60,9 +60,9 @@ public class GptConvert {
         if (result.getChoices() == null || result.getChoices().isEmpty()) {
             return result;
         }
-        result.getChoices().forEach(choice -> {
-            choice.setMessage(choice.getDelta());
-        });
+//        result.getChoices().forEach(choice -> {
+//            choice.setMessage(choice.getDelta());
+//        });
         return result;
     }
 }

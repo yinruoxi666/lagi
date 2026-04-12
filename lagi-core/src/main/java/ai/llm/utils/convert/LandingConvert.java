@@ -35,9 +35,9 @@ public class LandingConvert {
             return null;
         }
         ChatCompletionResult result = gson.fromJson(body, ChatCompletionResult.class);
-        result.getChoices().forEach(choice -> {
-            choice.setMessage(choice.getMessage());
-        });
+//        result.getChoices().forEach(choice -> {
+//            choice.setMessage(choice.getMessage());
+//        });
         return result;
     }
 }

@@ -83,7 +83,7 @@ public class GeminiConvert {
             ChatMessage chatMessage = new ChatMessage();
             chatMessage.setContent(candidate.getContent().getParts().get(0).getText());
             chatMessage.setRole(LagiGlobal.LLM_ROLE_ASSISTANT);
-            choice.setMessage(chatMessage);
+            choice.setDelta(chatMessage);
             choice.setFinish_reason("stop");
             choices.add(choice);
         }

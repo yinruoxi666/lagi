@@ -219,7 +219,7 @@ public final class ResponsesChatCompletionConverter {
 
         ChatCompletionChoice choice = new ChatCompletionChoice();
         choice.setIndex(0);
-        choice.setMessage(message);
+//        choice.setMessage(message);
         choice.setDelta(message);
         choice.setFinish_reason("stop");
         result.setChoices(Collections.singletonList(choice));

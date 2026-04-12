@@ -132,7 +132,7 @@ public class QwenConvert {
         ChatMessage chatMessage = new ChatMessage();
         chatMessage.setContent(response.getOutput().getChoices().get(0).getMessage().getContent());
         chatMessage.setRole("assistant");
-        choice.setMessage(chatMessage);
+        choice.setDelta(chatMessage);
         choice.setFinish_reason(response.getOutput().getFinishReason());
         List<ChatCompletionChoice> choices = new ArrayList<>();
         choices.add(choice);

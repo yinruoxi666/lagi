@@ -56,10 +56,10 @@ public class SparkConvert {
             return null;
         }
         ChatCompletionResult result = gson.fromJson(data, ChatCompletionResult.class);
-        result.getChoices().forEach(choice -> {
-            choice.setMessage(choice.getDelta());
-            choice.setDelta(null);
-        });
+//        result.getChoices().forEach(choice -> {
+//            choice.setMessage(choice.getDelta());
+//            choice.setDelta(null);
+//        });
         return result;
     }
 }

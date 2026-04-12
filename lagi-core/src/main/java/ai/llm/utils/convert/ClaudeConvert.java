@@ -76,12 +76,12 @@ public class ClaudeConvert {
             ChatMessage chatMessage = new ChatMessage();
             chatMessage.setContent(response.getDelta().getText());
             chatMessage.setRole(LagiGlobal.LLM_ROLE_ASSISTANT);
-            choice.setMessage(chatMessage);
+            choice.setDelta(chatMessage);
         } else {
             ChatMessage chatMessage = new ChatMessage();
             chatMessage.setContent("");
             chatMessage.setRole(LagiGlobal.LLM_ROLE_ASSISTANT);
-            choice.setMessage(chatMessage);
+            choice.setDelta(chatMessage);
             if ("message_delta".equals(response.getType())) {
                 choice.setFinish_reason(response.getDelta().getStop_reason());
                 Usage usage = new Usage();
