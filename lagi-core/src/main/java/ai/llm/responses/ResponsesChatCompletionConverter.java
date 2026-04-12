@@ -94,7 +94,7 @@ public final class ResponsesChatCompletionConverter {
     public static ChatCompletionResult convertResponse(String body) {
         try {
             JsonNode root = MAPPER.readTree(body);
-            return convertResponse(root);
+            return convertResponse(root, false);
         } catch (Exception e) {
             throw new RuntimeException("Failed to convert responses payload", e);
         }
@@ -118,7 +118,7 @@ public final class ResponsesChatCompletionConverter {
             }
             if ("response.completed".equals(type) || "response.incomplete".equals(type)) {
                 JsonNode response = root.path("response");
-                ChatCompletionResult result = convertResponse(response);
+                ChatCompletionResult result = convertResponse(response, true);
                 if (result.getChoices() != null && !result.getChoices().isEmpty()) {
                     result.getChoices().get(0).setFinish_reason("response.incomplete".equals(type) ? "length" : "stop");
                     if (result.getChoices().get(0).getMessage() != null) {
@@ -198,7 +198,7 @@ public final class ResponsesChatCompletionConverter {
         result.setChoices(Collections.singletonList(choice));
         return result;
     }
-    private static ChatCompletionResult convertResponse(JsonNode root) {
+    private static ChatCompletionResult convertResponse(JsonNode root, boolean stream) {
         ChatCompletionResult result = new ChatCompletionResult();
         result.setId(root.path("id").asText(null));
         result.setModel(root.path("model").asText(null));
@@ -219,8 +219,11 @@ public final class ResponsesChatCompletionConverter {
 
         ChatCompletionChoice choice = new ChatCompletionChoice();
         choice.setIndex(0);
-//        choice.setMessage(message);
-        choice.setDelta(message);
+        if (stream) {
+            choice.setDelta(message);
+        } else {
+            choice.setMessage(message);
+        }
         choice.setFinish_reason("stop");
         result.setChoices(Collections.singletonList(choice));
         result.setUsage(toUsage(root.path("usage")));
