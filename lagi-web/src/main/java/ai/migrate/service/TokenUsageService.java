@@ -1,5 +1,6 @@
 package ai.migrate.service;
 
+import ai.common.utils.LRUCache;
 import ai.openai.pojo.ChatCompletionResult;
 import ai.openai.pojo.Usage;
 import ai.utils.AiGlobal;
@@ -20,22 +21,19 @@ import java.util.concurrent.TimeUnit;
 public class TokenUsageService {
     private static final Gson gson = new Gson();
     private static final TokenUsageService INSTANCE = new TokenUsageService();
-    /** JAX-RS {@code @POST @Path("/calculateUsage")} under SAAS base. */
     private static final String CALCULATE_USAGE_URL = AiGlobal.SAAS_URL + "/saas/api/apikey/calculateUsage";
     private static final long RETRY_INTERVAL_MILLIS = 3000L;
     private static final int CONSUMER_THREADS = 3;
     private final TokenUsageQueue tokenUsageQueue = TokenUsageQueue.getInstance();
-    private final ExecutorService reportExecutor = Executors.newFixedThreadPool(CONSUMER_THREADS, new ThreadFactory() {
-        @Override
-        public Thread newThread(Runnable r) {
-            Thread thread = new Thread(r, "token-usage-report");
-            thread.setDaemon(true);
-            return thread;
-        }
-    });
+    private final LRUCache<String, Boolean> usageCache = new LRUCache<>(1000, 600, TimeUnit.SECONDS);
 
     private TokenUsageService() {
         for (int i = 0; i < CONSUMER_THREADS; i++) {
+            ExecutorService reportExecutor = Executors.newFixedThreadPool(CONSUMER_THREADS, r -> {
+                Thread thread = new Thread(r, "token-usage-report");
+                thread.setDaemon(true);
+                return thread;
+            });
             reportExecutor.submit(this::reportUsageToSaasAsync);
         }
     }
@@ -44,7 +42,10 @@ public class TokenUsageService {
         return INSTANCE;
     }
 
-    public void recordUsage(String apiKey, String modelName, Usage usage) {
+    public void recordUsage(String id, String apiKey, String modelName, Usage usage) {
+        if (usageCache.get(id) != null) {
+            return;
+        }
         if (isBlank(apiKey) || isBlank(modelName) || usage == null) {
             return;
         }
@@ -52,17 +53,7 @@ public class TokenUsageService {
         if (!offered) {
             log.warn("Token usage enqueue skipped");
         }
-    }
-
-    public void recordUsage(String apiKey, ChatCompletionResult result) {
-        if (result == null || result.getUsage() == null) {
-            return;
-        }
-        String modelName = result.getModel() == null ? null : result.getModel().trim();
-        if (isBlank(modelName)) {
-            return;
-        }
-        recordUsage(apiKey, modelName, result.getUsage());
+        usageCache.put(id, true);
     }
 
     public void reportUsageToSaasAsync() {

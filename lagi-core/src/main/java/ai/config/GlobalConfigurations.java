@@ -32,6 +32,7 @@ public class GlobalConfigurations extends AbstractConfiguration {
     private Logger logger = LoggerFactory.getLogger(GlobalConfigurations.class);
 
     private String systemTitle;
+    private GeneralConfig general;
     private List<Backend> models;
     private StoreConfig stores;
     private ModelFunctions functions;

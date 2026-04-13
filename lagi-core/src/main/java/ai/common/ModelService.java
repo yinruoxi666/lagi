@@ -5,9 +5,9 @@ import ai.llm.pojo.EnhanceChatCompletionRequest;
 import ai.llm.responses.ResponseProtocolConstants;
 import ai.openai.pojo.ChatCompletionRequest;
 import lombok.Data;
-@Data
-public class ModelService implements ModelVerify{
 
+@Data
+public class ModelService implements ModelVerify {
     protected String appId;
     protected String backend;
     protected String apiKey;
@@ -31,12 +31,10 @@ public class ModelService implements ModelVerify{
     protected Integer concurrency;
     protected String protocol = ResponseProtocolConstants.COMPLETION;
     protected Boolean function;
+
     @Override
     public boolean verify() {
-        if(getApiKey() == null || getApiKey().startsWith("you")) {
-            return false;
-        }
-        return true;
+        return getApiKey() != null && !getApiKey().startsWith("you");
     }
 
     protected void setDefaultField(ChatCompletionRequest request) {
@@ -48,6 +46,7 @@ public class ModelService implements ModelVerify{
             ((EnhanceChatCompletionRequest) request).setBrowserIp(null);
         }
         request.setCategory(null);
+        request.setApiKey(null);
         if (function != null && !function) {
             request.setTools(null);
             request.setTool_choice(null);

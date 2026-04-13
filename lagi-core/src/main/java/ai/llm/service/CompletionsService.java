@@ -79,7 +79,10 @@ public class CompletionsService implements ChatCompletion {
         RRException r = new RRException(LLMErrorConstants.OTHER_ERROR, "{\"error\":\"backend is not enabled.\"}");
         if (chatCompletionRequest.getModel() != null) {
             ILlmAdapter appointAdapter = llmAdapterAIManager.getAdapter(chatCompletionRequest.getModel());
-            if (appointAdapter != null && notFreezingAdapter(appointAdapter)) {
+            if (appointAdapter == null) {
+                throw new RRException(LLMErrorConstants.NO_AVAILABLE_MODEL, "{\"error\":\"No available model.\"}");
+            }
+            if (notFreezingAdapter(appointAdapter)) {
                 try {
                     ChatCompletionResult result = appointAdapter.completions(chatCompletionRequest);
                     unfreezeAdapter(appointAdapter);
@@ -123,7 +126,10 @@ public class CompletionsService implements ChatCompletion {
         String failedModel = null;
         if (chatCompletionRequest.getModel() != null) {
             ILlmAdapter adapter = llmAdapterAIManager.getAdapter(chatCompletionRequest.getModel());
-            if (adapter != null && notFreezingAdapter(adapter)) {
+            if (adapter == null) {
+                throw new RRException(LLMErrorConstants.NO_AVAILABLE_MODEL, "{\"error\":\"No available model.\"}");
+            }
+            if (notFreezingAdapter(adapter)) {
                 try {
                     Observable<ChatCompletionResult> result = adapter.streamCompletions(chatCompletionRequest);
                     unfreezeAdapter(adapter);

@@ -1,8 +1,10 @@
 package ai.migrate.service;
 
 import ai.config.ContextLoader;
+import ai.config.pojo.GeneralConfig;
 import ai.dto.LagiModelInfo;
 import ai.dto.ModelApiKey;
+import ai.migrate.dao.ApiKeyDao;
 import ai.utils.AiGlobal;
 import ai.utils.OkHttpUtil;
 import com.google.gson.Gson;
@@ -22,10 +24,12 @@ import java.util.*;
 
 public class ApiKeyService {
     private static final String OPENAI_COMPATIBLE = "OpenAICompatible";
+    private static final String LANDING = "Landing";
     private String lagiYmlPath = null;
 
     private static final String SAAS_BASE_URL = AiGlobal.SAAS_URL;
     private final Gson gson = new Gson();
+    private final ApiKeyDao apiKeyDao = new ApiKeyDao();
 
     private String getLagiYmlPath() {
         if (lagiYmlPath == null) {
@@ -169,10 +173,45 @@ public class ApiKeyService {
         return p;
     }
 
-    public synchronized List<Map<String, String>> listApiKeys() throws IOException {
+    /**
+     * When true (default), API key UI manages local DB keys plus remote Landing keys.
+     * When false, only remote Landing keys are listed or mutated.
+     */
+    public boolean isLocalApiKeyEditable() {
+        try {
+            if (ContextLoader.configuration == null) {
+                return true;
+            }
+            GeneralConfig general = ContextLoader.configuration.getGeneral();
+            if (general == null) {
+                return true;
+            }
+            Boolean b = general.getLocalApiKeyEditable();
+            return b == null || Boolean.TRUE.equals(b);
+        } catch (Exception e) {
+            return true;
+        }
+    }
+
+    public List<ModelApiKey> listApiKeys(String userId) throws IOException {
+        List<ModelApiKey> all = new ArrayList<>();
+        if (!isBlank(userId)) {
+            all.addAll(getLandingApiKeys(userId));
+        }
+        if (isLocalApiKeyEditable()) {
+            try {
+                all.addAll(apiKeyDao.listAll());
+            } catch (Exception e) {
+                throw new IOException("list local api keys failed: " + e.getMessage(), e);
+            }
+        }
+        return all;
+    }
+
+    public synchronized List<ModelApiKey> getLocalApiKeys() throws IOException {
         Map<String, Object> root = loadRootYaml();
         List<Map<String, Object>> models = getModels(root);
-        List<Map<String, String>> result = new ArrayList<Map<String, String>>();
+        List<ModelApiKey> result = new ArrayList<ModelApiKey>();
         for (Map<String, Object> model : models) {
             Object nameObj = model.get("name");
             if (nameObj == null) {
@@ -189,11 +228,11 @@ public class ApiKeyService {
             if (!OPENAI_COMPATIBLE.equalsIgnoreCase(provider)) {
                 apiAddress = "";
             }
-            Map<String, String> row = new LinkedHashMap<String, String>();
-            row.put("name", nameObj.toString());
-            row.put("provider", provider);
-            row.put("api_key", apiKey);
-            row.put("api_address", apiAddress);
+            ModelApiKey row = new ModelApiKey();
+            row.setName(nameObj.toString());
+            row.setProvider(provider);
+            row.setApiKey(apiKey);
+            row.setApiAddress(apiAddress);
             result.add(row);
         }
         return result;
@@ -228,46 +267,33 @@ public class ApiKeyService {
         return result;
     }
 
-    public synchronized void saveApiKey(String modelName, String apiKey) throws IOException {
-        if (modelName == null || modelName.trim().isEmpty()) {
-            throw new IOException("modelName is required");
+    public synchronized void deleteApiKey(Long id, String provider, String userId) throws IOException {
+        if (id == null) {
+            throw new IOException("id is required");
         }
-        if (apiKey == null) {
-            throw new IOException("apiKey is required");
+        String p = normalizeProvider(provider);
+        if (LANDING.equalsIgnoreCase(p)) {
+            deleteLandingApiKey(id);
+            return;
         }
-        Map<String, Object> root = loadRootYaml();
-        Map<String, Object> model = findModelByName(getModels(root), modelName.trim());
-        if (model == null) {
-            throw new IOException("Model not found: " + modelName);
+        if (!isLocalApiKeyEditable()) {
+            throw new IOException("local api key management is disabled");
         }
-        model.put("api_key", apiKey);
-        writeRootYaml(root);
-    }
-
-    public synchronized void deleteApiKey(String modelName) throws IOException {
-        if (modelName == null || modelName.trim().isEmpty()) {
-            throw new IOException("modelName is required");
+        try {
+            ModelApiKey item = apiKeyDao.findById(id);
+            if (item != null && item.getStatus() != null && item.getStatus() == 1) {
+                resetProviderApiKeyInConfig(item.getProvider());
+            }
+            apiKeyDao.deleteById(id);
+        } catch (Exception e) {
+            throw new IOException("delete local api key failed: " + e.getMessage(), e);
         }
-        Map<String, Object> root = loadRootYaml();
-        List<Map<String, Object>> models = getModels(root);
-        Map<String, Object> model = findModelByName(models, modelName.trim());
-        if (model == null) {
-            throw new IOException("Model not found: " + modelName);
-        }
-        String provider = normalizeProvider(model.get("type") == null ? "" : model.get("type").toString());
-        String name = model.get("name") == null ? "" : model.get("name").toString().trim();
-
-        // For OpenAICompatible custom extensions, remove the model item directly.
-        if (OPENAI_COMPATIBLE.equalsIgnoreCase(provider) && !"custom".equalsIgnoreCase(name)) {
-            models.remove(model);
-            root.put("models", models);
-        } else {
-            model.remove("api_key");
-        }
-        writeRootYaml(root);
     }
 
     public synchronized List<String> listProviders() throws IOException {
+        if (!isLocalApiKeyEditable()) {
+            return Collections.singletonList(LANDING);
+        }
         Map<String, Object> root = loadRootYaml();
         List<Map<String, Object>> models = getModels(root);
         Set<String> providerSet = new HashSet<>();
@@ -290,64 +316,93 @@ public class ApiKeyService {
         if (isBlank(provider)) {
             throw new IOException("provider is required");
         }
+        if (isBlank(name)) {
+            throw new IOException("name is required");
+        }
         String normalizedProvider = normalizeProvider(provider);
-        if (isBlank(apiKey) && !"Landing".equalsIgnoreCase(normalizedProvider)) {
+        if (isBlank(apiKey) && !LANDING.equalsIgnoreCase(normalizedProvider)) {
             throw new IOException("apiKey is required");
         }
-        Map<String, Object> root = loadRootYaml();
-        List<Map<String, Object>> models = getModels(root);
+        String nameTrimmed = name.trim();
 
-        if (OPENAI_COMPATIBLE.equalsIgnoreCase(normalizedProvider)) {
-            if (isBlank(name)) {
-                throw new IOException("name is required for OpenAICompatible");
-            }
-            if (isBlank(modelValue)) {
-                throw new IOException("model is required for OpenAICompatible");
-            }
-            if (findModelByName(models, name.trim()) != null) {
-                throw new IOException("Model name already exists: " + name);
-            }
-            Map<String, Object> newModel = new LinkedHashMap<String, Object>();
-            newModel.put("name", name.trim());
-            newModel.put("type", OPENAI_COMPATIBLE);
-            newModel.put("enable", true);
-            newModel.put("model", modelValue.trim());
-            newModel.put("driver", "ai.llm.adapter.impl.OpenAIStandardAdapter");
-            if (!isBlank(apiAddress)) {
-                newModel.put("api_address", apiAddress.trim());
-            }
-            newModel.put("api_key", apiKey.trim());
-            models.add(newModel);
-            root.put("models", models);
-            writeRootYaml(root);
-            return;
-        }
-
-        Map<String, Object> target = findModelByProvider(models, normalizedProvider);
-        if (target == null) {
-            throw new IOException("Provider not found in models: " + normalizedProvider);
-        }
-
-        if ("Landing".equalsIgnoreCase(normalizedProvider)) {
+        if (LANDING.equalsIgnoreCase(normalizedProvider)) {
             ModelApiKey landingRequest = new ModelApiKey();
-            if (!isBlank(name)) {
-                landingRequest.setName(name.trim());
-            } else if (target.get("name") != null) {
-                landingRequest.setName(target.get("name").toString().trim());
-            }
-            if (!isBlank(apiKey)) {
-                landingRequest.setApiKey(apiKey.trim());
-            }
+            // Display label for SAAS; lagi.yml model "name" is never updated from this field.
+            landingRequest.setName(nameTrimmed);
+            landingRequest.setApiKey(isBlank(apiKey) ? null : apiKey.trim());
+            landingRequest.setStatus(1);
             if (!isBlank(userId)) {
                 landingRequest.setUserId(userId.trim());
             }
-            ModelApiKey landingResponse = addLandingApiKey(landingRequest);
-            target.put("api_key", landingResponse.getApiKey());
-            target.put("model", getLandingModels());
-            writeRootYaml(root);
-        } else {
-            target.put("api_key", apiKey.trim());
-            writeRootYaml(root);
+            addLandingApiKey(landingRequest);
+            return;
+        }
+        if (!isLocalApiKeyEditable()) {
+            throw new IOException("local api key management is disabled");
+        }
+
+        ModelApiKey local = new ModelApiKey();
+        // Stored in api_key_store only; applyProviderApiKeyToConfig does not write this to lagi.yml.
+        local.setName(nameTrimmed);
+        local.setProvider(normalizedProvider);
+        local.setApiKey(apiKey.trim());
+        local.setApiAddress(isBlank(apiAddress) ? "" : apiAddress.trim());
+        local.setStatus(0);
+        try {
+            apiKeyDao.insert(local);
+        } catch (Exception e) {
+            throw new IOException("add local api key failed: " + e.getMessage(), e);
+        }
+    }
+
+    public synchronized void toggleApiKey(Long id, String provider, boolean enabled, String userId) throws IOException {
+        if (id == null) {
+            throw new IOException("id is required");
+        }
+        String p = normalizeProvider(provider);
+        if (LANDING.equalsIgnoreCase(p)) {
+            if (isBlank(userId)) {
+                throw new IOException("userId is required for Landing");
+            }
+            List<ModelApiKey> list = getLandingApiKeys(userId);
+            ModelApiKey target = null;
+            for (ModelApiKey item : list) {
+                if (item.getId() != null && item.getId().equals(id)) {
+                    target = item;
+                    break;
+                }
+            }
+            if (target == null) {
+                throw new IOException("Landing api key not found");
+            }
+            if (enabled) {
+                applyProviderApiKeyToConfig(LANDING, target.getApiKey());
+            } else {
+                resetProviderApiKeyInConfig(LANDING);
+            }
+            return;
+        }
+        if (!isLocalApiKeyEditable()) {
+            throw new IOException("local api key management is disabled");
+        }
+
+        try {
+            ModelApiKey target = apiKeyDao.findById(id);
+            if (target == null) {
+                throw new IOException("Local api key not found");
+            }
+            if (enabled) {
+                apiKeyDao.disableProviderKeys(target.getProvider());
+                apiKeyDao.setStatusById(id, 1);
+                applyProviderApiKeyToConfig(target.getProvider(), target.getApiKey());
+            } else {
+                apiKeyDao.setStatusById(id, 0);
+                resetProviderApiKeyInConfig(target.getProvider());
+            }
+        } catch (IOException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IOException("toggle local api key failed: " + e.getMessage(), e);
         }
     }
 
@@ -355,11 +410,58 @@ public class ApiKeyService {
         if (requestBody == null) {
             throw new IOException("request body is required");
         }
-        String url = SAAS_BASE_URL + "/saas/api/apikey/addOrUpdateApiKey";
+        String url = SAAS_BASE_URL + "/saas/api/apikey/addApiKey";
         String requestJson = gson.toJson(requestBody);
         String resultJson = OkHttpUtil.post(url, requestJson);
         ModelApiKey response = gson.fromJson(resultJson, ModelApiKey.class);
         return response;
+    }
+
+    /**
+     * Deletes a Landing API key on SAAS (POST /saas/api/apikey/deleteModelApiKey, body: {"id":...}).
+     */
+    public void deleteLandingApiKey(Long id) throws IOException {
+        if (id == null) {
+            throw new IOException("id is required");
+        }
+        String url = SAAS_BASE_URL + "/saas/api/apikey/deleteModelApiKey";
+        Map<String, Long> payload = new LinkedHashMap<String, Long>();
+        payload.put("id", id);
+        String requestJson = gson.toJson(payload);
+        OkHttpUtil.post(url, requestJson);
+    }
+
+    /**
+     * Writes only api_key (and Landing model list) into lagi.yml. Never updates the model entry's
+     * {@code name} field — user-provided key labels stay in DB / SAAS only.
+     */
+    private void applyProviderApiKeyToConfig(String provider, String apiKey) throws IOException {
+        if (isBlank(provider) || isBlank(apiKey)) {
+            throw new IOException("provider/apiKey is required");
+        }
+        Map<String, Object> root = loadRootYaml();
+        Map<String, Object> model = findModelByProvider(getModels(root), provider);
+        if (model == null) {
+            throw new IOException("Provider not found in models: " + provider);
+        }
+        model.put("api_key", apiKey.trim());
+        if (LANDING.equalsIgnoreCase(provider)) {
+            model.put("model", getLandingModels());
+        }
+        writeRootYaml(root);
+    }
+
+    private void resetProviderApiKeyInConfig(String provider) throws IOException {
+        if (isBlank(provider)) {
+            throw new IOException("provider is required");
+        }
+        Map<String, Object> root = loadRootYaml();
+        Map<String, Object> model = findModelByProvider(getModels(root), provider);
+        if (model == null) {
+            throw new IOException("Provider not found in models: " + provider);
+        }
+        model.put("api_key", "your-api-key");
+        writeRootYaml(root);
     }
 
     public String getLandingModels() throws IOException {
@@ -384,4 +486,17 @@ public class ApiKeyService {
         return list != null ? list : new ArrayList<>();
     }
 
+    public List<ModelApiKey> getLandingApiKeys(String userId) throws IOException {
+        String url = SAAS_BASE_URL + "/saas/api/apikey/listModelApiKeys";
+        Map<String, String> params = new HashMap<>();
+        params.put("userId", userId);
+        String resultJson = OkHttpUtil.get(url, params);
+        Type listType = new TypeToken<ArrayList<ModelApiKey>>() {
+        }.getType();
+        List<ModelApiKey> list = gson.fromJson(resultJson, listType);
+        if (list != null) {
+            list.forEach(item -> item.setProvider("Landing"));
+        }
+        return list != null ? list : new ArrayList<>();
+    }
 }

@@ -30,8 +30,28 @@
             window.__apiKeysPageState = {
                 rows: [],
                 loading: false,
-                types: []
+                types: [],
+                localApiKeyEditable: true,
+                apiKeysTableReady: false
             };
+        }
+    }
+
+    function syncLocalApiKeyEditableFromResponse(res, st) {
+        if (res && typeof res.localApiKeyEditable === "boolean") {
+            st.localApiKeyEditable = res.localApiKeyEditable;
+        }
+    }
+
+    function updateApiKeysModeHint(st) {
+        var hint = $("#apiKeysModeHint");
+        if (!hint.length) {
+            return;
+        }
+        if (!st.localApiKeyEditable) {
+            hint.text(tTextOpenRouter("仅管理云端 Landing 密钥（本地密钥已关闭）")).show();
+        } else {
+            hint.hide().text("");
         }
     }
 
@@ -42,20 +62,56 @@
         return s.slice(0, 4) + "..." + s.slice(-4);
     }
 
+    function copyTextToClipboard(text, onDone) {
+        var t = String(text || "");
+        var done = typeof onDone === "function" ? onDone : function() {};
+        if (!t) {
+            done(false);
+            return;
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(t).then(function() {
+                done(true);
+            }).catch(function() {
+                done(false);
+            });
+            return;
+        }
+        try {
+            var ta = document.createElement("textarea");
+            ta.value = t;
+            ta.setAttribute("readonly", "");
+            ta.style.position = "fixed";
+            ta.style.left = "-9999px";
+            document.body.appendChild(ta);
+            ta.select();
+            var ok = document.execCommand("copy");
+            document.body.removeChild(ta);
+            done(ok);
+        } catch (e) {
+            done(false);
+        }
+    }
+
     function renderApiKeysRows(rows) {
         if (!rows || !rows.length) {
-            return `<tr><td colspan="5" style="padding:24px;text-align:center;color:#9ca3af;">${tTextOpenRouter("暂无数据")}</td></tr>`;
+            return `<tr><td colspan="4" style="padding:24px;text-align:center;color:#9ca3af;">${tTextOpenRouter("暂无数据")}</td></tr>`;
         }
-        return rows.map(function(row) {
+        const st = window.__apiKeysPageState || {};
+        const showToggle = st.localApiKeyEditable !== false;
+        return rows.map(function(row, rowIndex) {
+            const isEnabled = Number(row.status || 0) === 1;
+            const toggleLink = showToggle
+                ? `<a href="javascript:void(0)" class="api-key-toggle-link" data-id="${row.id || ""}" data-provider="${row.provider || ""}" data-enabled="${isEnabled ? "1" : "0"}" style="margin-right:12px;color:${isEnabled ? "#f59e0b" : "#10b981"};">${isEnabled ? tTextOpenRouter("禁用") : tTextOpenRouter("启用")}</a>`
+                : "";
+            const copyLink = `<a href="javascript:void(0)" class="api-key-copy-link" data-row-index="${rowIndex}" style="margin-right:12px;color:#6366f1;">${tTextOpenRouter("复制")}</a>`;
             return `
                 <tr>
                     <td style="${openRouterTdStyle()}">${row.name || "—"}</td>
                     <td style="${openRouterTdStyle()}">${row.provider || "—"}</td>
                     <td style="${openRouterTdStyle()}">${maskApiKey(row.api_key)}</td>
-                    <td style="${openRouterTdStyle()}">${row.api_address || "—"}</td>
                     <td style="${openRouterTdStyle()}">
-                        ${row.provider === LANDING ? "" : `<a href="javascript:void(0)" class="api-key-edit-link" data-name="${row.name}" style="margin-right:12px;color:#6366f1;">${tTextOpenRouter("编辑")}</a>`}
-                        <a href="javascript:void(0)" class="api-key-delete-link" data-name="${row.name}" style="color:#ef4444;">${tTextOpenRouter("删除")}</a>
+                        ${toggleLink}${copyLink}<a href="javascript:void(0)" class="api-key-delete-link" data-id="${row.id || ""}" data-provider="${row.provider || ""}" style="color:#ef4444;">${tTextOpenRouter("删除")}</a>
                     </td>
                 </tr>
             `;
@@ -66,7 +122,7 @@
         const st = window.__apiKeysPageState;
         st.loading = !!loading;
         if (loading) {
-            $("#apiKeysTbody").html('<tr><td colspan="5" style="padding:24px;text-align:center;color:#9ca3af;">加载中...</td></tr>');
+            $("#apiKeysTbody").html('<tr><td colspan="4" style="padding:24px;text-align:center;color:#9ca3af;">加载中...</td></tr>');
         }
     }
 
@@ -83,10 +139,15 @@
             url: "/apiKey/providers",
             success: function(res) {
                 const st = window.__apiKeysPageState;
+                syncLocalApiKeyEditableFromResponse(res, st);
                 if (res && res.status === "success" && Array.isArray(res.data)) {
                     st.types = res.data;
                 } else {
                     st.types = [];
+                }
+                if (st.apiKeysTableReady && !st.loading && $("#apiKeysTbody").length) {
+                    $("#apiKeysTbody").html(renderApiKeysRows(st.rows || []));
+                    updateApiKeysModeHint(st);
                 }
                 if (typeof done === "function") {
                     done(st.types);
@@ -123,33 +184,42 @@
 
     function loadApiKeys() {
         ensureApiKeysState();
+        window.__apiKeysPageState.apiKeysTableReady = false;
         setApiKeysLoading(true);
+        var userId = getApiKeysUserId();
         $.ajax({
             type: "GET",
             contentType: "application/json;charset=utf-8",
             url: "/apiKey/list",
+            data: { userId: userId },
             success: function(res) {
                 const st = window.__apiKeysPageState;
                 st.loading = false;
+                syncLocalApiKeyEditableFromResponse(res, st);
                 if (!res || res.status !== "success" || !Array.isArray(res.data)) {
                     st.rows = [];
                 } else {
                     st.rows = res.data.map(function(item) {
                         return {
+                            id: item.id,
                             name: item.name || "",
                             provider: item.provider || "",
-                            api_address: item.api_address || "",
-                            api_key: item.api_key || ""
+                            api_address: item.api_address || item.apiAddress || "",
+                            api_key: item.api_key || item.apiKey || "",
+                            status: item.status == null ? 0 : Number(item.status)
                         };
                     });
                 }
                 $("#apiKeysTbody").html(renderApiKeysRows(st.rows));
+                st.apiKeysTableReady = true;
+                updateApiKeysModeHint(st);
             },
             error: function() {
                 const st = window.__apiKeysPageState;
                 st.loading = false;
                 st.rows = [];
-                $("#apiKeysTbody").html('<tr><td colspan="5" style="padding:24px;text-align:center;color:#9ca3af;">加载失败</td></tr>');
+                $("#apiKeysTbody").html('<tr><td colspan="4" style="padding:24px;text-align:center;color:#9ca3af;">加载失败</td></tr>');
+                st.apiKeysTableReady = true;
             }
         });
     }
@@ -157,12 +227,8 @@
     function bindApiKeysEvents() {
         $("#apiKeysCreateBtn").on("click", function() {
             resetAddDialog();
-            $("#apiKeyEditModelName").val("");
-            $("#apiKeyEditInput").val("");
-            $("#apiKeyEditArea").hide();
             $("#apiKeyAddArea").show();
             $("#apiKeyCreateConfirmBtn").show();
-            $("#apiKeyEditConfirmBtn").hide();
             $("#apiKeysCreateMask").css("display", "flex");
         });
         $("#apiKeysCloseBtn").on("click", function() {
@@ -179,30 +245,33 @@
         $("#apiKeyCreateConfirmBtn").on("click", function() {
             addApiKey();
         });
-        $("#apiKeyEditConfirmBtn").on("click", function() {
-            saveApiKey();
-        });
         $("#api-keys-container").on("click", ".api-key-delete-link", function() {
-            const name = String($(this).data("name") || "");
-            deleteApiKeyByName(name);
+            const id = Number($(this).data("id"));
+            const provider = String($(this).data("provider") || "");
+            const row = { id: id, provider: provider };
+            deleteApiKey(row);
         });
-        $("#api-keys-container").on("click", ".api-key-edit-link", function() {
-            const name = String($(this).data("name") || "");
-            openEditDialogByName(name);
+        $("#api-keys-container").on("click", ".api-key-toggle-link", function() {
+            const id = Number($(this).data("id"));
+            const provider = String($(this).data("provider") || "");
+            const enabled = String($(this).data("enabled") || "") === "1";
+            toggleApiKey(id, provider, !enabled);
         });
-    }
-
-    function openEditDialogByName(name) {
-        const st = window.__apiKeysPageState;
-        const row = (st.rows || []).find(function(item) { return item.name === name; });
-        if (!row) return;
-        $("#apiKeyAddArea").hide();
-        $("#apiKeyEditArea").show();
-        $("#apiKeyCreateConfirmBtn").hide();
-        $("#apiKeyEditConfirmBtn").show();
-        $("#apiKeyEditModelName").val(row.name || "");
-        $("#apiKeyEditInput").val(row.api_key || "");
-        $("#apiKeysCreateMask").css("display", "flex");
+        $("#api-keys-container").on("click", ".api-key-copy-link", function() {
+            const st = window.__apiKeysPageState;
+            const idx = Number($(this).data("row-index"));
+            const row = (st && st.rows && !isNaN(idx)) ? st.rows[idx] : null;
+            const key = row ? String(row.api_key || "").trim() : "";
+            if (!key) {
+                alert(tTextOpenRouter("暂无可复制的密钥"));
+                return;
+            }
+            copyTextToClipboard(key, function(ok) {
+                if (!ok) {
+                    alert(tTextOpenRouter("复制失败"));
+                }
+            });
+        });
     }
 
     function getApiKeysUserId() {
@@ -226,9 +295,15 @@
             alert(tTextOpenRouter("请输入 API Key"));
             return;
         }
+        const displayName = ($("#apiKeyAddNameInput").val() || "").trim();
+        if (!displayName) {
+            alert(tTextOpenRouter("名称为必填项"));
+            return;
+        }
         const payload = {
             provider: provider,
-            apiKey: apiKey
+            apiKey: apiKey,
+            name: displayName
         };
         if (provider === LANDING) {
             const userId = getApiKeysUserId();
@@ -239,18 +314,12 @@
             payload.userId = userId;
         }
         if (provider === OPENAI_COMPATIBLE) {
-            const name = ($("#apiKeyAddNameInput").val() || "").trim();
             const model = ($("#apiKeyAddModelInput").val() || "").trim();
             const apiAddress = ($("#apiKeyAddApiAddressInput").val() || "").trim();
-            if (!name) {
-                alert(tTextOpenRouter("OpenAICompatible 类型需要 name"));
-                return;
-            }
             if (!model) {
                 alert(tTextOpenRouter("OpenAICompatible 类型需要 model"));
                 return;
             }
-            payload.name = name;
             payload.model = model;
             payload.apiAddress = apiAddress;
         }
@@ -273,46 +342,19 @@
         });
     }
 
-    function saveApiKey() {
-        const modelName = ($("#apiKeyEditModelName").val() || "").trim();
-        const apiKey = ($("#apiKeyEditInput").val() || "").trim();
-        if (!modelName) {
-            alert(tTextOpenRouter("请输入模型名称"));
-            return;
-        }
-        if (!apiKey) {
-            alert(tTextOpenRouter("请输入 API Key"));
-            return;
-        }
-        const payload = { modelName: modelName, apiKey: apiKey };
-        $.ajax({
-            type: "POST",
-            url: "/apiKey/update",
-            contentType: "application/json;charset=utf-8",
-            data: JSON.stringify(payload),
-            success: function(res) {
-                if (res && res.status === "success") {
-                    $("#apiKeysCreateMask").hide();
-                    loadApiKeys();
-                } else {
-                    alert((res && res.msg) || tTextOpenRouter("保存失败"));
-                }
-            },
-            error: function() {
-                alert(tTextOpenRouter("保存失败"));
-            }
-        });
-    }
-
-    function deleteApiKeyByName(name) {
-        if (!name) return;
+    function deleteApiKey(row) {
+        if (!row || !row.id) return;
         confirm(tTextOpenRouter("确认删除该模型的 API Key 吗？")).then(function(ok) {
             if (!ok) return;
             $.ajax({
                 type: "POST",
                 url: "/apiKey/delete",
                 contentType: "application/json;charset=utf-8",
-                data: JSON.stringify({ modelName: name }),
+                data: JSON.stringify({
+                    id: row.id,
+                    provider: row.provider,
+                    userId: getApiKeysUserId()
+                }),
                 success: function(res) {
                     if (res && res.status === "success") {
                         loadApiKeys();
@@ -327,6 +369,31 @@
         });
     }
 
+    function toggleApiKey(id, provider, enabled) {
+        if (!id || !provider) return;
+        $.ajax({
+            type: "POST",
+            url: "/apiKey/toggle",
+            contentType: "application/json;charset=utf-8",
+            data: JSON.stringify({
+                id: id,
+                provider: provider,
+                enabled: !!enabled,
+                userId: getApiKeysUserId()
+            }),
+            success: function(res) {
+                if (res && res.status === "success") {
+                    loadApiKeys();
+                } else {
+                    alert((res && res.msg) || tTextOpenRouter("保存失败"));
+                }
+            },
+            error: function() {
+                alert(tTextOpenRouter("保存失败"));
+            }
+        });
+    }
+
     window.loadApiKeysPage = function loadApiKeysPage() {
         hideChatPartsForStandalonePage();
         ensureApiKeysState();
@@ -337,13 +404,14 @@
                     <div>
                         <h2 style="margin:0;font-size:28px;font-weight:700;">API 密钥</h2>
                         <div style="margin-top:6px;color:#6b7280;font-size:13px;">管理模型的 API Key</div>
+                        <div id="apiKeysModeHint" style="display:none;margin-top:6px;color:#6b7280;font-size:12px;"></div>
                     </div>
                     <button type="button" id="apiKeysCreateBtn" style="padding:10px 18px;border:none;border-radius:8px;background:#6366f1;color:#fff;font-size:14px;cursor:pointer;">新增配置</button>
                 </div>
                 <div style="border:1px solid #e5e7eb;border-radius:10px;background:#fff;overflow:hidden;">
                     <div style="overflow-x:auto;">
                         <table style="width:100%;border-collapse:collapse;font-size:13px;">
-                            <thead><tr style="background:#fff;"><th style="${openRouterThStyle()}">名称</th><th style="${openRouterThStyle()}">提供商</th><th style="${openRouterThStyle()}">API 密钥</th><th style="${openRouterThStyle()}">API 地址</th><th style="${openRouterThStyle()}">操作</th></tr></thead>
+                            <thead><tr style="background:#fff;"><th style="${openRouterThStyle()}">名称</th><th style="${openRouterThStyle()}">提供商</th><th style="${openRouterThStyle()}">API 密钥</th><th style="${openRouterThStyle()}">操作</th></tr></thead>
                             <tbody id="apiKeysTbody">${renderApiKeysRows(st.rows)}</tbody>
                         </table>
                     </div>
@@ -362,8 +430,8 @@
                                 ${renderProviderOptions(st.types)}
                             </select>
                         </label>
+                        <label style="font-size:13px;color:#374151;">${tTextOpenRouter("名称")}<span style="color:#dc2626;margin-left:2px;">*</span><span style="color:#9ca3af;font-weight:400;">（${tTextOpenRouter("必填，仅列表展示")}）</span><input id="apiKeyAddNameInput" type="text" required placeholder="${tTextOpenRouter("例如：工作用 Key")}" style="margin-top:6px;width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;" /></label>
                         <div id="apiKeyAddOpenAIFields" style="display:none;gap:10px;">
-                            <label style="font-size:13px;color:#374151;">name<input id="apiKeyAddNameInput" type="text" placeholder="例如：custom2" style="margin-top:6px;width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;" /></label>
                             <label style="font-size:13px;color:#374151;">model<input id="apiKeyAddModelInput" type="text" placeholder="例如：gpt-4o-mini" style="margin-top:6px;width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;" /></label>
                         </div>
                         <label id="apiKeyAddApiAddressWrap" style="display:none;font-size:13px;color:#374151;">api_address（可选）<input id="apiKeyAddApiAddressInput" type="text" placeholder="例如：https://xxx/v1/chat/completions" style="margin-top:6px;width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;" /></label>
@@ -372,21 +440,18 @@
                             <label style="font-size:13px;color:#374151;">API Key<input id="apiKeyAddApiKeyInput" type="text" placeholder="请输入 API Key" style="margin-top:6px;width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;" /></label>
                         </div>
                     </div>
-                    <div id="apiKeyEditArea" style="display:none;gap:10px;">
-                        <label style="font-size:13px;color:#374151;">模型名称<input id="apiKeyEditModelName" type="text" disabled style="margin-top:6px;width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;background:#f9fafb;" /></label>
-                        <label style="font-size:13px;color:#374151;">API Key<input id="apiKeyEditInput" type="text" placeholder="请输入 API Key" style="margin-top:6px;width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;" /></label>
-                    </div>
                     <button type="button" id="apiKeyCreateConfirmBtn" style="margin-top:14px;width:100%;padding:10px;border:none;border-radius:8px;background:#6366f1;color:#fff;cursor:pointer;">新增</button>
-                    <button type="button" id="apiKeyEditConfirmBtn" style="display:none;margin-top:10px;width:100%;padding:10px;border:none;border-radius:8px;background:#4f46e5;color:#fff;cursor:pointer;">保存修改</button>
                 </div>
             </div>
         `;
         $("#item-content").html(tHtmlOpenRouter(html));
         bindApiKeysEvents();
         loadProviders(function(types) {
+            const stAfter = window.__apiKeysPageState;
             const optionHtml = '<option value="">' + tTextOpenRouter("请选择 provider") + "</option>" + renderProviderOptions(types);
             $("#apiKeyAddProviderSelect").html(optionHtml);
             toggleAddDialogFields();
+            updateApiKeysModeHint(stAfter);
         });
         loadApiKeys();
     };

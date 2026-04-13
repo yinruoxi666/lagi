@@ -53,6 +53,8 @@ public class LLMErrorConstants {
      */
     public static final Integer CONTENT_SAFETY_BLOCKED = 609;
 
+    public static final Integer UNAUTHORIZED_CODE = 401;
+
     public static boolean isContentSafetyBlocked(Integer errorCode) {
         return CONTENT_SAFETY_BLOCKED.equals(errorCode);
     }

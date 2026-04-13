@@ -1,5 +1,6 @@
 package ai.servlet;
 
+import ai.dto.ModelApiKey;
 import ai.migrate.service.ApiKeyService;
 import com.google.gson.Gson;
 
@@ -45,11 +46,11 @@ public class ApiKeyServlet extends BaseServlet {
             case "add":
                 this.add(req, resp);
                 break;
-            case "update":
-                this.update(req, resp);
-                break;
             case "delete":
                 this.delete(req, resp);
+                break;
+            case "toggle":
+                this.toggle(req, resp);
                 break;
         }
     }
@@ -58,14 +59,11 @@ public class ApiKeyServlet extends BaseServlet {
         resp.setContentType("application/json;charset=utf-8");
         Map<String, Object> result = new HashMap<>();
         try {
-            List<Map<String, String>> data = apiKeyService.listApiKeys();
-            for (Map<String, String> item : data) {
-                if (item != null) {
-                    item.put("api_key", maskApiKey(item.get("api_key")));
-                }
-            }
+            String userId = req.getParameter("userId");
+            List<ModelApiKey> data = apiKeyService.listApiKeys(userId);
             result.put("status", "success");
             result.put("data", data);
+            result.put("localApiKeyEditable", apiKeyService.isLocalApiKeyEditable());
         } catch (Exception e) {
             result.put("status", "failed");
             result.put("msg", e.getMessage());
@@ -101,6 +99,7 @@ public class ApiKeyServlet extends BaseServlet {
             List<String> data = apiKeyService.listProviders();
             result.put("status", "success");
             result.put("data", data);
+            result.put("localApiKeyEditable", apiKeyService.isLocalApiKeyEditable());
         } catch (Exception e) {
             result.put("status", "failed");
             result.put("msg", e.getMessage());
@@ -108,19 +107,19 @@ public class ApiKeyServlet extends BaseServlet {
         responsePrint(resp, gson.toJson(result));
     }
 
-    @SuppressWarnings("unchecked")
     private void add(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         resp.setContentType("application/json;charset=utf-8");
         Map<String, Object> result = new HashMap<>();
         try {
-            Map<String, Object> body = reqBodyToObj(req, Map.class);
-            String modelName = body == null || body.get("name") == null ? null : body.get("name").toString();
-            String provider = body == null || body.get("provider") == null ? null : body.get("provider").toString();
-            String apiKey = body == null || body.get("apiKey") == null ? null : body.get("apiKey").toString();
-            String model = body == null || body.get("model") == null ? null : body.get("model").toString();
-            String apiAddress = body == null || body.get("apiAddress") == null ? null : body.get("apiAddress").toString();
-            String userId = body == null || body.get("userId") == null ? null : body.get("userId").toString();
-            apiKeyService.addApiKey(modelName, provider, apiKey, model, apiAddress, userId);
+            AddApiKeyRequest body = reqBodyToObj(req, AddApiKeyRequest.class);
+            apiKeyService.addApiKey(
+                    body == null ? null : body.name,
+                    body == null ? null : body.provider,
+                    body == null ? null : body.apiKey,
+                    body == null ? null : body.model,
+                    body == null ? null : body.apiAddress,
+                    body == null ? null : body.userId
+            );
             result.put("status", "success");
             result.put("msg", "add success");
         } catch (Exception e) {
@@ -130,32 +129,15 @@ public class ApiKeyServlet extends BaseServlet {
         responsePrint(resp, gson.toJson(result));
     }
 
-    @SuppressWarnings("unchecked")
-    private void update(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-        resp.setContentType("application/json;charset=utf-8");
-        Map<String, Object> result = new HashMap<>();
-        try {
-            Map<String, Object> body = reqBodyToObj(req, Map.class);
-            String modelName = body == null || body.get("modelName") == null ? null : body.get("modelName").toString();
-            String apiKey = body == null || body.get("apiKey") == null ? null : body.get("apiKey").toString();
-            apiKeyService.saveApiKey(modelName, apiKey);
-            result.put("status", "success");
-            result.put("msg", "update success");
-        } catch (Exception e) {
-            result.put("status", "failed");
-            result.put("msg", e.getMessage());
-        }
-        responsePrint(resp, gson.toJson(result));
-    }
-
-    @SuppressWarnings("unchecked")
     private void delete(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         resp.setContentType("application/json;charset=utf-8");
         Map<String, Object> result = new HashMap<>();
         try {
-            Map<String, Object> body = reqBodyToObj(req, Map.class);
-            String modelName = body == null || body.get("modelName") == null ? null : body.get("modelName").toString();
-            apiKeyService.deleteApiKey(modelName);
+            DeleteApiKeyRequest body = reqBodyToObj(req, DeleteApiKeyRequest.class);
+            Long id = body == null ? null : body.id;
+            String provider = body == null ? null : body.provider;
+            String userId = body == null ? null : body.userId;
+            apiKeyService.deleteApiKey(id, provider, userId);
             result.put("status", "success");
             result.put("msg", "delete success");
         } catch (Exception e) {
@@ -163,6 +145,48 @@ public class ApiKeyServlet extends BaseServlet {
             result.put("msg", e.getMessage());
         }
         responsePrint(resp, gson.toJson(result));
+    }
+
+    private void toggle(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        resp.setContentType("application/json;charset=utf-8");
+        Map<String, Object> result = new HashMap<>();
+        try {
+            ToggleApiKeyRequest body = reqBodyToObj(req, ToggleApiKeyRequest.class);
+            Long id = body == null ? null : body.id;
+            String provider = body == null ? null : body.provider;
+            String userId = body == null ? null : body.userId;
+            boolean enabled = body != null && Boolean.TRUE.equals(body.enabled);
+            apiKeyService.toggleApiKey(id, provider, enabled, userId);
+            result.put("status", "success");
+            result.put("msg", "toggle success");
+        } catch (Exception e) {
+            result.put("status", "failed");
+            result.put("msg", e.getMessage());
+        }
+        responsePrint(resp, gson.toJson(result));
+    }
+
+    private static class AddApiKeyRequest {
+        Long id;
+        String name;
+        String provider;
+        String apiKey;
+        String model;
+        String apiAddress;
+        String userId;
+    }
+
+    private static class DeleteApiKeyRequest {
+        Long id;
+        String provider;
+        String userId;
+    }
+
+    private static class ToggleApiKeyRequest {
+        Long id;
+        String provider;
+        String userId;
+        Boolean enabled;
     }
 
     private String maskApiKey(String apiKey) {

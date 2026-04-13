@@ -1,27 +1,22 @@
 package ai.llm.adapter.impl;
 
 
-import ai.common.exception.RRException;
 import ai.openai.pojo.ChatCompletionRequest;
 import ai.openai.pojo.ChatCompletionResult;
-import ai.utils.ApikeyUtil;
 import io.reactivex.Observable;
 
 public class LandingAdapter extends OpenAIStandardAdapter {
-    private static final int UNAUTHORIZED_CODE = 401;
-    private static final String INVALID_API_KEY_MSG = "Landing apiKey is invalid";
-
     @Override
     public ChatCompletionResult completions(ChatCompletionRequest chatCompletionRequest) {
         normalizeModelNameIfSlashSeparated(chatCompletionRequest);
-        ensureApiKeyValid();
+        setApiKey(chatCompletionRequest.getApiKey());
         return super.completions(chatCompletionRequest);
     }
 
     @Override
     public Observable<ChatCompletionResult> streamCompletions(ChatCompletionRequest chatCompletionRequest) {
         normalizeModelNameIfSlashSeparated(chatCompletionRequest);
-        ensureApiKeyValid();
+        setApiKey(chatCompletionRequest.getApiKey());
         return super.streamCompletions(chatCompletionRequest);
     }
 
@@ -42,17 +37,23 @@ public class LandingAdapter extends OpenAIStandardAdapter {
         }
     }
 
-    private void ensureApiKeyValid() {
-        if (!ApikeyUtil.validateModelApiKey(getApiKey())) {
-            throw new RRException(UNAUTHORIZED_CODE, INVALID_API_KEY_MSG);
-        }
-    }
-
     @Override
     public String getApiAddress() {
         if (apiAddress == null) {
             apiAddress = "https://lagi.saasai.top/v1/chat/completions";
         }
         return apiAddress;
+    }
+
+    @Override
+    public boolean verify() {
+        return true;
+    }
+
+    @Override
+    public void setApiKey(String apiKey) {
+        if (getApiKey() == null) {
+            this.apiKey = apiKey;
+        }
     }
 }
