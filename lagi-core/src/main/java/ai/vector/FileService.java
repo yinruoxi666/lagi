@@ -1,32 +1,46 @@
 package ai.vector;
 
+import ai.common.pojo.FileChunkResponse;
+import ai.common.pojo.Response;
+import ai.ocr.OcrService;
+import ai.pnps.skills.SkillScriptExecutor;
+import ai.pnps.skills.pojo.ScriptExecutionResult;
+import ai.pnps.skills.pojo.SkillExecutionPlan;
+import ai.utils.*;
+import ai.utils.pdf.PdfUtil;
+import ai.utils.word.WordUtils;
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.rendering.PDFRenderer;
+
+import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.*;
+import java.net.URL;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import ai.common.pojo.FileChunkResponse;
-import ai.common.pojo.Response;
-import ai.ocr.OcrService;
-import ai.utils.*;
-
-import ai.utils.pdf.PdfUtil;
-import ai.utils.word.WordUtils;
-import com.google.gson.Gson;
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.rendering.PDFRenderer;
-
-import javax.imageio.ImageIO;
-import lombok.extern.slf4j.Slf4j;
-
 @Slf4j
 public class FileService {
-    private static final String EXTRACT_CONTENT_URL = "http://lagi.saasai.top:8090/file/extract_content_with_image";
     private static final String TO_MARKDOWN_URL = "http://lagi.saasai.top:8090/file/to_markdown";
+    private static final String EXTRACT_CONTENT_SKILL_NAME = "extract_content_with_image";
+    private static final String EXTRACT_CONTENT_SKILL_RESOURCE_ROOT = "skills/extract_content_with_image";
+    private static final String EXTRACT_CONTENT_SKILL_SCRIPT = "scripts/extract_content_with_image.py";
+    private static final long LOCAL_EXTRACT_CONTENT_TIMEOUT_SECONDS = 600L;
+    private static final SkillScriptExecutor SKILL_SCRIPT_EXECUTOR = new SkillScriptExecutor();
+    private static final Object EXTRACT_CONTENT_SKILL_LOCK = new Object();
+    private static volatile Path cachedExtractContentSkillDir;
 
     private final Gson gson = new Gson();
 
@@ -38,17 +52,53 @@ public class FileService {
     }
 
     public FileChunkResponse extractContent(File file) {
-        String fileParmName = "file";
-        Map<String, String> formParmMap = new HashMap<>();
-        List<File> fileList = new ArrayList<>();
-        fileList.add(file);
-        Map<String, String> headers = new HashMap<>();
-        if (LagiGlobal.getLandingApikey() == null) {
-            return null;
+        if (file == null || !file.isFile()) {
+            return FileChunkResponse.builder().status("failed").msg("file not found").data(Collections.emptyList()).build();
         }
-        headers.put("Authorization", "Bearer " + LagiGlobal.getLandingApikey());
-        String returnStr = HttpUtil.multipartUpload(EXTRACT_CONTENT_URL, fileParmName, fileList, formParmMap, headers);
-        return gson.fromJson(returnStr, FileChunkResponse.class);
+        try {
+            Path skillDir = resolveExtractContentSkillDir();
+            Map<String, String> extraEnv = buildExtractContentSkillEnv(file);
+            SkillExecutionPlan.Script script = new SkillExecutionPlan.Script(
+                    EXTRACT_CONTENT_SKILL_SCRIPT,
+                    Collections.singletonList(file.getAbsolutePath()),
+                    "."
+            );
+            ScriptExecutionResult execution = SKILL_SCRIPT_EXECUTOR.execute(
+                    skillDir, script, LOCAL_EXTRACT_CONTENT_TIMEOUT_SECONDS, 0L, extraEnv);
+
+            if (execution.getExitCode() != 0 || execution.isTimeout() || execution.isNoOutputTimeout()) {
+                String msg = execution.isTimeout()
+                        ? "extract_content_with_image skill timed out"
+                        : buildSkillFailureMessage(execution);
+                log.warn("Local extract_content_with_image skill failed for file {}: {}", file.getAbsolutePath(), msg);
+                return FileChunkResponse.builder()
+                        .status("failed")
+                        .msg(msg)
+                        .data(Collections.emptyList())
+                        .build();
+            }
+
+            if (execution.getStderr() != null && !execution.getStderr().trim().isEmpty()) {
+                log.warn("Local extract_content_with_image skill stderr for {}: {}", file.getAbsolutePath(), execution.getStderr());
+            }
+
+            FileChunkResponse response = parseExtractContentSkillResponse(execution.getStdout());
+            if (response == null) {
+                return FileChunkResponse.builder()
+                        .status("failed")
+                        .msg("invalid skill stdout")
+                        .data(Collections.emptyList())
+                        .build();
+            }
+            return response;
+        } catch (Exception e) {
+            log.error("execute local extract_content_with_image skill error", e);
+            return FileChunkResponse.builder()
+                    .status("failed")
+                    .msg(e.getMessage())
+                    .data(Collections.emptyList())
+                    .build();
+        }
     }
 
     public Response toMarkdown(File file) {
@@ -406,5 +456,244 @@ public class FileService {
             e.printStackTrace();
         }
         return content.toString();
+    }
+
+    static FileChunkResponse parseExtractContentSkillResponse(String raw) {
+        if (raw == null || raw.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            JsonElement parsed = new JsonParser().parse(raw.trim());
+            if (!parsed.isJsonObject()) {
+                return null;
+            }
+            JsonObject root = parsed.getAsJsonObject();
+            List<FileChunkResponse.Document> docs = new ArrayList<>();
+            JsonArray data = root.has("data") && root.get("data").isJsonArray() ? root.getAsJsonArray("data") : null;
+            if (data != null) {
+                for (JsonElement item : data) {
+                    if (item != null && item.isJsonObject()) {
+                        docs.add(parseSkillDocument(item.getAsJsonObject()));
+                    }
+                }
+            }
+            return FileChunkResponse.builder()
+                    .status(getAsString(root, "status"))
+                    .msg(getAsString(root, "msg"))
+                    .data(docs)
+                    .build();
+        } catch (Exception e) {
+            log.warn("Failed to parse extract_content_with_image skill stdout: " + raw, e);
+            return null;
+        }
+    }
+
+    private static FileChunkResponse.Document parseSkillDocument(JsonObject obj) {
+        FileChunkResponse.Document doc = new FileChunkResponse.Document();
+        doc.setText(getAsString(obj, "text"));
+        doc.setSource(getAsString(obj, "source"));
+        if (obj.has("order") && !obj.get("order").isJsonNull()) {
+            try {
+                doc.setOrder(obj.get("order").getAsInt());
+            } catch (Exception ignored) {
+            }
+        }
+        doc.setReferenceDocumentId(getAsString(obj, "referenceDocumentId"));
+
+        List<FileChunkResponse.Image> images = new ArrayList<>();
+        images.addAll(parseImagesArray(obj.get("images")));
+        if (images.isEmpty()) {
+            images.addAll(parseImagesArray(obj.get("image")));
+        }
+        doc.setImages(images);
+        return doc;
+    }
+
+    private static List<FileChunkResponse.Image> parseImagesArray(JsonElement element) {
+        List<FileChunkResponse.Image> images = new ArrayList<>();
+        if (element == null || element.isJsonNull()) {
+            return images;
+        }
+
+        JsonElement actual = element;
+        if (element.isJsonPrimitive() && element.getAsJsonPrimitive().isString()) {
+            String raw = element.getAsString();
+            if (raw == null || raw.trim().isEmpty()) {
+                return images;
+            }
+            try {
+                actual = new JsonParser().parse(raw);
+            } catch (Exception ignored) {
+                FileChunkResponse.Image image = new FileChunkResponse.Image();
+                image.setPath(raw);
+                images.add(image);
+                return images;
+            }
+        }
+
+        if (!actual.isJsonArray()) {
+            return images;
+        }
+
+        for (JsonElement item : actual.getAsJsonArray()) {
+            if (item == null || !item.isJsonObject()) {
+                continue;
+            }
+            String path = getAsString(item.getAsJsonObject(), "path");
+            if (path == null || path.trim().isEmpty()) {
+                continue;
+            }
+            FileChunkResponse.Image image = new FileChunkResponse.Image();
+            image.setPath(path);
+            images.add(image);
+        }
+        return images;
+    }
+
+    private static String getAsString(JsonObject obj, String key) {
+        if (obj == null || key == null || !obj.has(key) || obj.get(key).isJsonNull()) {
+            return null;
+        }
+        try {
+            return obj.get(key).getAsString();
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static String buildSkillFailureMessage(ScriptExecutionResult execution) {
+        String stderr = execution.getStderr() == null ? "" : execution.getStderr().trim();
+        String stdout = execution.getStdout() == null ? "" : execution.getStdout().trim();
+        if (!stderr.isEmpty()) {
+            return stderr;
+        }
+        if (!stdout.isEmpty()) {
+            return stdout;
+        }
+        return "extract_content_with_image skill exited with code " + execution.getExitCode();
+    }
+
+    private static Map<String, String> buildExtractContentSkillEnv(File file) throws IOException {
+        Map<String, String> env = new LinkedHashMap<>();
+        Path outputDir = resolveExtractContentOutputDir(file);
+        env.put("SKILL_OUTPUT_DIR", outputDir.toString());
+        putIfPresent(env, "TOKENIZER_DIR", System.getenv("TOKENIZER_DIR"));
+        putIfPresent(env, "MODEL_DIR", System.getenv("MODEL_DIR"));
+        putIfPresent(env, "SOFFICE_PATH", System.getenv("SOFFICE_PATH"));
+        putIfPresent(env, "CHUNK_SIZE", System.getenv("CHUNK_SIZE"));
+        return env;
+    }
+
+    private static void putIfPresent(Map<String, String> env, String key, String value) {
+        if (value != null && !value.trim().isEmpty()) {
+            env.put(key, value);
+        }
+    }
+
+    private static Path resolveExtractContentOutputDir(File file) throws IOException {
+        List<Path> candidates = new ArrayList<>();
+        if (file != null && file.getParentFile() != null) {
+            candidates.add(file.getParentFile().toPath());
+        }
+        candidates.add(Paths.get(System.getProperty("java.io.tmpdir")));
+
+        for (Path baseDir : candidates) {
+            Path outputDir = baseDir.resolve(".lagi_skill_outputs").toAbsolutePath().normalize();
+            try {
+                Files.createDirectories(outputDir);
+                return outputDir;
+            } catch (IOException e) {
+                log.warn("Cannot create local skill output dir: {}", outputDir, e);
+            }
+        }
+        throw new IOException("Unable to create local extract_content skill output dir");
+    }
+
+    private static Path resolveExtractContentSkillDir() throws IOException {
+        Path cached = cachedExtractContentSkillDir;
+        if (isValidExtractContentSkillDir(cached)) {
+            return cached;
+        }
+        synchronized (EXTRACT_CONTENT_SKILL_LOCK) {
+            if (isValidExtractContentSkillDir(cachedExtractContentSkillDir)) {
+                return cachedExtractContentSkillDir;
+            }
+            Path resolved = locateExtractContentSkillDir();
+            cachedExtractContentSkillDir = resolved;
+            return resolved;
+        }
+    }
+
+    private static Path locateExtractContentSkillDir() throws IOException {
+        String userDir = System.getProperty("user.dir");
+        List<Path> candidates = new ArrayList<>();
+        if (userDir != null && !userDir.trim().isEmpty()) {
+            Path base = Paths.get(userDir).toAbsolutePath().normalize();
+            candidates.add(base.resolve("lagi-web").resolve("src").resolve("main").resolve("resources")
+                    .resolve("skills").resolve(EXTRACT_CONTENT_SKILL_NAME));
+            candidates.add(base.resolve("skills").resolve(EXTRACT_CONTENT_SKILL_NAME));
+            Path parent = base.getParent();
+            if (parent != null) {
+                candidates.add(parent.resolve("lagi-web").resolve("src").resolve("main").resolve("resources")
+                        .resolve("skills").resolve(EXTRACT_CONTENT_SKILL_NAME));
+                candidates.add(parent.resolve("skills").resolve(EXTRACT_CONTENT_SKILL_NAME));
+            }
+        }
+
+        URL skillMdUrl = FileService.class.getClassLoader()
+                .getResource(EXTRACT_CONTENT_SKILL_RESOURCE_ROOT + "/SKILL.md");
+        if (skillMdUrl != null && "file".equalsIgnoreCase(skillMdUrl.getProtocol())) {
+            try {
+                candidates.add(Paths.get(skillMdUrl.toURI()).getParent());
+            } catch (Exception ignored) {
+            }
+        }
+
+        for (Path candidate : candidates) {
+            if (isValidExtractContentSkillDir(candidate)) {
+                return candidate.toAbsolutePath().normalize();
+            }
+        }
+
+        Path extracted = materializeExtractContentSkillFromResources();
+        if (isValidExtractContentSkillDir(extracted)) {
+            return extracted;
+        }
+        throw new FileNotFoundException("extract_content_with_image skill not found");
+    }
+
+    private static boolean isValidExtractContentSkillDir(Path dir) {
+        if (dir == null) {
+            return false;
+        }
+        return Files.isRegularFile(dir.resolve("SKILL.md"))
+                && Files.isRegularFile(dir.resolve(EXTRACT_CONTENT_SKILL_SCRIPT));
+    }
+
+    private static Path materializeExtractContentSkillFromResources() throws IOException {
+        Path skillDir = Paths.get(System.getProperty("java.io.tmpdir"), "lagi-skills", EXTRACT_CONTENT_SKILL_NAME)
+                .toAbsolutePath().normalize();
+        copyClasspathResource(
+                EXTRACT_CONTENT_SKILL_RESOURCE_ROOT + "/SKILL.md",
+                skillDir.resolve("SKILL.md")
+        );
+        copyClasspathResource(
+                EXTRACT_CONTENT_SKILL_RESOURCE_ROOT + "/" + EXTRACT_CONTENT_SKILL_SCRIPT,
+                skillDir.resolve(EXTRACT_CONTENT_SKILL_SCRIPT)
+        );
+        return skillDir;
+    }
+
+    private static void copyClasspathResource(String resourcePath, Path target) throws IOException {
+        URL url = FileService.class.getClassLoader().getResource(resourcePath);
+        if (url == null) {
+            throw new FileNotFoundException("resource not found: " + resourcePath);
+        }
+        if (target.getParent() != null) {
+            Files.createDirectories(target.getParent());
+        }
+        try (InputStream in = url.openStream()) {
+            Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
+        }
     }
 }
