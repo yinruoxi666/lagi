@@ -450,8 +450,8 @@ public class LlmApiServlet extends BaseServlet {
                         String msg = gson.toJson(filter);
                         outputChunk(out, msg);
                         chatCompletionChoice.setFinish_reason(finishReason);
-//                        chatCompletionChoice.getDelta().setContent("");
-                        chatCompletionChoice.getMessage().setContent("");
+                        chatCompletionChoice.getDelta().setContent("");
+//                        chatCompletionChoice.getMessage().setContent("");
                         msg = gson.toJson(filter);
                         outputChunk(out, msg);
                     } else {
