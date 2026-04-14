@@ -280,7 +280,7 @@ function validateRegisterForm() {
 
     errorMessage.style.display = 'none';
 
-    const usernameRegex = /^[a-zA-Z0-9_-]+$/;
+    const usernameRegex = /^[a-zA-Z0-9_.-]+$/;
     if (username === '') {
         showRegisterError('用户名不能为空');
         return false;
@@ -290,7 +290,7 @@ function validateRegisterForm() {
         return false;
     }
     if (!usernameRegex.test(username)) {
-        showRegisterError('用户名只能包含大小写字母、数字、"-" 和 "_"');
+        showRegisterError('用户名只能包含大小写字母、数字、"."、"-" 和 "_"');
         return false;
     }
 
