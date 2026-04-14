@@ -36,13 +36,13 @@ public class GlobalConfigurations extends AbstractConfiguration {
     private List<Backend> models;
     private StoreConfig stores;
     private ModelFunctions functions;
-    private List<AgentConfig> agents;
+    private AgentsConfig agents;
 
-    private List<RouterConfig> routers;
+    private RoutersConfig routers;
 
     private SkillsConfig skills;
 
-    private List<FilterConfig> filters;
+    private FiltersConfig filters;
 
     private McpConfig mcps;
 
@@ -63,9 +63,13 @@ public class GlobalConfigurations extends AbstractConfiguration {
         MultimodalAIManager.register(models, functions);
         PromptCacheConfig.init(stores.getVectors(), stores.getMedusa());
         OcrConfig.init(functions.getImage2ocr());
-        AgentManager.getInstance().register(agents);
-        Routers.getInstance().register(skills.getWorkers(), routers);
-        Routers.getInstance().register(functions, routers);
+        if(Boolean.TRUE.equals(agents.getEnable())) {
+            AgentManager.getInstance().register(agents.getAgents());
+        }
+        if(Boolean.TRUE.equals(routers.getEnable())) {
+            Routers.getInstance().register(skills.getWorkers(), routers.getRouterItems());
+            Routers.getInstance().register(functions, routers.getRouterItems());
+        }
         WorkerManager.getInstance().register(skills.getWorkers());
         McpManager.getInstance().register(mcps);
         PnpManager.getInstance().register(skills.getPnps());
@@ -109,16 +113,19 @@ public class GlobalConfigurations extends AbstractConfiguration {
         }catch (Exception ignored) {}
         try {
             if(agents == null) {
-                agents = YmlPropertiesLoader.loaderProperties(getIncludeAgents(), "agents", new cn.hutool.core.lang.TypeReference<List<AgentConfig>>(){});
+                agents = YmlPropertiesLoader.loaderProperties(getIncludeAgents(), "agents", new cn.hutool.core.lang.TypeReference<AgentsConfig>(){});
             } else {
-                List<AgentConfig> agents1 = YmlPropertiesLoader.loaderProperties(getIncludeAgents(), "agents", new cn.hutool.core.lang.TypeReference<List<AgentConfig>>(){});
-                if (agents1 != null && agents != null) {
-                    agents.addAll(agents1);
+                if(Boolean.TRUE.equals(agents.getEnable())) {
+                    List<AgentConfig> agents1 = YmlPropertiesLoader.loaderProperties(getIncludeAgents(), "agents", new cn.hutool.core.lang.TypeReference<List<AgentConfig>>(){});
+                    if (agents1 != null && agents != null && agents.getAgents() != null) {
+                        agents.getAgents().addAll(agents1);
+                    }
                 }
             }
-            if(agents != null) {
-                Set<String> agentNames = agents.stream().map(AgentConfig::getName).collect(Collectors.toSet());
-                agents = agents.stream().filter(model -> agentNames.contains(model.getName())).collect(Collectors.toList());
+            if(agents != null && agents.getAgents() != null) {
+                Set<String> agentNames = agents.getAgents().stream().map(AgentConfig::getName).collect(Collectors.toSet());
+                List<AgentConfig> collect = agents.getAgents().stream().filter(model -> agentNames.contains(model.getName())).collect(Collectors.toList());
+                agents.setAgents(collect);
             }
         } catch (Exception ignored) {}
         try {
@@ -290,8 +297,8 @@ public class GlobalConfigurations extends AbstractConfiguration {
 
 
     private void registerFilter() {
-        if (filters != null) {
-            for (FilterConfig filter : filters) {
+        if (filters != null && Boolean.TRUE.equals(filters.getEnable()) && filters.getItems() != null) {
+            for (FilterConfig filter : filters.getItems()) {
                 if(filter.getName().equals("sensitive")) {
                     push2WordRule(filter);
                 } else if(filter.getName().equals("sensitive_input")) {
@@ -441,7 +448,7 @@ public class GlobalConfigurations extends AbstractConfiguration {
                 .videoEnhance(VideoEnhance.builder().backends(functions.getVideo2Enhance()).build())
                 .videoGeneration(VideoGeneration.builder().backends(functions.getImage2video()).build())
                 .videoTrack(VideoTrack.builder().backends(functions.getVideo2Track()).build())
-                .agents(agents)
+                .agents(agents.getAgents())
                 .workers(skills.getWorkers())
                 .build();
     }

@@ -26,7 +26,7 @@ public class McpManager {
     public void register(McpConfig config)
     {
         mcpBackendsMap.clear();
-        if (config == null) {
+        if (config == null || Boolean.TRUE.equals(config.getEnable())) {
             return;
         }
         String defaultDriver = config.getDriver();

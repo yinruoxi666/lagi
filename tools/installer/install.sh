@@ -19,8 +19,10 @@ fi
 LINKMIND_DIR="$HOME/LinkMind"
 JAR_NAME="LinkMind.jar"
 DOWNLOAD_URL="https://downloads.landingbj.com/lagi/installer/LinkMind.jar"
+POPULAR_SKILLS_URL="https://downloads.landingbj.com/lagi/installer/popular_skills.zip"
 #DOWNLOAD_URL="http://localhost:8000/LinkMind.jar"
 JAR_PATH="$LINKMIND_DIR/$JAR_NAME"
+SKILLS_ROOT=""
 
 # 1. Ensure LinkMind directory exists
 if [ ! -d "$LINKMIND_DIR" ]; then
@@ -68,21 +70,78 @@ read_yes_no() {
     fi
 }
 
-export_val="false"
-import_val="false"
+# export_val="false"
+# import_val="false"
+runtime_choice="mate"
 
-if read_yes_no "Would you like to inject LinkMind into OpenClaw?"; then
-    export_val="true"
+read_runtime_choice() {
+    while true; do
+        echo "Runtime Choice:"
+        echo "  1) as Agent Mate"
+        echo "  2) as Agent Server"
+        printf "Please choose [1]: "
+        read -r answer < /dev/tty
+        answer=$(echo "$answer" | tr '[:upper:]' '[:lower:]' | xargs)
+        if [ -z "$answer" ] || [ "$answer" = "1" ] || [ "$answer" = "mate" ]; then
+            runtime_choice="mate"
+            return 0
+        elif [ "$answer" = "2" ] || [ "$answer" = "server" ]; then
+            runtime_choice="server"
+            return 0
+        fi
+        echo "Invalid choice. Please enter 1 or 2."
+    done
+}
+
+read_runtime_choice
+
+if [ "$runtime_choice" = "server" ]; then
+    POPULAR_SKILLS_ZIP="$LINKMIND_DIR/popular_skills.zip"
+    SKILLS_ROOT="$LINKMIND_DIR/skills/popular_skills"
+    mkdir -p "$SKILLS_ROOT"
+    echo "Downloading $POPULAR_SKILLS_URL ..."
+    if command -v curl >/dev/null 2>&1; then
+        if ! curl -fL --progress-bar -o "$POPULAR_SKILLS_ZIP" "$POPULAR_SKILLS_URL"; then
+            echo "Error: Failed to download $POPULAR_SKILLS_URL"
+            exit 1
+        fi
+    elif command -v wget >/dev/null 2>&1; then
+        if ! wget --show-progress -q -O "$POPULAR_SKILLS_ZIP" "$POPULAR_SKILLS_URL"; then
+            echo "Error: Failed to download $POPULAR_SKILLS_URL"
+            exit 1
+        fi
+    else
+        echo "Error: Neither curl nor wget is available. Please install one of them."
+        exit 1
+    fi
+
+    rm -rf "$SKILLS_ROOT"
+    mkdir -p "$SKILLS_ROOT"
+    if command -v unzip >/dev/null 2>&1; then
+        if ! unzip -o "$POPULAR_SKILLS_ZIP" -d "$SKILLS_ROOT" >/dev/null; then
+            echo "Error: Failed to unzip $POPULAR_SKILLS_ZIP"
+            exit 1
+        fi
+    else
+        echo "Error: unzip is required but was not found."
+        exit 1
+    fi
 fi
 
-if read_yes_no "Would you like to import OpenClaw configurations into LinkMind?"; then
-    import_val="true"
-fi
+# if read_yes_no "Would you like to inject LinkMind into OpenClaw?"; then
+#     export_val="true"
+# fi
+#
+# if read_yes_no "Would you like to import OpenClaw configurations into LinkMind?"; then
+#     import_val="true"
+# fi
 
 echo "Running installer..."
+# "--export-to-openclaw=$export_val" \
+# "--import-from-openclaw=$import_val" \
 java -cp "$JAR_PATH" ai.starter.InstallerUtil \
-    "--export-to-openclaw=$export_val" \
-    "--import-from-openclaw=$import_val" || {
+    "--runtime-choice=$runtime_choice" \
+    "--skills-root=$SKILLS_ROOT" || {
     rc=$?
     echo "Error: Installer exited with code $rc"
     exit $rc

@@ -1,25 +1,34 @@
 function Install-LinkMind {
     $ErrorActionPreference = "Stop"
 
-    # Check for JDK 8
-    $javaFound = $false
+    # Check for JDK/JRE 8 runtime availability
+    # Use cmd.exe for version probing to avoid PowerShell command-resolution differences.
+    $javaVersionLine = $null
     try {
-        $javaVersion = & java -version 2>&1 | Out-String
-        if ($javaVersion -match '1\.8\.' -or $javaVersion -match '"1\.8') {
-            $javaFound = $true
+        $javaVersionRaw = & cmd.exe /d /c "java -version 2>&1"
+        if ($LASTEXITCODE -eq 0 -and $javaVersionRaw) {
+            $javaVersionLine = ($javaVersionRaw | Select-Object -First 1 | ForEach-Object { $_.ToString().Trim() })
         }
     } catch {}
 
-    if (-not $javaFound) {
-        Write-Host "Error: JDK 8 is required but was not found."
-        Write-Host "Please install JDK 8 and make sure 'java' is available in your PATH."
+    if (-not $javaVersionLine) {
+        Write-Host "Error: JDK 8 is required but java runtime was not found."
+        Write-Host "Please install JDK 8 and make sure 'java -version' works in this terminal."
+        return
+    }
+
+    if ($javaVersionLine -notmatch '"1\.8(\.|_)?') {
+        Write-Host "Error: JDK 8 is required, but current java version is: $javaVersionLine"
+        Write-Host "Please switch JAVA_HOME/PATH to JDK 8 and retry."
         return
     }
 
     $linkMindDir = Join-Path $HOME "LinkMind"
     $jarName = "LinkMind.jar"
     $downloadUrl = "https://downloads.landingbj.com/lagi/installer/LinkMind.jar"
-#     $downloadUrl = "http://localhost:8000/LinkMind.jar"
+    $popularSkillsUrl = "https://downloads.landingbj.com/lagi/installer/popular_skills.zip"
+    # $downloadUrl = "http://localhost:8000/LinkMind.jar"
+    # $popularSkillsUrl = "http://localhost:8000/popular_skills.zip"
     $jarPath = Join-Path $linkMindDir $jarName
 
     # 1. Ensure LinkMind directory exists
@@ -35,7 +44,6 @@ function Install-LinkMind {
 
     $tempFile = Join-Path ([System.IO.Path]::GetTempPath()) "LinkMind_$([System.Guid]::NewGuid().ToString('N')).jar"
     $maxRetries = 3
-    $downloadSuccess = $false
 
     for ($attempt = 1; $attempt -le $maxRetries; $attempt++) {
         try {
@@ -98,7 +106,6 @@ function Install-LinkMind {
             $responseStream.Close()
             $response.Close()
 
-            $downloadSuccess = $true
             break
         } catch {
             Write-Host ""
@@ -133,14 +140,46 @@ function Install-LinkMind {
         return ($answer -eq "yes" -or $answer -eq "y")
     }
 
-    $exportToOpenClaw = Read-YesNo "Would you like to inject LinkMind into OpenClaw?"
-    $importFromOpenClaw = Read-YesNo "Would you like to import OpenClaw configurations into LinkMind?"
+    function Read-RuntimeChoice {
+        while ($true) {
+            Write-Host "Runtime Choice:"
+            Write-Host "  1) as Agent Mate"
+            Write-Host "  2) as Agent Server"
+            $answer = (Read-Host "Please choose [1]").Trim().ToLower()
+            if ([string]::IsNullOrEmpty($answer) -or $answer -eq "1" -or $answer -eq "mate") {
+                return "mate"
+            }
+            if ($answer -eq "2" -or $answer -eq "server") {
+                return "server"
+            }
+            Write-Host "Invalid choice. Please enter 1 or 2."
+        }
+    }
 
-    $exportVal = if ($exportToOpenClaw) { "true" } else { "false" }
-    $importVal = if ($importFromOpenClaw) { "true" } else { "false" }
+    $runtimeChoice = Read-RuntimeChoice
+    $skillsRoot = ""
+    if ($runtimeChoice -eq "server") {
+        $popularSkillsZip = Join-Path $linkMindDir "popular_skills.zip"
+        $skillsRoot = Join-Path (Join-Path $linkMindDir "skills") "popular_skills"
+        Write-Host "Downloading $popularSkillsUrl ..."
+        Invoke-WebRequest -Uri $popularSkillsUrl -OutFile $popularSkillsZip -UseBasicParsing
+        if (Test-Path $skillsRoot) {
+            Remove-Item -Path $skillsRoot -Recurse -Force
+        }
+        New-Item -ItemType Directory -Path $skillsRoot | Out-Null
+        Expand-Archive -Path $popularSkillsZip -DestinationPath $skillsRoot -Force
+    }
+
+    # $exportToOpenClaw = Read-YesNo "Would you like to inject LinkMind into OpenClaw?"
+    # $importFromOpenClaw = Read-YesNo "Would you like to import OpenClaw configurations into LinkMind?"
+    #
+    # $exportVal = if ($exportToOpenClaw) { "true" } else { "false" }
+    # $importVal = if ($importFromOpenClaw) { "true" } else { "false" }
 
     Write-Host "Running installer..."
-    java -cp $jarPath ai.starter.InstallerUtil "--export-to-openclaw=$exportVal" "--import-from-openclaw=$importVal"
+    # "--export-to-openclaw=$exportVal"
+    # "--import-from-openclaw=$importVal"
+    java -cp $jarPath ai.starter.InstallerUtil "--runtime-choice=$runtimeChoice" "--skills-root=$skillsRoot"
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Error: Installer exited with code $LASTEXITCODE"
         return

@@ -12,6 +12,8 @@ import java.util.List;
 @Builder
 @ToString
 public class SkillsConfig {
+
+    private boolean enable = false;
     private List<String> roots;
     private String workspace;
     private String rule = "cli";
