@@ -37,6 +37,11 @@
         }
     }
 
+    /** Same rule as credits center: only cookie userId counts as logged in. */
+    function isApiKeysUserLoggedIn() {
+        return !!((typeof getCookie === "function" ? getCookie("userId") : "") || "");
+    }
+
     function syncLocalApiKeyEditableFromResponse(res, st) {
         if (res && typeof res.localApiKeyEditable === "boolean") {
             st.localApiKeyEditable = res.localApiKeyEditable;
@@ -133,6 +138,12 @@
     }
 
     function loadProviders(done) {
+        if (!isApiKeysUserLoggedIn()) {
+            if (typeof done === "function") {
+                done([]);
+            }
+            return;
+        }
         $.ajax({
             type: "GET",
             contentType: "application/json;charset=utf-8",
@@ -183,6 +194,9 @@
     }
 
     function loadApiKeys() {
+        if (!isApiKeysUserLoggedIn()) {
+            return;
+        }
         ensureApiKeysState();
         window.__apiKeysPageState.apiKeysTableReady = false;
         setApiKeysLoading(true);
@@ -258,6 +272,10 @@
             toggleApiKey(id, provider, !enabled);
         });
         $("#api-keys-container").on("click", ".api-key-copy-link", function() {
+            if (!isApiKeysUserLoggedIn()) {
+                alert(tTextOpenRouter("请先登录"));
+                return;
+            }
             const st = window.__apiKeysPageState;
             const idx = Number($(this).data("row-index"));
             const row = (st && st.rows && !isNaN(idx)) ? st.rows[idx] : null;
@@ -285,6 +303,10 @@
     }
 
     function addApiKey() {
+        if (!isApiKeysUserLoggedIn()) {
+            alert(tTextOpenRouter("请先登录"));
+            return;
+        }
         const provider = ($("#apiKeyAddProviderSelect").val() || "").trim();
         const apiKey = ($("#apiKeyAddApiKeyInput").val() || "").trim();
         if (!provider) {
@@ -343,6 +365,10 @@
     }
 
     function deleteApiKey(row) {
+        if (!isApiKeysUserLoggedIn()) {
+            alert(tTextOpenRouter("请先登录"));
+            return;
+        }
         if (!row || !row.id) return;
         confirm(tTextOpenRouter("确认删除该模型的 API Key 吗？")).then(function(ok) {
             if (!ok) return;
@@ -370,6 +396,10 @@
     }
 
     function toggleApiKey(id, provider, enabled) {
+        if (!isApiKeysUserLoggedIn()) {
+            alert(tTextOpenRouter("请先登录"));
+            return;
+        }
         if (!id || !provider) return;
         $.ajax({
             type: "POST",
@@ -398,21 +428,33 @@
         hideChatPartsForStandalonePage();
         ensureApiKeysState();
         const st = window.__apiKeysPageState;
+        const loggedIn = isApiKeysUserLoggedIn();
+        const subtitleText = loggedIn
+            ? tTextOpenRouter("管理模型的 API Key")
+            : tTextOpenRouter("登录后显示 API 密钥");
+        const tbodyHtml = loggedIn
+            ? renderApiKeysRows(st.rows)
+            : '<tr><td colspan="4" style="padding:24px;text-align:center;color:#6b7280;font-size:14px;line-height:1.6;">' +
+              tTextOpenRouter("登录后可查看 API 密钥") +
+              "</td></tr>";
+        const createBtnStyle = loggedIn
+            ? "padding:10px 18px;border:none;border-radius:8px;background:#6366f1;color:#fff;font-size:14px;cursor:pointer;"
+            : "display:none;";
         const html = `
             <div id="api-keys-container" style="padding:20px;min-height:100%;background:#fff;">
                 <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
                     <div>
                         <h2 style="margin:0;font-size:28px;font-weight:700;">API 密钥</h2>
-                        <div style="margin-top:6px;color:#6b7280;font-size:13px;">管理模型的 API Key</div>
+                        <div style="margin-top:6px;color:#6b7280;font-size:13px;">${subtitleText}</div>
                         <div id="apiKeysModeHint" style="display:none;margin-top:6px;color:#6b7280;font-size:12px;"></div>
                     </div>
-                    <button type="button" id="apiKeysCreateBtn" style="padding:10px 18px;border:none;border-radius:8px;background:#6366f1;color:#fff;font-size:14px;cursor:pointer;">新增配置</button>
+                    <button type="button" id="apiKeysCreateBtn" style="${createBtnStyle}">新增配置</button>
                 </div>
                 <div style="border:1px solid #e5e7eb;border-radius:10px;background:#fff;overflow:hidden;">
                     <div style="overflow-x:auto;">
                         <table style="width:100%;border-collapse:collapse;font-size:13px;">
                             <thead><tr style="background:#fff;"><th style="${openRouterThStyle()}">名称</th><th style="${openRouterThStyle()}">提供商</th><th style="${openRouterThStyle()}">API 密钥</th><th style="${openRouterThStyle()}">操作</th></tr></thead>
-                            <tbody id="apiKeysTbody">${renderApiKeysRows(st.rows)}</tbody>
+                            <tbody id="apiKeysTbody">${tbodyHtml}</tbody>
                         </table>
                     </div>
                 </div>
@@ -446,13 +488,65 @@
         `;
         $("#item-content").html(tHtmlOpenRouter(html));
         bindApiKeysEvents();
-        loadProviders(function(types) {
-            const stAfter = window.__apiKeysPageState;
-            const optionHtml = '<option value="">' + tTextOpenRouter("请选择 provider") + "</option>" + renderProviderOptions(types);
-            $("#apiKeyAddProviderSelect").html(optionHtml);
-            toggleAddDialogFields();
-            updateApiKeysModeHint(stAfter);
+        if (loggedIn) {
+            loadProviders(function(types) {
+                const stAfter = window.__apiKeysPageState;
+                const optionHtml = '<option value="">' + tTextOpenRouter("请选择 provider") + "</option>" + renderProviderOptions(types);
+                $("#apiKeyAddProviderSelect").html(optionHtml);
+                toggleAddDialogFields();
+                updateApiKeysModeHint(stAfter);
+            });
+            loadApiKeys();
+        }
+    };
+
+    /**
+     * For chat completions: if user is logged in (cookie userId), returns a Landing API key from /apiKey/list.
+     * Prefers enabled keys (status === 1). Resolves to null if not logged in or no Landing key.
+     */
+    window.fetchLandingApiKeyForChat = function() {
+        return new Promise(function(resolve) {
+            if (!isApiKeysUserLoggedIn()) {
+                resolve(null);
+                return;
+            }
+            var userId = getApiKeysUserId();
+            if (!userId) {
+                resolve(null);
+                return;
+            }
+            $.ajax({
+                type: "GET",
+                contentType: "application/json;charset=utf-8",
+                url: "/apiKey/list",
+                data: { userId: userId },
+                success: function(res) {
+                    if (!res || res.status !== "success" || !Array.isArray(res.data)) {
+                        resolve(null);
+                        return;
+                    }
+                    var landing = [];
+                    for (var i = 0; i < res.data.length; i++) {
+                        var item = res.data[i];
+                        if (item && String(item.provider || "").toLowerCase() === "landing") {
+                            landing.push(item);
+                        }
+                    }
+                    if (!landing.length) {
+                        resolve(null);
+                        return;
+                    }
+                    var enabled = landing.filter(function(x) {
+                        return Number(x.status) === 1;
+                    });
+                    var pick = (enabled.length ? enabled : landing)[0];
+                    var key = String(pick.api_key || pick.apiKey || "").trim();
+                    resolve(key || null);
+                },
+                error: function() {
+                    resolve(null);
+                }
+            });
         });
-        loadApiKeys();
     };
 })();

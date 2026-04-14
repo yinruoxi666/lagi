@@ -629,6 +629,8 @@
         '打开微信支付': 'Open WeChat Pay',
         '登录后显示余额': 'Sign in to view balance',
         '登录后可查看交易记录': 'Sign in to view transactions',
+        '登录后显示 API 密钥': 'Sign in to view API keys',
+        '登录后可查看 API 密钥': 'Sign in to view API keys',
         '已支付': 'Paid',
         '未支付': 'Unpaid',
         '个人账户': 'Personal account',

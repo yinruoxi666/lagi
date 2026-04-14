@@ -254,7 +254,7 @@
             window.__creditsPageState = {
                 account: "个人账户: 未登录",
                 balance: 0,
-                purchaseAmount: 0.01,
+                purchaseAmount: 5,
                 transactions: []
             };
         }
@@ -367,7 +367,7 @@
                     </div>
                     <div style="display:grid;grid-template-columns:1fr auto;align-items:center;gap:10px;margin-bottom:10px;">
                         <label style="font-size:14px;color:#374151;">充值金额</label>
-                        <input id="creditsAmountInput" type="number" min="0.01" step="0.01" value="${st.purchaseAmount}" style="width:120px;padding:8px;border:1px solid #d1d5db;border-radius:6px;text-align:right;" />
+                        <input id="creditsAmountInput" type="number" min="1" step="1" value="${st.purchaseAmount}" style="width:120px;padding:8px;border:1px solid #d1d5db;border-radius:6px;text-align:right;" />
                     </div>
                     <div style="border-top:1px solid #e5e7eb;padding-top:10px;margin-top:10px;font-size:14px;line-height:1.8;">
                         <div style="display:flex;justify-content:space-between;font-weight:700;"><span>应付总额</span><span id="creditsTotalDue">¥ ${formatCreditsMoney(st.purchaseAmount)}</span></div>

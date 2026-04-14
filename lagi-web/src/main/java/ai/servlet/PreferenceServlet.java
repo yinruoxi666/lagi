@@ -4,6 +4,7 @@ import ai.annotation.*;
 import ai.common.ModelService;
 import ai.dto.ModelInfo;
 import ai.dto.ModelPreferenceDto;
+import ai.llm.adapter.ILlmAdapter;
 import ai.llm.utils.CacheManager;
 import ai.llm.adapter.impl.ProxyLlmAdapter;
 import ai.manager.*;
@@ -54,21 +55,7 @@ public class PreferenceServlet extends RestfulServlet {
     }
 
     private <A extends Annotation> List<ModelInfo> convert2ModelInfo(ModelService modelService, Class<A> annotationClass) {
-        Object target = modelService;
-        if (modelService instanceof ProxyLlmAdapter) {
-            target = ((ProxyLlmAdapter) modelService).getLlmAdapter();
-        }
-
-        A annotation = target.getClass().getAnnotation(annotationClass);
-        if(annotation == null){
-            return Collections.emptyList();
-        }
-
-        String [] modelNames = AnnotationUtil.getAnnotationValue(target.getClass(), annotationClass, "modelNames");
-        if (modelNames == null) {
-            return Collections.emptyList();
-        }
-
+        String [] modelNames = {};
         // Use the modelNames configured in the yaml file if they exist and are not empty
         String configuredModel = modelService.getModel();
         if (configuredModel != null && !configuredModel.trim().isEmpty()) {

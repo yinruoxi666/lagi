@@ -27,6 +27,8 @@ import java.util.concurrent.ThreadLocalRandom;
 
 @Slf4j
 public class TokenStatisticsDao {
+    private static final int MAX_INSERT_RETRY = 3;
+
     private static final String CREATE_SQL = ""
             + "CREATE TABLE IF NOT EXISTS llm_token_statistics ("
             + " id INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -135,19 +137,29 @@ public class TokenStatisticsDao {
     public void insert(long promptTokens, long completionTokens, long totalTokens, long savedTokens,
                        String provider, String model, String sessionId) {
         String sql = "INSERT INTO llm_token_statistics (created_at, prompt_tokens, completion_tokens, total_tokens, saved_tokens, provider, model, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-        try (Connection conn = HikariDS.getConnection(AiGlobal.DEFAULT_DB);
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setLong(1, System.currentTimeMillis());
-            ps.setLong(2, promptTokens);
-            ps.setLong(3, completionTokens);
-            ps.setLong(4, totalTokens);
-            ps.setLong(5, savedTokens);
-            ps.setString(6, provider);
-            ps.setString(7, model);
-            ps.setString(8, sessionId);
-            ps.executeUpdate();
-        } catch (SQLException e) {
-            log.error("insert token statistics failed", e);
+        int retry = 0;
+        while (retry <= MAX_INSERT_RETRY) {
+            try (Connection conn = HikariDS.getConnection(AiGlobal.DEFAULT_DB);
+                 PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setLong(1, System.currentTimeMillis());
+                ps.setLong(2, promptTokens);
+                ps.setLong(3, completionTokens);
+                ps.setLong(4, totalTokens);
+                ps.setLong(5, savedTokens);
+                ps.setString(6, provider);
+                ps.setString(7, model);
+                ps.setString(8, sessionId);
+                ps.executeUpdate();
+                return;
+            } catch (SQLException e) {
+                if (!isSqliteBusy(e) || retry == MAX_INSERT_RETRY) {
+                    log.error("insert token statistics failed", e);
+                    return;
+                }
+                retry++;
+                log.warn("insert token statistics busy, retry {}", retry, e);
+                sleepQuietly(100L * retry);
+            }
         }
     }
 
@@ -375,6 +387,18 @@ public class TokenStatisticsDao {
             try (PreparedStatement ps = conn.prepareStatement(ddl)) {
                 ps.executeUpdate();
             }
+        }
+    }
+
+    private static boolean isSqliteBusy(SQLException e) {
+        return e.getMessage() != null && e.getMessage().contains("SQLITE_BUSY");
+    }
+
+    private static void sleepQuietly(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException ignored) {
+            Thread.currentThread().interrupt();
         }
     }
 }

@@ -67,7 +67,6 @@ public class UserModelPreferenceDao {
                 res = updatePreference(conn, modelPreferenceDto);
             } else { // 如果记录不存在，则插入
                 res = insertPreference(conn, modelPreferenceDto);
-                System.out.println(res);
             }
             // 提交事务
             conn.commit();
@@ -122,9 +121,6 @@ public class UserModelPreferenceDao {
     }
 
     private int insertPreference(Conn conn, ModelPreferenceDto modelPreferenceDto) throws SQLException {
-//        INSERT INTO lagi_user_preference (finger, user_id, llm, tts, asr, img2Text, imgGen, imgEnhance, img2Video, text2Video,
-//                videoEnhance, videoTrack)
-//        VALUES ('aaaa', 'aaaa', null, null, null, null, null, null, null, null, null, null);
         StringBuilder updateBuilder = new StringBuilder();
         List<List<String>> fs = getFields(modelPreferenceDto);
         fs.get(0).add("finger");
@@ -147,7 +143,6 @@ public class UserModelPreferenceDao {
             }
         }
         updateBuilder.append(");");
-        System.out.println(updateBuilder.toString());
         PreparedStatement preparedStatement = conn.prepareStatement(updateBuilder.toString());
         for (int i = 1; i <= params.size(); i++) {
             preparedStatement.setString(i , params.get(i-1));

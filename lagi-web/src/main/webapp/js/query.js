@@ -326,6 +326,17 @@ function getLoginStatus(appId, username) {
 
 const CONVERSATION_CONTEXT = [];
 
+/**
+ * Authorization for v1/chat/completions (Bearer Landing key) when logged in. See apikeys.js fetchLandingApiKeyForChat.
+ */
+async function buildChatCompletionsAuthHeader() {
+    if (typeof window.fetchLandingApiKeyForChat !== "function") {
+        return null;
+    }
+    var key = await window.fetchLandingApiKeyForChat();
+    return key ? ("Bearer " + key) : null;
+}
+
 function getTextResult(question, robootAnswerJq, conversation, agentId) {
     var result = '';
     var paras = {
@@ -434,9 +445,9 @@ function getTextResult(question, robootAnswerJq, conversation, agentId) {
     return result;
 }
 
-function generalOutput(paras, question, robootAnswerJq) {
+async function generalOutput(paras, question, robootAnswerJq) {
     let url = paras.agentId ? 'chat/go' : 'v1/chat/completions';
-    $.ajax({
+    var ajaxOpts = {
         type: "POST",
         contentType: "application/json;charset=utf-8",
         url: url,
@@ -497,7 +508,14 @@ function generalOutput(paras, question, robootAnswerJq) {
             querying = false;
             robootAnswerJq.html(tTextQuery("调用失败！"));
         }
-    });
+    };
+    if (!paras.agentId) {
+        var authHeader = await buildChatCompletionsAuthHeader();
+        if (authHeader) {
+            ajaxOpts.headers = { Authorization: authHeader };
+        }
+    }
+    $.ajax(ajaxOpts);
 }
 
 function streamOutput(paras, question, robootAnswerJq) {
@@ -512,14 +530,21 @@ function streamOutput(paras, question, robootAnswerJq) {
 
     async function generateStream(paras) {
         let url = paras.agentId ? 'chat/go' : 'v1/chat/completions';
+        var streamHeaders = {
+            "Content-Type": "application/json",
+            "Accept": "text/event-stream",
+        };
+        if (!paras.agentId) {
+            var authH = await buildChatCompletionsAuthHeader();
+            if (authH) {
+                streamHeaders["Authorization"] = authH;
+            }
+        }
         const response = await fetch(url, {
             method: "POST",
             cache: "no-cache",
             keepalive: true,
-            headers: {
-                "Content-Type": "application/json",
-                "Accept": "text/event-stream",
-            },
+            headers: streamHeaders,
             body: JSON.stringify(paras),
         });
 
@@ -567,7 +592,7 @@ function streamOutput(paras, question, robootAnswerJq) {
                 if (json.choices.length === 0) {
                     continue;
                 }
-                let chatMessage = json.choices[0].message;
+                let chatMessage = json.choices[0].delta;
                 let a = '';
                 if (chatMessage.filename) {
                     for (let i = 0; i < chatMessage.filename.length; i++) {

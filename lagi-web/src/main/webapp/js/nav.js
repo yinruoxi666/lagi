@@ -1281,7 +1281,10 @@ function getPromptDialog(id, subId) {
     
     $('#item-content').empty();
     $('#footer-info').show();
-    
+    // Special pages do not call backToChat(); hide model preference UI when leaving skill/chat flows.
+    $('#model-selects').empty();
+    $('#model-prefences').hide();
+
     if (subId === 14) {
         loadTokenUsagePage();
         setLeafNavActiveByNavId(subId);
@@ -1415,6 +1418,8 @@ function goToUserTab(id, e) {
     setLeafNavActiveByNavId(id);
     $('#conTab').hide();
     $('#mytab').show();
+    $('#model-selects').empty();
+    $('#model-prefences').hide();
     const formElement = document.querySelector('#not-content form');
     formElement.style.visibility = 'hidden';
     let subNavs = promptNavs[4].subNavs;
@@ -1461,6 +1466,8 @@ function goToUserTabV2(navId, subNavId, e) {
     setLeafNavActiveByNavId(subNavId);
     $('#conTab').hide();
     $('#mytab').show();
+    $('#model-selects').empty();
+    $('#model-prefences').hide();
     const formElement = document.querySelector('#not-content form');
     formElement.style.visibility = 'hidden';
     let subNavs = promptNavs[4].subNavs;

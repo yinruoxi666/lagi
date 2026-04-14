@@ -239,6 +239,7 @@ pre .key {
 
 
 #model-prefences {
+    display: none;
     font-size: 1em;
 }
 
