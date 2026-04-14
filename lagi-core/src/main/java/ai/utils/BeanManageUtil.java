@@ -1,6 +1,8 @@
 package ai.utils;
 
 import ai.annotation.Component;
+import ai.annotation.ConditionalOnProperty;
+import ai.annotation.Profile;
 import ai.annotation.Value;
 import cn.hutool.core.convert.Convert;
 import org.slf4j.Logger;
@@ -83,6 +85,16 @@ public class BeanManageUtil {
             try {
                 Component annotation = clazz.getAnnotation(Component.class);
                 if(annotation == null) {
+                    continue;
+                }
+                ConditionalOnProperty onProperty = clazz.getAnnotation(ConditionalOnProperty.class);
+                if (onProperty != null && !ConditionalOnPropertyEvaluator.matches(onProperty)) {
+                    log.debug("Skip component {}: @ConditionalOnProperty not matched", clazz.getName());
+                    continue;
+                }
+                Profile profile = clazz.getAnnotation(Profile.class);
+                if (profile != null && !ProfileEvaluator.matches(profile)) {
+                    log.debug("Skip component {}: @Profile not matched (active: {})", clazz.getName(), ProfileEvaluator.resolveActiveProfiles());
                     continue;
                 }
                 Object instance = clazz.getConstructor().newInstance();

@@ -1,7 +1,9 @@
 package ai.llm.hook.impl;
 
 import ai.annotation.Component;
+import ai.annotation.ConditionalOnProperty;
 import ai.annotation.Order;
+import ai.annotation.Profile;
 import ai.common.ModelService;
 import ai.common.utils.LRUCache;
 import ai.config.ContextLoader;
@@ -37,6 +39,7 @@ import java.util.stream.Collectors;
 
 @Order(2)
 @Component
+@ConditionalOnProperty(name = "skills.enabled", havingValue = "true")
 public class OpenClawSkillInject implements BeforeModel, AfterModel {
 
     private static final int CACHE_SIZE = 100;

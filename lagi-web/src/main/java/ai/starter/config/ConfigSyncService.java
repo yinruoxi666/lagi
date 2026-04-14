@@ -1,0 +1,78 @@
+package ai.starter.config;
+
+import ai.starter.config.impl.DeepFlowSyncServiceImpl;
+import ai.starter.config.impl.HermesSyncServiceImpl;
+import ai.starter.config.impl.OpenClawSyncServiceImpl;
+import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+
+@Slf4j
+public class ConfigSyncService {
+
+    public static final int OpenClaw = 1;
+    public static final int deepFlow = 1 << 1;
+    public static final int Hermes = 1 << 2;
+
+    @Getter
+    private int all = 0;
+
+    private int port = 8080;
+
+
+    private final Map<Integer, IConfigSyncService> configSyncServices = new HashMap<>();
+
+    public ConfigSyncService() {
+        init();
+    }
+
+    public ConfigSyncService(int port) {
+        init();
+        this.port = port;
+    }
+
+    private void init() {
+        configSyncServices.put(OpenClaw, new OpenClawSyncServiceImpl());
+        configSyncServices.put(deepFlow, new DeepFlowSyncServiceImpl());
+        configSyncServices.put(Hermes, new HermesSyncServiceImpl());
+        all = OpenClaw | deepFlow | Hermes;
+    }
+
+    public int selected(int [] selected) {
+        int selects = 0;
+        for (int i : selected) {
+            selects |= i;
+        }
+        return selects & all;
+    }
+
+
+    private String getBasePath() {
+        return "http://127.0.0.1:" + port + "/v1";
+    }
+
+    public void sync(int exportWhich, int loadWhich) {
+        Set<Integer> keys = configSyncServices.keySet();
+        for (Integer key : keys) {
+            IConfigSyncService service = configSyncServices.get(key);
+            if(!service.check()) {
+                log.warn("{} is not installed, skipping configuration synchronization", service.name());
+                continue;
+            }
+            if ((exportWhich & key) == 0) {
+                log.info("Skipped: LinkMind to {} configuration synchronization", service.name());
+            } else {
+                service.export(getBasePath());
+            }
+            if ((loadWhich & key) == 0) {
+                log.info("Skipped: {} to LinkMind configuration synchronization", service.name());
+            } else {
+                service.load();
+            }
+        }
+    }
+
+}

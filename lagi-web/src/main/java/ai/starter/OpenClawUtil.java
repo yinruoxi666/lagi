@@ -50,7 +50,7 @@ public class OpenClawUtil {
         }
     }
 
-    private static boolean openClawExists() {
+    public static boolean openClawExists() {
         Path openClawPath = resolveOpenClawJsonPath();
         return openClawPath != null && Files.exists(openClawPath);
     }

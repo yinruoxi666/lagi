@@ -1,5 +1,6 @@
 package ai.starter;
 
+import ai.starter.config.ConfigSyncService;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.bridge.SLF4JBridgeHandler;
 
@@ -20,7 +21,9 @@ public class Application {
         boolean enableSync = InstallerUtil.resolveEnableSync(args);
 
         if (!devMode && enableSync) {
-            OpenClawUtil.sync(port, true, true);
+//        if (enableSync) {
+            ConfigSyncService configSyncService = new ConfigSyncService(port);
+            configSyncService.sync(configSyncService.getAll(), configSyncService.getAll());
         }
 
         Path webappDir = TomcatUtil.resolveWebappDir(Application.class);

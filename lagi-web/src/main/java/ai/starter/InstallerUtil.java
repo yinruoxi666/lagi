@@ -1,5 +1,8 @@
 package ai.starter;
 
+import ai.pnps.skills.SkillLoader;
+import ai.pnps.skills.pojo.SkillEntry;
+import ai.starter.config.ConfigSyncService;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
@@ -8,19 +11,36 @@ import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.lang.reflect.Array;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Enumeration;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
+import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 
 @Slf4j
 public class InstallerUtil {
     public static final String CONFIG_FILE_PROPERTY = "linkmind.config";
     private static final String EXPORT_TO_OPENCLAW_ARG = "--export-to-openclaw=";
     private static final String IMPORT_FROM_OPENCLAW_ARG = "--import-from-openclaw=";
+    private static final String RUNTIME_CHOICE_ARG = "--runtime-choice=";
+    private static final String SKILLS_ROOT_ARG = "--skills-root=";
     private static final String LAGI_YML = "lagi.yml";
     private static final String SQLITE_RESOURCE_DIR = "sqlite";
     private static final int DEFAULT_PORT = 8080;
@@ -29,9 +49,10 @@ public class InstallerUtil {
     public static void main(String[] args) throws IOException {
         File jarFile = InstallerUtil.getJarFile();
         InstallerUtil.applyConfigAndDataDir(args, jarFile);
-        boolean exportToOpenClaw = resolveExportToOpenClaw(args);
-        boolean importFromOpenClaw = resolveImportFromOpenClaw(args);
-        OpenClawUtil.sync(DEFAULT_PORT, exportToOpenClaw, importFromOpenClaw);
+        InstallerUtil.applyRuntimeSkillsConfig(args);
+        ConfigSyncService configSyncService = new ConfigSyncService(DEFAULT_PORT);
+        configSyncService.sync(configSyncService.getAll(), configSyncService.getAll());
+//        OpenClawUtil.sync(DEFAULT_PORT, exportToOpenClaw, importFromOpenClaw);
     }
 
     public static int resolvePort(String[] args) {
@@ -68,6 +89,18 @@ public class InstallerUtil {
 
     public static boolean resolveImportFromOpenClaw(String[] args) {
         return Boolean.parseBoolean(parseArg(args, IMPORT_FROM_OPENCLAW_ARG));
+    }
+
+    public static String resolveRuntimeChoice(String[] args) {
+        String value = parseArg(args, RUNTIME_CHOICE_ARG);
+        if (value == null || value.isEmpty()) {
+            return "mate";
+        }
+        String normalized = value.trim().toLowerCase();
+        if (Arrays.asList("2", "server").contains(normalized)) {
+            return "server";
+        }
+        return "mate";
     }
 
     public static boolean resolveEnableSync(String[] args) {
@@ -156,6 +189,287 @@ public class InstallerUtil {
             }
         }
         return null;
+    }
+
+    private static void applyRuntimeSkillsConfig(String[] args) throws IOException {
+        String configFile = System.getProperty(CONFIG_FILE_PROPERTY);
+        if (configFile == null || configFile.trim().isEmpty()) {
+            log.warn("Skip runtime config: {} is empty", CONFIG_FILE_PROPERTY);
+            return;
+        }
+        Path configPath = Paths.get(configFile).toAbsolutePath().normalize();
+        String runtimeChoice = resolveRuntimeChoice(args);
+        Path skillsRoot = null;
+        if ("server".equals(runtimeChoice)) {
+            String skillsRootArg = parseArg(args, SKILLS_ROOT_ARG);
+            if (skillsRootArg != null && !skillsRootArg.trim().isEmpty()) {
+                skillsRoot = Paths.get(skillsRootArg).toAbsolutePath().normalize();
+            }
+        }
+        try {
+            updateSkillsConfig(configPath, "server".equals(runtimeChoice), skillsRoot);
+        } catch (Exception e) {
+            log.error("Skip runtime skills config due to invalid YAML at {}. Please fix this file and retry if needed.", configPath, e);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void updateSkillsConfig(Path configPath, boolean enableSkills, Path skillsRoot) throws IOException {
+        // Default YAMLMapper can emit broken single-quoted multiline scalars (e.g. filters.rules), which then fail on re-read.
+        YAMLFactory yamlFactory = new YAMLFactory()
+                .disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
+                .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
+                .enable(YAMLGenerator.Feature.LITERAL_BLOCK_STYLE)
+                .enable(YAMLGenerator.Feature.INDENT_ARRAYS_WITH_INDICATOR);
+        YAMLMapper yamlMapper = new YAMLMapper(yamlFactory);
+        Map<String, Object> rootMap = new LinkedHashMap<>();
+        if (Files.exists(configPath)) {
+            try (InputStream in = Files.newInputStream(configPath)) {
+                Map<String, Object> loaded = yamlMapper.readValue(in, new TypeReference<Map<String, Object>>() {
+                });
+                if (loaded != null) {
+                    rootMap.putAll(loaded);
+                }
+            } catch (Exception e) {
+                log.warn("Skip runtime skills config due to invalid YAML at {}. Please fix this file and retry if needed.", configPath, e);
+            }
+        }
+
+        Object skillsObj = rootMap.get("skills");
+        Map<String, Object> skillsMap = skillsObj instanceof Map
+                ? new LinkedHashMap<>((Map<String, Object>) skillsObj)
+                : new LinkedHashMap<String, Object>();
+        skillsMap.put("enable", enableSkills);
+        if (skillsRoot != null) {
+            // roots 里只追加安装器传入的解压目录；内层目录推断仅用于发现 items，避免写入“多出来的错误路径”
+            Path discoveryRoot = resolveSkillRootForConfig(skillsRoot);
+            skillsMap.put("roots", mergeSkillRoots(skillsMap, skillsRoot));
+            appendSkillItems(skillsMap, discoveryRoot);
+        }
+        rootMap.put("skills", skillsMap);
+
+        if (configPath.getParent() != null) {
+            Files.createDirectories(configPath.getParent());
+        }
+        yamlMapper.writeValue(configPath.toFile(), rootMap);
+    }
+
+    /**
+     * 保留 YAML 里已有的 {@code skills.roots}（任意 Jackson/SnakeYAML 常见形态），再追加安装器解压目录（去重）。
+     */
+    private static List<String> mergeSkillRoots(Map<String, Object> skillsMap, Path unpackedDirForYaml) {
+        List<String> merged = new ArrayList<>();
+        Set<String> seenNorm = new HashSet<>();
+        collectExistingRoots(skillsMap.get("roots"), merged, seenNorm);
+        addRootIfAbsent(merged, seenNorm, unpackedDirForYaml.toAbsolutePath().normalize().toString());
+        return merged;
+    }
+
+    /**
+     * roots 可能是 List、其它 Collection、字符串、或 Java 数组；仅识别为 List 时会漏掉 classpath:skills 等配置。
+     */
+    private static void collectExistingRoots(Object rootsObj, List<String> merged, Set<String> seenNorm) {
+        if (rootsObj == null) {
+            return;
+        }
+        if (rootsObj instanceof Map) {
+            log.warn("skills.roots is a map; expected list or scalar. Skipping existing roots.");
+            return;
+        }
+        if (rootsObj instanceof CharSequence) {
+            addRootIfAbsent(merged, seenNorm, rootsObj.toString().trim());
+            return;
+        }
+        if (rootsObj instanceof Iterable && !(rootsObj instanceof Map)) {
+            for (Object o : (Iterable<?>) rootsObj) {
+                if (o != null) {
+                    addRootIfAbsent(merged, seenNorm, o.toString().trim());
+                }
+            }
+            return;
+        }
+        if (rootsObj.getClass().isArray()) {
+            int n = Array.getLength(rootsObj);
+            for (int i = 0; i < n; i++) {
+                Object o = Array.get(rootsObj, i);
+                if (o != null) {
+                    addRootIfAbsent(merged, seenNorm, o.toString().trim());
+                }
+            }
+            return;
+        }
+        addRootIfAbsent(merged, seenNorm, rootsObj.toString().trim());
+    }
+
+    private static void addRootIfAbsent(List<String> merged, Set<String> seenNorm, String s) {
+        if (s == null || s.isEmpty()) {
+            return;
+        }
+        String norm = normalizeRootForDedup(s);
+        if (norm.isEmpty()) {
+            return;
+        }
+        if (seenNorm.contains(norm)) {
+            return;
+        }
+        seenNorm.add(norm);
+        merged.add(s);
+    }
+
+    private static String normalizeRootForDedup(String pathOrUri) {
+        String t = pathOrUri == null ? "" : pathOrUri.trim();
+        if (t.isEmpty()) {
+            return "";
+        }
+        if (t.startsWith("classpath:")) {
+            return t;
+        }
+        try {
+            return Paths.get(t).toAbsolutePath().normalize().toString();
+        } catch (Exception e) {
+            return t;
+        }
+    }
+
+    /**
+     * Installers unzip into a folder that often contains a single top-level directory before skill dirs
+     * (e.g. {@code .../popular_skills/<bundle>/skill-a/SKILL.md}). {@link SkillLoader} expects roots where
+     * either {@code root/skills/...} or immediate child dirs contain {@code SKILL.md}; this picks such a path.
+     */
+    private static Path resolveSkillRootForConfig(Path declaredUnpackDir) {
+        Path real = declaredUnpackDir.toAbsolutePath().normalize();
+        if (!Files.isDirectory(real)) {
+            return real;
+        }
+        if (looksLikeSkillLoaderRoot(real)) {
+            return real;
+        }
+        try {
+            List<Path> subdirs = listDirectSubdirectories(real);
+            if (subdirs.size() == 1) {
+                Path inner = subdirs.get(0).toAbsolutePath().normalize();
+                if (looksLikeSkillLoaderRoot(inner)) {
+                    return inner;
+                }
+            }
+        } catch (IOException e) {
+            log.debug("resolveSkillRootForConfig: {}", real, e);
+        }
+        return real;
+    }
+
+    private static List<Path> listDirectSubdirectories(Path dir) throws IOException {
+        List<Path> subdirs = new ArrayList<>();
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
+            for (Path child : stream) {
+                String name = child.getFileName() == null ? "" : child.getFileName().toString();
+                if (name.startsWith(".") || "node_modules".equals(name)) {
+                    continue;
+                }
+                if (Files.isDirectory(child)) {
+                    subdirs.add(child);
+                }
+            }
+        }
+        return subdirs;
+    }
+
+    /**
+     * Mirrors {@link SkillLoader} scan root: {@code root/skills} when present, else {@code root}.
+     */
+    private static boolean looksLikeSkillLoaderRoot(Path root) {
+        try {
+            Path scanRoot = Files.isDirectory(root.resolve("skills")) ? root.resolve("skills") : root;
+            Path rootSkill = scanRoot.resolve("SKILL.md");
+            if (Files.isRegularFile(rootSkill)) {
+                return true;
+            }
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(scanRoot)) {
+                for (Path child : stream) {
+                    String name = child.getFileName() == null ? "" : child.getFileName().toString();
+                    if (name.startsWith(".") || "node_modules".equals(name)) {
+                        continue;
+                    }
+                    if (Files.isDirectory(child) && Files.isRegularFile(child.resolve("SKILL.md"))) {
+                        return true;
+                    }
+                }
+            }
+        } catch (IOException e) {
+            log.debug("looksLikeSkillLoaderRoot: {}", root, e);
+        }
+        return false;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void appendSkillItems(Map<String, Object> skillsMap, Path skillsRoot) {
+        List<Map<String, String>> discoveredItems = discoverSkillItems(skillsRoot);
+        if (discoveredItems.isEmpty()) {
+            return;
+        }
+
+        Object itemsObj = skillsMap.get("items");
+        List<Map<String, Object>> items = itemsObj instanceof List
+                ? new ArrayList<>((List<Map<String, Object>>) itemsObj)
+                : new ArrayList<Map<String, Object>>();
+
+        Set<String> existingNames = new HashSet<>();
+        for (Map<String, Object> item : items) {
+            Object name = item.get("name");
+            if (name instanceof String && !((String) name).trim().isEmpty()) {
+                existingNames.add(((String) name).trim());
+            }
+        }
+
+        for (Map<String, String> discoveredItem : discoveredItems) {
+            String name = discoveredItem.get("name");
+            if (name == null || name.trim().isEmpty() || existingNames.contains(name.trim())) {
+                continue;
+            }
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("name", name.trim());
+            item.put("description", discoveredItem.get("description"));
+            items.add(item);
+            existingNames.add(name.trim());
+        }
+        skillsMap.put("items", items);
+    }
+
+    private static List<Map<String, String>> discoverSkillItems(Path skillsRoot) {
+        if (skillsRoot == null) {
+            return Collections.emptyList();
+        }
+        Path root = skillsRoot.toAbsolutePath().normalize();
+        if (!Files.isDirectory(root)) {
+            return Collections.emptyList();
+        }
+        List<Map<String, String>> result = new ArrayList<>();
+        try {
+            SkillLoader loader = new SkillLoader();
+            List<SkillEntry> entries = loader.load(Collections.singletonList(root.toString()));
+            for (SkillEntry entry : entries) {
+                String name = trimToNull(entry == null ? null : entry.getName());
+                String description = trimToNull(entry == null ? null : entry.getDescription());
+                if (name == null || description == null) {
+                    continue;
+                }
+                Map<String, String> item = new LinkedHashMap<>();
+                item.put("name", name);
+                item.put("description", description);
+                result.add(item);
+            }
+        } catch (Exception e) {
+            log.warn("Discover skills failed in: {}", root, e);
+        }
+        return result;
+    }
+
+    private static String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     /**
