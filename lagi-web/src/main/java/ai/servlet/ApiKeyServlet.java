@@ -3,6 +3,7 @@ package ai.servlet;
 import ai.dto.ModelApiKey;
 import ai.migrate.service.ApiKeyService;
 import com.google.gson.Gson;
+import lombok.extern.slf4j.Slf4j;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -12,6 +13,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 public class ApiKeyServlet extends BaseServlet {
     private static final long serialVersionUID = 1L;
     protected Gson gson = new Gson();
@@ -123,6 +125,7 @@ public class ApiKeyServlet extends BaseServlet {
             result.put("status", "success");
             result.put("msg", "add success");
         } catch (Exception e) {
+            log.error("Failed to add API key: {}", e.getMessage(), e);
             result.put("status", "failed");
             result.put("msg", e.getMessage());
         }
@@ -135,9 +138,10 @@ public class ApiKeyServlet extends BaseServlet {
         try {
             DeleteApiKeyRequest body = reqBodyToObj(req, DeleteApiKeyRequest.class);
             Long id = body == null ? null : body.id;
+            String apiKey = body == null ? null : body.apiKey;
             String provider = body == null ? null : body.provider;
             String userId = body == null ? null : body.userId;
-            apiKeyService.deleteApiKey(id, provider, userId);
+            apiKeyService.deleteApiKey(id, apiKey, provider, userId);
             result.put("status", "success");
             result.put("msg", "delete success");
         } catch (Exception e) {
@@ -178,6 +182,7 @@ public class ApiKeyServlet extends BaseServlet {
 
     private static class DeleteApiKeyRequest {
         Long id;
+        String apiKey;
         String provider;
         String userId;
     }

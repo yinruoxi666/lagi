@@ -1,6 +1,7 @@
 package ai.utils;
 
 import ai.common.pojo.Response;
+import ai.config.ContextLoader;
 import com.google.gson.Gson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,6 +15,7 @@ public class ApikeyUtil {
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String SAAS_API_KEY_VALIDATE_PATH = "/saas/api/apikey/validate";
     private static final int DEFAULT_TIMEOUT_SECONDS = 3;
+    private static final Boolean enableAuth = ContextLoader.configuration.getFunctions().getChat().getEnableAuth();
 
     public static String extractBearerToken(String authorizationHeader) {
         if (authorizationHeader == null || !authorizationHeader.startsWith(BEARER_PREFIX)) {
@@ -43,6 +45,9 @@ public class ApikeyUtil {
     }
 
     public static boolean validateModelApiKey(String apiKey) {
+        if (!enableAuth) {
+            return true;
+        }
         if (apiKey == null || apiKey.trim().isEmpty()) {
             return false;
         }

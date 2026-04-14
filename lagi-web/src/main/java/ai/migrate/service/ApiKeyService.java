@@ -21,6 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ApiKeyService {
     private static final String OPENAI_COMPATIBLE = "OpenAICompatible";
@@ -30,6 +31,12 @@ public class ApiKeyService {
     private static final String SAAS_BASE_URL = AiGlobal.SAAS_URL;
     private final Gson gson = new Gson();
     private final ApiKeyDao apiKeyDao = new ApiKeyDao();
+    private final AtomicBoolean localSynced = new AtomicBoolean(false);
+    private final AtomicBoolean landingSynced = new AtomicBoolean(false);
+
+    public ApiKeyService() {
+        syncApiKeysToLocalDb(null);
+    }
 
     private String getLagiYmlPath() {
         if (lagiYmlPath == null) {
@@ -187,25 +194,88 @@ public class ApiKeyService {
                 return true;
             }
             Boolean b = general.getLocalApiKeyEditable();
-            return b == null || Boolean.TRUE.equals(b);
+            return b == null || b;
         } catch (Exception e) {
             return true;
         }
     }
 
     public List<ModelApiKey> listApiKeys(String userId) throws IOException {
+        syncApiKeysToLocalDb(userId);
         List<ModelApiKey> all = new ArrayList<>();
-        if (!isBlank(userId)) {
-            all.addAll(getLandingApiKeys(userId));
-        }
         if (isLocalApiKeyEditable()) {
             try {
-                all.addAll(apiKeyDao.listAll());
+                all.addAll(apiKeyDao.listByUserIdOrEmpty(userId));
             } catch (Exception e) {
                 throw new IOException("list local api keys failed: " + e.getMessage(), e);
             }
+        } else {
+            if (!isBlank(userId)) {
+                all.addAll(getLandingApiKeys(userId));
+            }
         }
         return all;
+    }
+
+    private void syncApiKeysToLocalDb(String userId) {
+        if (!isLocalApiKeyEditable()) {
+            return;
+        }
+        try {
+            if (localSynced.compareAndSet(false, true)) {
+                syncLocalApiKeysToDb();
+            }
+            if (!isBlank(userId) && landingSynced.compareAndSet(false, true)) {
+                syncLandingApiKeysToDb(userId.trim());
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            localSynced.set(false);
+            landingSynced.set(false);
+        }
+    }
+
+    private void syncLocalApiKeysToDb() throws Exception {
+        List<ModelApiKey> localApiKeys = getLocalApiKeys();
+        for (ModelApiKey item : localApiKeys) {
+            insertIfApiKeyNotExists(item);
+        }
+    }
+
+    private void syncLandingApiKeysToDb(String userId) throws Exception {
+        if (isBlank(userId)) {
+            throw new IOException("userId is required for Landing");
+        }
+        List<ModelApiKey> landingApiKeys = getLandingApiKeys(userId);
+        for (ModelApiKey item : landingApiKeys) {
+            item.setUserId(userId.trim());
+            insertIfApiKeyNotExists(item);
+        }
+    }
+
+    private void insertIfApiKeyNotExists(ModelApiKey source) throws Exception {
+        if (source == null || isBlank(source.getApiKey())) {
+            return;
+        }
+        String apiKey = source.getApiKey().trim();
+        if (apiKeyDao.existsByApiKey(apiKey)) {
+            return;
+        }
+        ModelApiKey row = new ModelApiKey();
+        row.setName(source.getName());
+        row.setProvider(normalizeProvider(source.getProvider()));
+        row.setApiKey(apiKey);
+        if (LANDING.equalsIgnoreCase(row.getProvider())) {
+            if (isBlank(source.getUserId())) {
+                throw new IOException("userId is required for Landing");
+            }
+            row.setUserId(source.getUserId().trim());
+        } else {
+            row.setUserId(null);
+        }
+        row.setApiAddress(isBlank(source.getApiAddress()) ? "" : source.getApiAddress().trim());
+        row.setStatus(source.getStatus() == null ? 0 : source.getStatus());
+        apiKeyDao.insert(row);
     }
 
     public synchronized List<ModelApiKey> getLocalApiKeys() throws IOException {
@@ -267,24 +337,52 @@ public class ApiKeyService {
         return result;
     }
 
-    public synchronized void deleteApiKey(Long id, String provider, String userId) throws IOException {
-        if (id == null) {
-            throw new IOException("id is required");
-        }
+    public synchronized void deleteApiKey(Long id, String apiKey, String provider, String userId) throws IOException {
         String p = normalizeProvider(provider);
         if (LANDING.equalsIgnoreCase(p)) {
-            deleteLandingApiKey(id);
+            if (isBlank(userId)) {
+                throw new IOException("userId is required for Landing");
+            }
+            String targetApiKey = apiKey;
+            if (isBlank(targetApiKey)) {
+                throw new IOException("Landing api key not found");
+            }
+            deleteLandingApiKey(targetApiKey);
+            try {
+                apiKeyDao.deleteByApiKey(targetApiKey);
+            } catch (Exception e) {
+                throw new IOException("delete local Landing api key failed: " + e.getMessage(), e);
+            }
             return;
         }
         if (!isLocalApiKeyEditable()) {
             throw new IOException("local api key management is disabled");
         }
         try {
-            ModelApiKey item = apiKeyDao.findById(id);
-            if (item != null && item.getStatus() != null && item.getStatus() == 1) {
-                resetProviderApiKeyInConfig(item.getProvider());
+            String targetApiKey = apiKey;
+            ModelApiKey target = null;
+            if (!isBlank(targetApiKey)) {
+                target = apiKeyDao.findByApiKey(targetApiKey);
             }
-            apiKeyDao.deleteById(id);
+            if (target == null) {
+                if (id == null) {
+                    throw new IOException("apiKey is required");
+                }
+                List<ModelApiKey> localList = apiKeyDao.listAll();
+                for (ModelApiKey item : localList) {
+                    if (item.getId() != null && item.getId().equals(id)) {
+                        target = item;
+                        break;
+                    }
+                }
+            }
+            if (target == null) {
+                throw new IOException("Local api key not found");
+            }
+            if (target.getStatus() != null && target.getStatus() == 1) {
+                resetProviderApiKeyInConfig(target.getProvider());
+            }
+            apiKeyDao.deleteByApiKey(target.getApiKey());
         } catch (Exception e) {
             throw new IOException("delete local api key failed: " + e.getMessage(), e);
         }
@@ -326,15 +424,23 @@ public class ApiKeyService {
         String nameTrimmed = name.trim();
 
         if (LANDING.equalsIgnoreCase(normalizedProvider)) {
+            if (isBlank(userId)) {
+                throw new IOException("userId is required for Landing");
+            }
             ModelApiKey landingRequest = new ModelApiKey();
             // Display label for SAAS; lagi.yml model "name" is never updated from this field.
             landingRequest.setName(nameTrimmed);
-            landingRequest.setApiKey(isBlank(apiKey) ? null : apiKey.trim());
-            landingRequest.setStatus(1);
-            if (!isBlank(userId)) {
-                landingRequest.setUserId(userId.trim());
+            landingRequest.setUserId(userId.trim());
+            ModelApiKey localLanding = addLandingApiKey(landingRequest);
+            if (isLocalApiKeyEditable()) {
+                localLanding.setStatus(0);
+                localLanding.setProvider(LANDING);
+                try {
+                    insertIfApiKeyNotExists(localLanding);
+                } catch (Exception e) {
+                    throw new IOException("sync Landing api key to local db failed: " + e.getMessage(), e);
+                }
             }
-            addLandingApiKey(landingRequest);
             return;
         }
         if (!isLocalApiKeyEditable()) {
@@ -346,6 +452,7 @@ public class ApiKeyService {
         local.setName(nameTrimmed);
         local.setProvider(normalizedProvider);
         local.setApiKey(apiKey.trim());
+        local.setUserId(null);
         local.setApiAddress(isBlank(apiAddress) ? "" : apiAddress.trim());
         local.setStatus(0);
         try {
@@ -364,10 +471,25 @@ public class ApiKeyService {
             if (isBlank(userId)) {
                 throw new IOException("userId is required for Landing");
             }
+            String targetApiKey = null;
+            try {
+                List<ModelApiKey> localList = apiKeyDao.listByUserIdOrEmpty(userId);
+                for (ModelApiKey item : localList) {
+                    if (item.getId() != null && item.getId().equals(id)) {
+                        targetApiKey = item.getApiKey();
+                        break;
+                    }
+                }
+            } catch (Exception e) {
+                throw new IOException("query local api key failed: " + e.getMessage(), e);
+            }
+            if (isBlank(targetApiKey)) {
+                throw new IOException("Landing api key not found");
+            }
             List<ModelApiKey> list = getLandingApiKeys(userId);
             ModelApiKey target = null;
             for (ModelApiKey item : list) {
-                if (item.getId() != null && item.getId().equals(id)) {
+                if (!isBlank(item.getApiKey()) && targetApiKey.equals(item.getApiKey().trim())) {
                     target = item;
                     break;
                 }
@@ -377,8 +499,24 @@ public class ApiKeyService {
             }
             if (enabled) {
                 applyProviderApiKeyToConfig(LANDING, target.getApiKey());
+                if (isLocalApiKeyEditable()) {
+                    try {
+                        insertIfApiKeyNotExists(target);
+                        apiKeyDao.disableProviderKeys(LANDING);
+                        apiKeyDao.setStatusByApiKey(target.getApiKey(), 1);
+                    } catch (Exception e) {
+                        throw new IOException("sync Landing toggle to local db failed: " + e.getMessage(), e);
+                    }
+                }
             } else {
                 resetProviderApiKeyInConfig(LANDING);
+                if (isLocalApiKeyEditable()) {
+                    try {
+                        apiKeyDao.setStatusByApiKey(target.getApiKey(), 0);
+                    } catch (Exception e) {
+                        throw new IOException("sync Landing toggle to local db failed: " + e.getMessage(), e);
+                    }
+                }
             }
             return;
         }
@@ -387,16 +525,23 @@ public class ApiKeyService {
         }
 
         try {
-            ModelApiKey target = apiKeyDao.findById(id);
+            ModelApiKey target = null;
+            List<ModelApiKey> localList = apiKeyDao.listAll();
+            for (ModelApiKey item : localList) {
+                if (item.getId() != null && item.getId().equals(id)) {
+                    target = item;
+                    break;
+                }
+            }
             if (target == null) {
                 throw new IOException("Local api key not found");
             }
             if (enabled) {
                 apiKeyDao.disableProviderKeys(target.getProvider());
-                apiKeyDao.setStatusById(id, 1);
+                apiKeyDao.setStatusByApiKey(target.getApiKey(), 1);
                 applyProviderApiKeyToConfig(target.getProvider(), target.getApiKey());
             } else {
-                apiKeyDao.setStatusById(id, 0);
+                apiKeyDao.setStatusByApiKey(target.getApiKey(), 0);
                 resetProviderApiKeyInConfig(target.getProvider());
             }
         } catch (IOException e) {
@@ -418,15 +563,15 @@ public class ApiKeyService {
     }
 
     /**
-     * Deletes a Landing API key on SAAS (POST /saas/api/apikey/deleteModelApiKey, body: {"id":...}).
+     * Deletes a Landing API key on SAAS (POST /saas/api/apikey/deleteModelApiKey, body: {"apiKey":...}).
      */
-    public void deleteLandingApiKey(Long id) throws IOException {
-        if (id == null) {
-            throw new IOException("id is required");
+    public void deleteLandingApiKey(String apiKey) throws IOException {
+        if (isBlank(apiKey)) {
+            throw new IOException("apiKey is required");
         }
         String url = SAAS_BASE_URL + "/saas/api/apikey/deleteModelApiKey";
-        Map<String, Long> payload = new LinkedHashMap<String, Long>();
-        payload.put("id", id);
+        Map<String, String> payload = new LinkedHashMap<String, String>();
+        payload.put("apiKey", apiKey.trim());
         String requestJson = gson.toJson(payload);
         OkHttpUtil.post(url, requestJson);
     }
@@ -445,9 +590,9 @@ public class ApiKeyService {
             throw new IOException("Provider not found in models: " + provider);
         }
         model.put("api_key", apiKey.trim());
-        if (LANDING.equalsIgnoreCase(provider)) {
-            model.put("model", getLandingModels());
-        }
+//        if (LANDING.equalsIgnoreCase(provider)) {
+//            model.put("model", getLandingModels());
+//        }
         writeRootYaml(root);
     }
 
@@ -495,7 +640,10 @@ public class ApiKeyService {
         }.getType();
         List<ModelApiKey> list = gson.fromJson(resultJson, listType);
         if (list != null) {
-            list.forEach(item -> item.setProvider("Landing"));
+            list.forEach(item -> {
+                item.setProvider("Landing");
+                item.setStatus(0);
+            });
         }
         return list != null ? list : new ArrayList<>();
     }

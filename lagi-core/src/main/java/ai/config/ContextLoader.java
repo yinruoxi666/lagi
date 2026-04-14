@@ -1,5 +1,8 @@
 package ai.config;
 
+import ai.manager.Html2ContentManager;
+import ai.manager.LlmInstructionManager;
+import ai.manager.LlmManager;
 import ai.utils.BeanManageUtil;
 import ai.utils.LoadJarUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -172,14 +175,11 @@ public class ContextLoader {
         if (extensionJarFolder == null) {
             extensionJarFolder = "extension";
         }
-        GlobalConfigurations previous = configuration;
-        try {
-            loadContextByFilePath(filePath.trim(), extensionJarFolder);
-            log.info("reloadLagiYmlFromFile success for {}", filePath);
-        } catch (RuntimeException e) {
-            configuration = previous;
-            log.error("reloadLagiYmlFromFile failed for {}, keeping previous configuration", filePath, e);
-        }
+        LlmManager.getInstance().clear();
+        Html2ContentManager.getInstance().clear();
+        LlmInstructionManager.getInstance().clear();
+        loadContextByFilePath(filePath.trim(), extensionJarFolder);
+        log.info("reload config file success for {}", filePath);
     }
 
     private static String detectEncoding(String filePath) {

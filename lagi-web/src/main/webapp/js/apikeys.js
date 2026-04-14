@@ -116,7 +116,7 @@
                     <td style="${openRouterTdStyle()}">${row.provider || "—"}</td>
                     <td style="${openRouterTdStyle()}">${maskApiKey(row.api_key)}</td>
                     <td style="${openRouterTdStyle()}">
-                        ${toggleLink}${copyLink}<a href="javascript:void(0)" class="api-key-delete-link" data-id="${row.id || ""}" data-provider="${row.provider || ""}" style="color:#ef4444;">${tTextOpenRouter("删除")}</a>
+                        ${toggleLink}${copyLink}<a href="javascript:void(0)" class="api-key-delete-link" data-id="${row.id || ""}" data-provider="${row.provider || ""}" data-row-index="${rowIndex}" style="color:#ef4444;">${tTextOpenRouter("删除")}</a>
                     </td>
                 </tr>
             `;
@@ -262,7 +262,11 @@
         $("#api-keys-container").on("click", ".api-key-delete-link", function() {
             const id = Number($(this).data("id"));
             const provider = String($(this).data("provider") || "");
-            const row = { id: id, provider: provider };
+            const rowIndex = Number($(this).data("row-index"));
+            const st = window.__apiKeysPageState;
+            const raw = (st && st.rows && !isNaN(rowIndex)) ? st.rows[rowIndex] : null;
+            const apiKey = raw ? String(raw.api_key || "").trim() : "";
+            const row = { id: id, provider: provider, api_key: apiKey };
             deleteApiKey(row);
         });
         $("#api-keys-container").on("click", ".api-key-toggle-link", function() {
@@ -378,6 +382,7 @@
                 contentType: "application/json;charset=utf-8",
                 data: JSON.stringify({
                     id: row.id,
+                    apiKey: row.api_key || "",
                     provider: row.provider,
                     userId: getApiKeysUserId()
                 }),

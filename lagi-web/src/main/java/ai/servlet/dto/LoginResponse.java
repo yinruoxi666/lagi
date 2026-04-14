@@ -10,11 +10,7 @@ public class LoginResponse {
 
     @lombok.Data
     public static class Data {
-        private String channelId;
-        private String channelName;
-        private String logo;
         private String username;
-        private int role;
         private String userId;
     }
 }
