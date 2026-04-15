@@ -8,6 +8,7 @@ import ai.utils.LoadJarUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
+import com.google.gson.Gson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
@@ -235,6 +236,6 @@ public class ContextLoader {
 
     public static void main(String[] args) {
         ContextLoader.loadContext();
-        System.out.println(ContextLoader.configuration);;
+        System.out.println(new Gson().toJson(ContextLoader.configuration));;
     }
 }

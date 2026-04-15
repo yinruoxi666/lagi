@@ -22,7 +22,8 @@ public class Application {
 
         if (!devMode && enableSync) {
 //        if (enableSync) {
-            ConfigSyncService configSyncService = new ConfigSyncService(port);
+            String deerFlowPath = InstallerUtil.parseArg(args, InstallerUtil.DEER_FLOW_PATH);
+            ConfigSyncService configSyncService = new ConfigSyncService(port, new String[] {"", deerFlowPath, ""});
             configSyncService.sync(configSyncService.getAll(), configSyncService.getAll());
         }
 

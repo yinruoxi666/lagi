@@ -74,6 +74,7 @@ read_yes_no() {
 # import_val="false"
 runtime_choice="mate"
 inject_agent=0
+deer_flow_path=""
 
 read_runtime_choice() {
     while true; do
@@ -95,6 +96,24 @@ read_runtime_choice() {
 }
 
 read_runtime_choice
+
+read_deer_flow_path() {
+    while true; do
+        printf "Please enter deer-flow install directory: "
+        read -r answer < /dev/tty
+        answer=$(echo "$answer" | xargs)
+        if [ -z "$answer" ]; then
+            echo "deer-flow install directory is required."
+            continue
+        fi
+        if [ ! -d "$answer" ]; then
+            echo "Directory does not exist: $answer"
+            continue
+        fi
+        deer_flow_path="$answer"
+        return 0
+    done
+}
 
 read_inject_agent_choice() {
     while true; do
@@ -121,6 +140,9 @@ read_inject_agent_choice() {
 
 if [ "$runtime_choice" = "mate" ]; then
     read_inject_agent_choice
+    if [ "$inject_agent" -eq $((1 << 1)) ]; then
+        read_deer_flow_path
+    fi
 fi
 
 if [ "$runtime_choice" = "server" ]; then
@@ -170,7 +192,8 @@ echo "Running installer..."
 java -cp "$JAR_PATH" ai.starter.InstallerUtil \
     "--runtime-choice=$runtime_choice" \
     "--skills-root=$SKILLS_ROOT" \
-    "--inject-agent=$inject_agent" || {
+    "--inject-agent=$inject_agent" \
+    "--deer-flow-path=$deer_flow_path" || {
     rc=$?
     echo "Error: Installer exited with code $rc"
     exit $rc

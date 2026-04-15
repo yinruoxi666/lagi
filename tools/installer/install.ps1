@@ -159,6 +159,7 @@ function Install-LinkMind {
     $runtimeChoice = Read-RuntimeChoice
     $skillsRoot = ""
     $injectAgent = 0
+    $deerFlowPath = ""
 
     function Read-InjectAgentChoice {
         while ($true) {
@@ -180,8 +181,26 @@ function Install-LinkMind {
         }
     }
 
+    function Read-DeerFlowPath {
+        while ($true) {
+            $answer = (Read-Host "Please enter deer-flow install directory").Trim()
+            if ([string]::IsNullOrEmpty($answer)) {
+                Write-Host "deer-flow install directory is required."
+                continue
+            }
+            if (-not (Test-Path $answer -PathType Container)) {
+                Write-Host "Directory does not exist: $answer"
+                continue
+            }
+            return $answer
+        }
+    }
+
     if ($runtimeChoice -eq "mate") {
         $injectAgent = Read-InjectAgentChoice
+        if ($injectAgent -eq (1 -shl 1)) {
+            $deerFlowPath = Read-DeerFlowPath
+        }
     }
 
     if ($runtimeChoice -eq "server") {
@@ -205,7 +224,7 @@ function Install-LinkMind {
     Write-Host "Running installer..."
     # "--export-to-openclaw=$exportVal"
     # "--import-from-openclaw=$importVal"
-    java -cp $jarPath ai.starter.InstallerUtil "--runtime-choice=$runtimeChoice" "--skills-root=$skillsRoot" "--inject-agent=$injectAgent"
+    java -cp $jarPath ai.starter.InstallerUtil "--runtime-choice=$runtimeChoice" "--skills-root=$skillsRoot" "--inject-agent=$injectAgent" "--deer-flow-path=$deerFlowPath"
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Error: Installer exited with code $LASTEXITCODE"
         return

@@ -26,19 +26,19 @@ public class ConfigSyncService {
 
     private final Map<Integer, IConfigSyncService> configSyncServices = new HashMap<>();
 
-    public ConfigSyncService() {
-        init();
+    public ConfigSyncService(String[] paths) {
+        init(paths);
     }
 
-    public ConfigSyncService(int port) {
-        init();
+    public ConfigSyncService(int port, String[] paths) {
+        init(paths);
         this.port = port;
     }
 
-    private void init() {
-        configSyncServices.put(OpenClaw, new OpenClawSyncServiceImpl(""));
-        configSyncServices.put(deerFlow, new DeerFlowSyncServiceImpl(""));
-        configSyncServices.put(Hermes, new HermesSyncServiceImpl(""));
+    private void init(String[] paths) {
+        configSyncServices.put(OpenClaw, new OpenClawSyncServiceImpl(paths[0]));
+        configSyncServices.put(deerFlow, new DeerFlowSyncServiceImpl(paths[1]));
+        configSyncServices.put(Hermes, new HermesSyncServiceImpl(paths[2]));
         all = OpenClaw | deerFlow | Hermes;
     }
 
@@ -66,12 +66,20 @@ public class ConfigSyncService {
             if ((exportWhich & key) == 0) {
                 log.info("Skipped: LinkMind to {} configuration synchronization", service.name());
             } else {
-                service.export(getBasePath());
+                try {
+                    service.export(getBasePath());
+                } catch (Exception e) {
+                    log.error("Failed to export {} configuration", service.name(), e);
+                }
             }
             if ((loadWhich & key) == 0) {
                 log.info("Skipped: {} to LinkMind configuration synchronization", service.name());
             } else {
-                service.load();
+                try {
+                    service.load();
+                } catch (Exception e) {
+                    log.error("Failed to load {} configuration", service.name(), e);
+                }
             }
         }
     }

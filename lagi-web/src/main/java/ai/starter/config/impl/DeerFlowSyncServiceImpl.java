@@ -1,11 +1,11 @@
 package ai.starter.config.impl;
 
 
-import ai.starter.InstallerUtil;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
-import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
+import ai.common.pojo.Backend;
+import ai.config.GlobalConfigurations;
+import ai.starter.config.util.ConfigUtil;
+import ai.utils.YmlLoader;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,11 +15,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 public class DeerFlowSyncServiceImpl extends BaseSyncServiceImpl {
 
@@ -37,6 +37,9 @@ public class DeerFlowSyncServiceImpl extends BaseSyncServiceImpl {
             log.warn("{}: \t {} is not exists, skipping configuration synchronization", name(), path);
             return false;
         }
+        if(file.isFile()) {
+            return true;
+        }
         Path configPath = path.resolve("config.yaml");
         if(!configPath.toFile().exists()) {
             log.warn("{}: \t {} is not exists, skipping configuration synchronization", name(), configPath);
@@ -47,45 +50,151 @@ public class DeerFlowSyncServiceImpl extends BaseSyncServiceImpl {
 
     @Override
     public void export(String path) {
-        System.out.println("DeepFlowSyncServiceImpl export");
+        load();
+        Path deerFlowPath = Paths.get(basePath);
+        boolean exists = deerFlowPath.toFile().exists();
+        if (!exists) {
+            log.warn("{}: {} is not exists, skipping configuration synchronization", name(), deerFlowPath);
+            return;
+        }
+        Path configPath = null;
+        boolean directory = deerFlowPath.toFile().isDirectory();
+        if(!directory) {
+            log.warn("{}: {} is not a directory, skipping configuration synchronization", name(), deerFlowPath);
+            return;
+        }
+        configPath = deerFlowPath.resolve("config.yaml");
+        if (!Files.exists(configPath)) {
+            log.warn("{}: config file is not found: {}", name(), configPath);
+            return;
+        }
+        Map<String, Object> configYaml = YmlLoader.loadYamlAsMap(configPath.toString());
+        List<Map<String, Object>> models = (List<Map<String, Object>>)configYaml.get("models");
+        GlobalConfigurations globalConfigurations = YmlLoader.loadYaml(ConfigUtil.getLagiYmlPath().toString(), GlobalConfigurations.class);
+        List<Backend> backends = globalConfigurations.getFunctions().getChat().getBackends();
+        List<Map<String, Object>> collect = backends.stream().filter(backend -> backend.getBackend().startsWith(getNamePrifix())).map(backend -> buildDeerFlowModelConfig(backend, path)).collect(Collectors.toList());
+        models.addAll(collect);
+        YmlLoader.writeYaml(configPath.toString(), configYaml);
+    }
+
+    private @NotNull String getNamePrifix() {
+        return "linkmind-" + name().toLowerCase();
+    }
+
+
+    private Map<String, Object> buildDeerFlowModelConfig(Backend backend, String path) {
+        String name = backend.getName() == null ? backend.getBackend() : backend.getName();
+        Map<String, Object> modelConfig = new HashMap<>();
+        modelConfig.put("name", name);
+        modelConfig.put("display_name", "linkmind-pro("+backend.getModel()+")");
+        modelConfig.put("use", "langchain_openai:ChatOpenAI");
+        modelConfig.put("model", backend.getModel());
+        modelConfig.put("api_key", "sk-test");
+        modelConfig.put("base_url", path);
+        modelConfig.put("request_timeout", 600.0);
+        modelConfig.put("max_retries", 2);
+        modelConfig.put("max_tokens", 8192);
+        modelConfig.put("supports_thinking", true);
+        modelConfig.put("supports_vision", false);
+        Map<String, Object> chatTemplateKwargs = new HashMap<>();
+        chatTemplateKwargs.put("enable_thinking", true);
+        Map<String, Object> extraBody = new HashMap<>();
+        extraBody.put("chat_template_kwargs", chatTemplateKwargs);
+        Map<String, Object> whenThinkingEnabled = new HashMap<>();
+        whenThinkingEnabled.put("extra_body", extraBody);
+        modelConfig.put("when_thinking_enabled", whenThinkingEnabled);
+        return modelConfig;
+    }
+
+    private Backend convertModel2Backend(Map<String, Object> loadModels) {
+
+        String name = (String) loadModels.get("name");
+        if(name.startsWith(getNamePrifix())) {
+            return null;
+        }
+        try {
+            name = "linkmind-" + name().toLowerCase() + "-" + name;
+            Backend backend = new Backend();
+            backend.setName(name);
+            backend.setType(name);
+            backend.setBackend(name);
+            String baseUrl = loadModels.get("api_base") == null ? (String)loadModels.get("base_url") : (String)loadModels.get("api_base");
+            backend.setEndpoint(toCompletionApiAddress(baseUrl));
+            backend.setApiAddress(toCompletionApiAddress(baseUrl));
+            backend.setApiKey((String) loadModels.get("api_key"));
+            backend.setEnable(true);
+            backend.setStream(true);
+            backend.setPriority(100);
+            String model =   (String) loadModels.get("model");
+            String[] split = model.split("/");
+            if(split.length > 1) {
+                model = split[split.length - 1];
+            }
+            backend.setModel(model);
+            String use = (String) loadModels.get("use");
+            String driver = use2Driver(use, model, baseUrl);
+            backend.setDriver(driver);
+            return backend;
+        } catch (Exception e) {
+            log.error("{}: \t Failed to convert model to backend: {}", name(), loadModels, e);
+        }
+        return null;
+    }
+
+    private String use2Driver(String use, String model, String baseUrl) {
+        if(baseUrl == null) {
+            if(use.contains("ChatOpenAI")) {
+                return "ai.llm.adapter.impl.GPTAdapter";
+            }
+            if(use.contains("ChatGoogleGenerativeAI")) {
+                return "ai.llm.adapter.impl.GeminiAdapter";
+            }
+            if(use.contains("ChatAnthropic")) {
+                return "ai.llm.adapter.impl.ClaudeAdapter";
+            }
+        }
+        if(use.contains("PatchedChatDeepSeek") && model.contains("deepseek")) {
+            return "ai.llm.adapter.impl.DeepSeekAdapter";
+        }
+        if(use.contains("PatchedChatDeepSeek") && model.contains("doubao")) {
+            return "ai.llm.adapter.impl.DoubaoAdapter";
+        }
+        return "ai.llm.adapter.impl.OpenAIStandardAdapter";
     }
 
     @Override
     public void load() {
         Path deerFlowPath = Paths.get(basePath);
-        Path configPath = deerFlowPath.resolve("config.yaml");
+        boolean exists = deerFlowPath.toFile().exists();
+        if (!exists) {
+            log.warn("{}: {} is not exists, skipping configuration synchronization", name(), deerFlowPath);
+            return;
+        }
+        Path configPath = null;
+        boolean directory = deerFlowPath.toFile().isDirectory();
+        if(!directory) {
+            log.warn("{}: {} is not a directory, skipping configuration synchronization", name(), deerFlowPath);
+            return;
+        }
+        configPath = deerFlowPath.resolve("config.yaml");
         if (!Files.exists(configPath)) {
             log.warn("{}: config file is not found: {}", name(), configPath);
             return;
         }
         try {
-            YAMLMapper yamlMapper = createYamlMapper();
-
-            Map<String, Object> deerFlowConfig = yamlMapper.readValue(configPath.toFile(), new TypeReference<Map<String,  Object>>() {});
-            DeerFlowModelConfig sourceModel = extractFirstModel(deerFlowConfig);
-            if (sourceModel == null) {
-                log.warn("{}: no valid model found in {}", name(), configPath);
-                return;
-            }
-
+            Map<String, Object> deerFlowConfig = YmlLoader.loadYamlAsMap(configPath.toString());
+            List<Map<String, Object>> loadMap = (List<Map<String, Object>>) deerFlowConfig.get("models");
+            List<Backend> backends = loadMap.stream().map(this::convertModel2Backend).filter(Objects::nonNull).collect(Collectors.toList());
             Path envPath = deerFlowPath.resolve(".env");
             Map<String, String> envKeyValues = loadEnv(envPath);
-            sourceModel.apiKey = resolveEnvPlaceholder(sourceModel.apiKey, envKeyValues);
-
-            Path lagiYmlPath = resolveLagiYmlPath();
-            if (!Files.exists(lagiYmlPath)) {
-                log.warn("{}: lagi.yml is not found via system property {}", name(), InstallerUtil.CONFIG_FILE_PROPERTY);
-                return;
+            for (Backend backend : backends) {
+                String apiKey = backend.getApiKey();
+                apiKey = resolveEnvPlaceholder(apiKey, envKeyValues);
+                backend.setApiKey(apiKey);
             }
-
-            Map<String, Object> lagiConfig = yamlMapper.readValue(lagiYmlPath.toFile(), new TypeReference<Map<String,  Object>>() {});
-            boolean changed = mergeToLagiConfig(lagiConfig, sourceModel);
-            if (!changed) {
-                log.info("{}: no changes detected for {}", name(), lagiYmlPath);
-                return;
-            }
-            yamlMapper.writeValue(lagiYmlPath.toFile(), lagiConfig);
-            log.info("{}: synced model '{}' into {}", name(), sourceModel.backendName, lagiYmlPath);
+            GlobalConfigurations globalConfigurations = YmlLoader.loadYaml(ConfigUtil.getLagiYmlPath().toString(), GlobalConfigurations.class);
+            ConfigUtil.setConfig(globalConfigurations, backends);
+            YmlLoader.writeYaml(ConfigUtil.getLagiYmlPath().toString(), globalConfigurations);
         } catch (Exception e) {
             log.error("{}: failed to load and sync config", name(), e);
         }
@@ -96,57 +205,7 @@ public class DeerFlowSyncServiceImpl extends BaseSyncServiceImpl {
         return "DeerFlow";
     }
 
-    private YAMLMapper createYamlMapper() {
-        YAMLFactory yamlFactory = new YAMLFactory()
-                .disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
-                .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
-                .enable(YAMLGenerator.Feature.LITERAL_BLOCK_STYLE)
-                .enable(YAMLGenerator.Feature.INDENT_ARRAYS_WITH_INDICATOR);
-        return new YAMLMapper(yamlFactory);
-    }
 
-    private Path resolveLagiYmlPath() {
-        return Paths.get("C:\\Users\\Administrator\\LinkMind\\config\\lagi.yml");
-//        String configFilePath = System.getProperty(InstallerUtil.CONFIG_FILE_PROPERTY);
-//        if (configFilePath == null || configFilePath.trim().isEmpty()) {
-//            return null;
-//        }
-//        return Paths.get(configFilePath.trim());
-    }
-
-    @SuppressWarnings("unchecked")
-    private DeerFlowModelConfig extractFirstModel(Map<String, Object> deerFlowConfig) {
-        if (deerFlowConfig == null) {
-            return null;
-        }
-        Object modelsObj = deerFlowConfig.get("models");
-        if (!(modelsObj instanceof List)) {
-            return null;
-        }
-        List<Object> models = (List<Object>) modelsObj;
-        for (Object item : models) {
-            if (!(item instanceof Map)) {
-                continue;
-            }
-            Map<String, Object> modelEntry = (Map<String, Object>) item;
-            String modelId = textOf(modelEntry.get("model"));
-            if (isBlank(modelId)) {
-                continue;
-            }
-            String deerModelName = textOf(modelEntry.get("name"));
-            String backendName = inferBackendName(deerModelName, modelId);
-            if (isBlank(backendName)) {
-                continue;
-            }
-            DeerFlowModelConfig modelConfig = new DeerFlowModelConfig();
-            modelConfig.backendName = backendName;
-            modelConfig.model = modelId;
-            modelConfig.apiBase = firstNonBlank(textOf(modelEntry.get("api_base")), textOf(modelEntry.get("base_url")));
-            modelConfig.apiKey = textOf(modelEntry.get("api_key"));
-            return modelConfig;
-        }
-        return null;
-    }
 
     private Map<String, String> loadEnv(Path envPath) throws IOException {
         Map<String, String> envMap = new HashMap<>();
@@ -188,136 +247,7 @@ public class DeerFlowSyncServiceImpl extends BaseSyncServiceImpl {
         return isBlank(resolved) ? trimmed : resolved;
     }
 
-    @SuppressWarnings("unchecked")
-    private boolean mergeToLagiConfig(Map<String, Object> lagiConfig, DeerFlowModelConfig sourceModel) {
-        boolean changed = false;
 
-        List<Map<String, Object>> models = ensureModels(lagiConfig);
-        Map<String, Object> targetModel = findModel(models, sourceModel.backendName);
-        if (targetModel == null) {
-            targetModel = new LinkedHashMap<>();
-            targetModel.put("name", sourceModel.backendName);
-            targetModel.put("enable", true);
-            models.add(targetModel);
-            changed = true;
-        }
-
-        changed |= upsert(targetModel, "model", sourceModel.model);
-        changed |= upsert(targetModel, "enable", true);
-        if (!isBlank(sourceModel.apiKey)) {
-            changed |= upsert(targetModel, "api_key", sourceModel.apiKey);
-        }
-        String apiAddress = toCompletionApiAddress(sourceModel.apiBase);
-        if (!isBlank(apiAddress)) {
-            changed |= upsert(targetModel, "api_address", apiAddress);
-        }
-
-        Object functionsObj = lagiConfig.get("functions");
-        if (!(functionsObj instanceof Map)) {
-            functionsObj = new LinkedHashMap<String, Object>();
-            lagiConfig.put("functions", functionsObj);
-            changed = true;
-        }
-        Map<String, Object> functions = (Map<String, Object>) functionsObj;
-        Object chatObj = functions.get("chat");
-        if (!(chatObj instanceof Map)) {
-            chatObj = new LinkedHashMap<String, Object>();
-            functions.put("chat", chatObj);
-            changed = true;
-        }
-        Map<String, Object> chat = (Map<String, Object>) chatObj;
-        changed |= upsert(chat, "route", "best(" + sourceModel.backendName + ")");
-
-        List<Map<String, Object>> backends = ensureBackends(chat);
-        Map<String, Object> backend = findBackend(backends, sourceModel.backendName);
-        if (backend == null) {
-            backend = new LinkedHashMap<>();
-            backend.put("backend", sourceModel.backendName);
-            backends.add(backend);
-            changed = true;
-        }
-        changed |= upsert(backend, "model", sourceModel.model);
-        changed |= upsert(backend, "enable", true);
-        changed |= upsert(backend, "stream", true);
-        changed |= upsert(backend, "protocol", "completion");
-        changed |= upsert(backend, "priority", 100);
-        return changed;
-    }
-
-    @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> ensureModels(Map<String, Object> lagiConfig) {
-        Object modelsObj = lagiConfig.get("models");
-        if (modelsObj instanceof List) {
-            return (List<Map<String, Object>>) modelsObj;
-        }
-        List<Map<String, Object>> models = new ArrayList<>();
-        lagiConfig.put("models", models);
-        return models;
-    }
-
-    @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> ensureBackends(Map<String, Object> chat) {
-        Object backendsObj = chat.get("backends");
-        if (backendsObj instanceof List) {
-            return (List<Map<String, Object>>) backendsObj;
-        }
-        List<Map<String, Object>> backends = new ArrayList<>();
-        chat.put("backends", backends);
-        return backends;
-    }
-
-    private Map<String, Object> findModel(List<Map<String, Object>> models, String backendName) {
-        for (Map<String, Object> model : models) {
-            if (model == null) {
-                continue;
-            }
-            String name = textOf(model.get("name"));
-            if (backendName.equalsIgnoreCase(name)) {
-                return model;
-            }
-        }
-        return null;
-    }
-
-    private Map<String, Object> findBackend(List<Map<String, Object>> backends, String backendName) {
-        for (Map<String, Object> backend : backends) {
-            if (backend == null) {
-                continue;
-            }
-            String name = textOf(backend.get("backend"));
-            if (backendName.equalsIgnoreCase(name)) {
-                return backend;
-            }
-        }
-        return null;
-    }
-
-    private boolean upsert(Map<String, Object> target, String key, Object value) {
-        Object old = target.get(key);
-        if (old == null ? value == null : old.equals(value)) {
-            return false;
-        }
-        target.put(key, value);
-        return true;
-    }
-
-    private String inferBackendName(String deerModelName, String modelId) {
-        String source = firstNonBlank(deerModelName, modelId);
-        if (isBlank(source)) {
-            return null;
-        }
-        String lower = source.toLowerCase();
-        if (lower.contains("qwen")) {
-            return "qwen";
-        }
-        if (lower.contains("deepseek")) {
-            return "deepseek";
-        }
-        if (lower.contains("hunyuan") || lower.contains("tencent")) {
-            return "tencent";
-        }
-        return source;
-    }
 
     private String toCompletionApiAddress(String apiBase) {
         if (isBlank(apiBase)) {
@@ -333,36 +263,15 @@ public class DeerFlowSyncServiceImpl extends BaseSyncServiceImpl {
         return base + "/chat/completions";
     }
 
-    private String textOf(Object obj) {
-        if (obj == null) {
-            return null;
-        }
-        String value = obj.toString().trim();
-        return value.isEmpty() ? null : value;
-    }
-
-    private String firstNonBlank(String... values) {
-        for (String value : values) {
-            if (!isBlank(value)) {
-                return value.trim();
-            }
-        }
-        return null;
-    }
 
     private boolean isBlank(String s) {
         return s == null || s.trim().isEmpty();
     }
 
-    private static class DeerFlowModelConfig {
-        private String backendName;
-        private String model;
-        private String apiBase;
-        private String apiKey;
-    }
+
 
     public static void main(String[] args) {
-        DeerFlowSyncServiceImpl service = new DeerFlowSyncServiceImpl("C:\\lz\\work\\lagi");
-        service.load();
+        DeerFlowSyncServiceImpl service = new DeerFlowSyncServiceImpl("C:\\Users\\Administrator\\Desktop\\project\\lagi\\deer-flow");
+        service.export("http://127.0.0.1:8080/v1");
     }
 }

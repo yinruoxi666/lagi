@@ -101,7 +101,7 @@ public class OpenClawUtil {
     }
 
 
-    private static Path getLagiYmlPath() {
+    public static Path getLagiYmlPath() {
         String configFilePath = System.getProperty(CONFIG_FILE_PROPERTY);
         if (configFilePath == null || configFilePath.trim().isEmpty()) {
             return null;
@@ -141,6 +141,16 @@ public class OpenClawUtil {
             return null;
         }
         return Paths.get(userHome, OPEN_CLAW_DIR_NAME, OPENCLAW_JSON);
+    }
+
+
+    public static Path getOpenClawBathPath() {
+        String userHome = System.getProperty("user.home");
+        if (userHome == null || userHome.trim().isEmpty()) {
+            log.warn("Cannot get user home directory");
+            return null;
+        }
+        return Paths.get(userHome, OPEN_CLAW_DIR_NAME);
     }
 
     /**

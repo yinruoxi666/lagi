@@ -16,6 +16,7 @@ import ai.utils.*;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
 import cn.hutool.core.util.StrUtil;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
@@ -29,7 +30,8 @@ import java.util.stream.Collectors;
 @ToString
 @Data
 public class GlobalConfigurations extends AbstractConfiguration {
-    private Logger logger = LoggerFactory.getLogger(GlobalConfigurations.class);
+    @JsonIgnore
+    private transient Logger logger = LoggerFactory.getLogger(GlobalConfigurations.class);
 
     private String systemTitle;
     private GeneralConfig general;
@@ -79,9 +81,9 @@ public class GlobalConfigurations extends AbstractConfiguration {
     private void loadFromPropertiesFromYaml() {
         try {
             if(models == null) {
-                models = YmlPropertiesLoader.loaderProperties(getIncludeModels(), "models", new cn.hutool.core.lang.TypeReference<List<Backend>>(){});
+                models = YmlLoader.loaderProperties(getIncludeModels(), "models", new cn.hutool.core.lang.TypeReference<List<Backend>>(){});
             } else {
-                List<Backend> models1 = YmlPropertiesLoader.loaderProperties(getIncludeModels(), "models", new cn.hutool.core.lang.TypeReference<List<Backend>>(){});
+                List<Backend> models1 = YmlLoader.loaderProperties(getIncludeModels(), "models", new cn.hutool.core.lang.TypeReference<List<Backend>>(){});
                 if (models1 != null && models != null) {
                     models.addAll(models1);
                 }
@@ -93,9 +95,9 @@ public class GlobalConfigurations extends AbstractConfiguration {
         } catch (Exception ignored){}
         try {
             if(stores == null) {
-                stores = YmlPropertiesLoader.loaderProperties(getIncludeStores(), "stores", StoreConfig.class);
+                stores = YmlLoader.loaderProperties(getIncludeStores(), "stores", StoreConfig.class);
             } else {
-                StoreConfig stores1 = YmlPropertiesLoader.loaderProperties(getIncludeStores(), "stores", StoreConfig.class);
+                StoreConfig stores1 = YmlLoader.loaderProperties(getIncludeStores(), "stores", StoreConfig.class);
                 if(stores1 != null) {
                     CopyOptions copyOption = CopyOptions.create(null, true, "vectors");
                     BeanUtil.copyProperties(stores1, stores, copyOption);
@@ -113,10 +115,10 @@ public class GlobalConfigurations extends AbstractConfiguration {
         }catch (Exception ignored) {}
         try {
             if(agents == null) {
-                agents = YmlPropertiesLoader.loaderProperties(getIncludeAgents(), "agents", new cn.hutool.core.lang.TypeReference<AgentsConfig>(){});
+                agents = YmlLoader.loaderProperties(getIncludeAgents(), "agents", new cn.hutool.core.lang.TypeReference<AgentsConfig>(){});
             } else {
                 if(Boolean.TRUE.equals(agents.getEnable())) {
-                    List<AgentConfig> agents1 = YmlPropertiesLoader.loaderProperties(getIncludeAgents(), "agents", new cn.hutool.core.lang.TypeReference<List<AgentConfig>>(){});
+                    List<AgentConfig> agents1 = YmlLoader.loaderProperties(getIncludeAgents(), "agents", new cn.hutool.core.lang.TypeReference<List<AgentConfig>>(){});
                     if (agents1 != null && agents != null && agents.getAgents() != null) {
                         agents.getAgents().addAll(agents1);
                     }
@@ -130,9 +132,9 @@ public class GlobalConfigurations extends AbstractConfiguration {
         } catch (Exception ignored) {}
         try {
             if(mcps == null) {
-                mcps = YmlPropertiesLoader.loaderProperties(getIncludeMcps(), "mcps", McpConfig.class);
+                mcps = YmlLoader.loaderProperties(getIncludeMcps(), "mcps", McpConfig.class);
             } else {
-                McpConfig mcps1 = YmlPropertiesLoader.loaderProperties(getIncludeMcps(), "mcps", McpConfig.class);
+                McpConfig mcps1 = YmlLoader.loaderProperties(getIncludeMcps(), "mcps", McpConfig.class);
                 if(mcps1 != null) {
                     CopyOptions copyOption = CopyOptions.create(null, true, "servers");
                     BeanUtil.copyProperties(mcps1, mcps, copyOption);
@@ -150,9 +152,9 @@ public class GlobalConfigurations extends AbstractConfiguration {
 
         try {
             if(skills.getPnps() == null) {
-                skills.setPnps(YmlPropertiesLoader.loaderProperties(getIncludePnps(), "skill", new cn.hutool.core.lang.TypeReference<List<PnpConfig>>(){}));
+                skills.setPnps(YmlLoader.loaderProperties(getIncludePnps(), "skill", new cn.hutool.core.lang.TypeReference<List<PnpConfig>>(){}));
             } else {
-                List<PnpConfig> pnps2 = YmlPropertiesLoader.loaderProperties(getIncludePnps(), "skill", new cn.hutool.core.lang.TypeReference<List<PnpConfig>>(){});
+                List<PnpConfig> pnps2 = YmlLoader.loaderProperties(getIncludePnps(), "skill", new cn.hutool.core.lang.TypeReference<List<PnpConfig>>(){});
                 if (pnps2 != null && skills.getPnps() != null) {
                     skills.getPnps().addAll(pnps2);
                 }

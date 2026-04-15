@@ -40,6 +40,7 @@ public class InstallerUtil {
     private static final String EXPORT_TO_OPENCLAW_ARG = "--export-to-openclaw=";
     private static final String IMPORT_FROM_OPENCLAW_ARG = "--import-from-openclaw=";
     private static final String RUNTIME_CHOICE_ARG = "--runtime-choice=";
+    public static final String DEER_FLOW_PATH = "--deer-flow-path=";
     private static final String SKILLS_ROOT_ARG = "--skills-root=";
     private static final String LAGI_YML = "lagi.yml";
     private static final String SQLITE_RESOURCE_DIR = "sqlite";
@@ -50,7 +51,8 @@ public class InstallerUtil {
         File jarFile = InstallerUtil.getJarFile();
         InstallerUtil.applyConfigAndDataDir(args, jarFile);
         InstallerUtil.applyRuntimeSkillsConfig(args);
-        ConfigSyncService configSyncService = new ConfigSyncService(DEFAULT_PORT);
+        String deerFlowPath = parseArg(args, DEER_FLOW_PATH);
+        ConfigSyncService configSyncService = new ConfigSyncService(DEFAULT_PORT, new String [] {"", deerFlowPath, "" });
         String injectAgent = parseArg(args, "--inject-agent=");
         int witch = Integer.parseInt(injectAgent == null ? "0" : injectAgent);
         configSyncService.sync(witch, witch);
