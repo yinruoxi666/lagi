@@ -31,6 +31,9 @@ public class DeerFlowSyncServiceImpl extends BaseSyncServiceImpl {
 
     @Override
     public boolean check() {
+        if (isBlank(basePath)) {
+            return false;
+        }
         Path path = Paths.get(basePath);
         File file = path.toFile();
         if(!file.exists()) {
@@ -50,7 +53,7 @@ public class DeerFlowSyncServiceImpl extends BaseSyncServiceImpl {
 
     @Override
     public void export(String path) {
-        load();
+        load(path);
         Path deerFlowPath = Paths.get(basePath);
         boolean exists = deerFlowPath.toFile().exists();
         if (!exists) {
@@ -163,7 +166,7 @@ public class DeerFlowSyncServiceImpl extends BaseSyncServiceImpl {
     }
 
     @Override
-    public void load() {
+    public void load(String urlPath) {
         Path deerFlowPath = Paths.get(basePath);
         boolean exists = deerFlowPath.toFile().exists();
         if (!exists) {

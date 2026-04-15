@@ -63,6 +63,15 @@ public class ConfigSyncService {
                 log.warn("{} is not installed, skipping configuration synchronization", service.name());
                 continue;
             }
+            if ((loadWhich & key) == 0) {
+                log.info("Skipped: {} to LinkMind configuration synchronization", service.name());
+            } else {
+                try {
+                    service.load(getBasePath());
+                } catch (Exception e) {
+                    log.error("Failed to load {} configuration", service.name(), e);
+                }
+            }
             if ((exportWhich & key) == 0) {
                 log.info("Skipped: LinkMind to {} configuration synchronization", service.name());
             } else {
@@ -70,15 +79,6 @@ public class ConfigSyncService {
                     service.export(getBasePath());
                 } catch (Exception e) {
                     log.error("Failed to export {} configuration", service.name(), e);
-                }
-            }
-            if ((loadWhich & key) == 0) {
-                log.info("Skipped: {} to LinkMind configuration synchronization", service.name());
-            } else {
-                try {
-                    service.load();
-                } catch (Exception e) {
-                    log.error("Failed to load {} configuration", service.name(), e);
                 }
             }
         }

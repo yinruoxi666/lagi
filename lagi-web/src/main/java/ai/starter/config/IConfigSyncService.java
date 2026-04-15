@@ -11,7 +11,7 @@ public interface IConfigSyncService {
     /**
      * Load the config
      */
-    void load();
+    void load(String path);
 
     String name();
 

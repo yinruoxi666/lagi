@@ -9,6 +9,7 @@ import ai.utils.YmlLoader;
 import cn.hutool.core.util.StrUtil;
 import lombok.extern.slf4j.Slf4j;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.Map;
@@ -28,16 +29,35 @@ public class OpenClawSyncServiceImpl extends BaseSyncServiceImpl {
     public OpenClawSyncServiceImpl(String basePath) {
         super(basePath);
         Path openClawBathPath = OpenClawUtil.getOpenClawBathPath();
-        if(openClawBathPath != null && StrUtil.isNotBlank(this.basePath)) {
+        if (openClawBathPath == null || !Files.exists(openClawBathPath)) {
+            return;
+        }
+        if(StrUtil.isNotBlank(this.basePath)) {
             this.basePath = openClawBathPath.toString();
         }
-        if (openClawBathPath != null) {
-            Map<String, Object> map = YmlLoader.readYamlAsMap(openClawBathPath.resolve(OPENCLAW_JSON).toString());
+        Map<String, Object> map;
+        Path openClawJsonPath = openClawBathPath.resolve(OPENCLAW_JSON);
+        if (Files.exists(openClawJsonPath)) {
+            map = YmlLoader.readYamlAsMap(openClawJsonPath.toString());
             YmlLoader.flattenYamlToProperties(map, "", openClawJsonProperties);
-            map = YmlLoader.readYamlAsMap(openClawBathPath.resolve(MODELS_JSON).toString());
+        } else {
+            log.warn("{}: {} not found, skip loading openclaw config", name(), OPENCLAW_JSON);
+        }
+
+        Path modelsJsonPath = openClawBathPath.resolve(MODELS_JSON);
+        if (Files.exists(modelsJsonPath)) {
+            map = YmlLoader.readYamlAsMap(modelsJsonPath.toString());
             YmlLoader.flattenYamlToProperties(map, "", modelsJsonProperties);
-            map = YmlLoader.readYamlAsMap(openClawBathPath.resolve(AUTH_JSON).toString());
+        } else {
+            log.warn("{}: {} not found, skip loading models config", name(), MODELS_JSON);
+        }
+
+        Path authJsonPath = openClawBathPath.resolve(AUTH_JSON);
+        if (Files.exists(authJsonPath)) {
+            map = YmlLoader.readYamlAsMap(authJsonPath.toString());
             YmlLoader.flattenYamlToProperties(map, "", authJsonProperties);
+        } else {
+            log.warn("{}: {} not found, skip loading auth profiles", name(), AUTH_JSON);
         }
     }
 
@@ -52,7 +72,7 @@ public class OpenClawSyncServiceImpl extends BaseSyncServiceImpl {
     }
 
     @Override
-    public void load() {
+    public void load(String urlPath) {
         Path lagiYmlPath = ConfigUtil.getLagiYmlPath();
         if(lagiYmlPath == null || !lagiYmlPath.toFile().exists()) {
             log.error("{}: \t Lagi.yml not found", name());
