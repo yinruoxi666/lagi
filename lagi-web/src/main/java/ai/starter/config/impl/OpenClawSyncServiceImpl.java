@@ -2,9 +2,13 @@ package ai.starter.config.impl;
 
 import ai.starter.OpenClawInjector;
 import ai.starter.OpenClawUtil;
-import ai.starter.config.IConfigSyncService;
 
-public class OpenClawSyncServiceImpl implements IConfigSyncService {
+public class OpenClawSyncServiceImpl extends BaseSyncServiceImpl {
+
+    public OpenClawSyncServiceImpl(String basePath) {
+        super(basePath);
+    }
+
     @Override
     public boolean check() {
         return OpenClawUtil.openClawExists();

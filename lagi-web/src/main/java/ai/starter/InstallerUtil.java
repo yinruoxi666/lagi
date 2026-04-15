@@ -51,7 +51,9 @@ public class InstallerUtil {
         InstallerUtil.applyConfigAndDataDir(args, jarFile);
         InstallerUtil.applyRuntimeSkillsConfig(args);
         ConfigSyncService configSyncService = new ConfigSyncService(DEFAULT_PORT);
-        configSyncService.sync(configSyncService.getAll(), configSyncService.getAll());
+        String injectAgent = parseArg(args, "--inject-agent=");
+        int witch = Integer.parseInt(injectAgent == null ? "0" : injectAgent);
+        configSyncService.sync(witch, witch);
 //        OpenClawUtil.sync(DEFAULT_PORT, exportToOpenClaw, importFromOpenClaw);
     }
 

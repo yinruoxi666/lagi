@@ -133,7 +133,13 @@ public class FilterConfigServlet extends RestfulServlet {
             if (filtersObj == null) {
                 return new ArrayList<>();
             }
-            
+
+            filtersObj = ((Map<String, Object>) filtersObj).get("items");
+
+            if (filtersObj == null) {
+                return new ArrayList<>();
+            }
+
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> filtersList = (List<Map<String, Object>>) filtersObj;
             List<FilterConfig> filterConfigs = new ArrayList<>();

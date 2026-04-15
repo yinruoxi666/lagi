@@ -1,6 +1,6 @@
 package ai.starter.config;
 
-import ai.starter.config.impl.DeepFlowSyncServiceImpl;
+import ai.starter.config.impl.DeerFlowSyncServiceImpl;
 import ai.starter.config.impl.HermesSyncServiceImpl;
 import ai.starter.config.impl.OpenClawSyncServiceImpl;
 import lombok.Getter;
@@ -14,8 +14,9 @@ import java.util.Set;
 public class ConfigSyncService {
 
     public static final int OpenClaw = 1;
-    public static final int deepFlow = 1 << 1;
+    public static final int deerFlow = 1 << 1;
     public static final int Hermes = 1 << 2;
+
 
     @Getter
     private int all = 0;
@@ -35,10 +36,10 @@ public class ConfigSyncService {
     }
 
     private void init() {
-        configSyncServices.put(OpenClaw, new OpenClawSyncServiceImpl());
-        configSyncServices.put(deepFlow, new DeepFlowSyncServiceImpl());
-        configSyncServices.put(Hermes, new HermesSyncServiceImpl());
-        all = OpenClaw | deepFlow | Hermes;
+        configSyncServices.put(OpenClaw, new OpenClawSyncServiceImpl(""));
+        configSyncServices.put(deerFlow, new DeerFlowSyncServiceImpl(""));
+        configSyncServices.put(Hermes, new HermesSyncServiceImpl(""));
+        all = OpenClaw | deerFlow | Hermes;
     }
 
     public int selected(int [] selected) {

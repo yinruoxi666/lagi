@@ -158,6 +158,32 @@ function Install-LinkMind {
 
     $runtimeChoice = Read-RuntimeChoice
     $skillsRoot = ""
+    $injectAgent = 0
+
+    function Read-InjectAgentChoice {
+        while ($true) {
+            Write-Host "Inject Agent Framework:"
+            Write-Host "  1) openclaw"
+            Write-Host "  2) deer-flow"
+            Write-Host "  3) hermes"
+            $answer = (Read-Host "Please choose [1]").Trim().ToLower()
+            if ([string]::IsNullOrEmpty($answer) -or $answer -eq "1" -or $answer -eq "openclaw") {
+                return 1
+            }
+            if ($answer -eq "2" -or $answer -eq "deer-flow" -or $answer -eq "deerflow") {
+                return (1 -shl 1)
+            }
+            if ($answer -eq "3" -or $answer -eq "hermes") {
+                return (1 -shl 2)
+            }
+            Write-Host "Invalid choice. Please enter 1, 2 or 3."
+        }
+    }
+
+    if ($runtimeChoice -eq "mate") {
+        $injectAgent = Read-InjectAgentChoice
+    }
+
     if ($runtimeChoice -eq "server") {
         $popularSkillsZip = Join-Path $linkMindDir "popular_skills.zip"
         $skillsRoot = Join-Path (Join-Path $linkMindDir "skills") "popular_skills"
@@ -179,7 +205,7 @@ function Install-LinkMind {
     Write-Host "Running installer..."
     # "--export-to-openclaw=$exportVal"
     # "--import-from-openclaw=$importVal"
-    java -cp $jarPath ai.starter.InstallerUtil "--runtime-choice=$runtimeChoice" "--skills-root=$skillsRoot"
+    java -cp $jarPath ai.starter.InstallerUtil "--runtime-choice=$runtimeChoice" "--skills-root=$skillsRoot" "--inject-agent=$injectAgent"
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Error: Installer exited with code $LASTEXITCODE"
         return
@@ -194,10 +220,10 @@ function Install-LinkMind {
     $startNow = Read-YesNo "Would you like to start LinkMind now?"
     if ($startNow) {
         Set-Location $linkMindDir
-        java -jar $jarName
+        java -jar $jarName "--enable-sync=false"
     } else {
         Write-Host "You can start LinkMind later by running:"
-        Write-Host "  cd $linkMindDir && java -jar $jarName"
+        Write-Host "  cd $linkMindDir && java -jar $jarName --enable-sync=false"
     }
 }
 

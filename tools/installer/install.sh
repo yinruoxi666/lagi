@@ -73,6 +73,7 @@ read_yes_no() {
 # export_val="false"
 # import_val="false"
 runtime_choice="mate"
+inject_agent=0
 
 read_runtime_choice() {
     while true; do
@@ -94,6 +95,33 @@ read_runtime_choice() {
 }
 
 read_runtime_choice
+
+read_inject_agent_choice() {
+    while true; do
+        echo "Inject Agent Framework:"
+        echo "  1) openclaw"
+        echo "  2) deer-flow"
+        echo "  3) hermes"
+        printf "Please choose [1]: "
+        read -r answer < /dev/tty
+        answer=$(echo "$answer" | tr '[:upper:]' '[:lower:]' | xargs)
+        if [ -z "$answer" ] || [ "$answer" = "1" ] || [ "$answer" = "openclaw" ]; then
+            inject_agent=1
+            return 0
+        elif [ "$answer" = "2" ] || [ "$answer" = "deer-flow" ] || [ "$answer" = "deerflow" ]; then
+            inject_agent=$((1 << 1))
+            return 0
+        elif [ "$answer" = "3" ] || [ "$answer" = "hermes" ]; then
+            inject_agent=$((1 << 2))
+            return 0
+        fi
+        echo "Invalid choice. Please enter 1, 2 or 3."
+    done
+}
+
+if [ "$runtime_choice" = "mate" ]; then
+    read_inject_agent_choice
+fi
 
 if [ "$runtime_choice" = "server" ]; then
     POPULAR_SKILLS_ZIP="$LINKMIND_DIR/popular_skills.zip"
@@ -141,7 +169,8 @@ echo "Running installer..."
 # "--import-from-openclaw=$import_val" \
 java -cp "$JAR_PATH" ai.starter.InstallerUtil \
     "--runtime-choice=$runtime_choice" \
-    "--skills-root=$SKILLS_ROOT" || {
+    "--skills-root=$SKILLS_ROOT" \
+    "--inject-agent=$inject_agent" || {
     rc=$?
     echo "Error: Installer exited with code $rc"
     exit $rc
@@ -155,8 +184,8 @@ echo ""
 # 7. Optionally start LinkMind
 if read_yes_no "Would you like to start LinkMind now?"; then
     cd "$LINKMIND_DIR"
-    java -jar "$JAR_NAME"
+    java -jar "$JAR_NAME" --enable-sync=false
 else
     echo "You can start LinkMind later by running:"
-    echo "  cd $LINKMIND_DIR && java -jar $JAR_NAME"
+    echo "  cd $LINKMIND_DIR && java -jar $JAR_NAME --enable-sync=false"
 fi

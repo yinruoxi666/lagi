@@ -1,8 +1,12 @@
 package ai.starter.config.impl;
 
-import ai.starter.config.IConfigSyncService;
 
-public class HermesSyncServiceImpl implements IConfigSyncService {
+public class HermesSyncServiceImpl extends BaseSyncServiceImpl {
+
+    public HermesSyncServiceImpl(String basePath) {
+        super(basePath);
+    }
+
     @Override
     public boolean check() {
         // TODO 2026/4/13 Hermes inject
