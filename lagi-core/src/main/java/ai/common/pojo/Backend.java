@@ -29,7 +29,7 @@ public class Backend {
     private String accessKeyId;
     private String accessKeySecret;
     private String securityKey;
-    private Boolean stream;
+    private Boolean stream = true;
     private String oss;
     private String accessToken;
     private String others;

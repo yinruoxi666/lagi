@@ -14,7 +14,7 @@ public class ApikeyUtil {
     private static final Logger logger = LoggerFactory.getLogger(ApikeyUtil.class);
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String SAAS_API_KEY_VALIDATE_PATH = "/saas/api/apikey/validate";
-    private static final int DEFAULT_TIMEOUT_SECONDS = 3;
+    private static final int DEFAULT_TIMEOUT_SECONDS = 30;
     private static final Boolean enableAuth = ContextLoader.configuration.getFunctions().getChat().getEnableAuth();
 
     public static String extractBearerToken(String authorizationHeader) {

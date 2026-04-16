@@ -30,6 +30,8 @@ public class ModelFunction extends Backend {
     private Boolean tokenCharge;
     @JsonProperty("enable_auth")
     private Boolean enableAuth;
+    @JsonProperty("enable_policy")
+    private Boolean enablePolicy;
 
     @JsonCreator
     public ModelFunction(
@@ -39,7 +41,8 @@ public class ModelFunction extends Backend {
             @JsonProperty("maxgen") Integer maxGen,
             @JsonProperty("context_length") Integer contextLength,
             @JsonProperty("token_charge") Boolean tokenCharge,
-            @JsonProperty("enable_auth") Boolean enableAuth
+            @JsonProperty("enable_auth") Boolean enableAuth,
+            @JsonProperty("enable_policy") Boolean enablePolicy
     ) {
         this.enableQueueHandle = enableQueueHandle != null && enableQueueHandle;
         this.handle = handle == null ? PolicyConstants.PARALLEL : handle;
@@ -48,5 +51,6 @@ public class ModelFunction extends Backend {
         this.contextLength = contextLength == null ? 4096 : contextLength;
         this.tokenCharge = tokenCharge != null && tokenCharge;
         this.enableAuth = enableAuth != null && enableAuth;
+        this.enablePolicy = enablePolicy == null || enablePolicy;
     }
 }

@@ -66,8 +66,7 @@ public class CompletionsService implements ChatCompletion {
     }
 
     public static Policy getPolicy() {
-        Policy policy = BeanUtil.copyProperties(ContextLoader.configuration.getFunctions().getChat(), Policy.class);
-        return policy;
+        return FreezingService.getPolicy();
     }
 
     public static String getRoute() {
@@ -88,7 +87,8 @@ public class CompletionsService implements ChatCompletion {
                     unfreezeAdapter(appointAdapter);
                     return result;
                 } catch (RRException e) {
-                    if (LLMErrorConstants.isContentSafetyBlocked(e.getCode())) {
+                    Policy policy = getPolicy();
+                    if (LLMErrorConstants.isContentSafetyBlocked(e.getCode()) || !policy.getEnablePolicy()) {
                         throw e;
                     }
                     freezingAdapterByErrorCode(appointAdapter, e.getCode());
@@ -135,7 +135,8 @@ public class CompletionsService implements ChatCompletion {
                     unfreezeAdapter(adapter);
                     return result;
                 } catch (RRException e) {
-                    if (LLMErrorConstants.isContentSafetyBlocked(e.getCode())) {
+                    Policy policy = getPolicy();
+                    if (LLMErrorConstants.isContentSafetyBlocked(e.getCode()) || !policy.getEnablePolicy()) {
                         throw e;
                     }
                     if (adapter instanceof ModelService) {
