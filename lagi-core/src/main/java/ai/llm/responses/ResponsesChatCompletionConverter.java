@@ -6,6 +6,7 @@ import cn.hutool.core.util.StrUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.*;
@@ -31,8 +32,9 @@ public final class ResponsesChatCompletionConverter {
         responseRequest.setPrevious_response_id(sessionContext.getPreviousResponseId());
         responseRequest.setStream(Boolean.TRUE.equals(request.getStream()));
         responseRequest.setMax_output_tokens(request.getMax_tokens());
-        responseRequest.setTools(toTools(request.getTools()));
-        responseRequest.setTool_choice(toToolChoice(request.getTool_choice()));
+        List<ResponseTool> requestTools = toTools(request.getTools(), modelName);
+        responseRequest.setTools(requestTools);
+        responseRequest.setTool_choice(toToolChoice(request.getTool_choice(), requestTools));
         responseRequest.setParallel_tool_calls(request.getParallel_tool_calls());
         responseRequest.setText(toText(request.getResponse_format()));
         return responseRequest;
@@ -121,8 +123,8 @@ public final class ResponsesChatCompletionConverter {
                 ChatCompletionResult result = convertResponse(response, true);
                 if (result.getChoices() != null && !result.getChoices().isEmpty()) {
                     result.getChoices().get(0).setFinish_reason("response.incomplete".equals(type) ? "length" : "stop");
-                    if (result.getChoices().get(0).getMessage() != null) {
-                        result.getChoices().get(0).getMessage().setContent("");
+                    if (result.getChoices().get(0).getDelta() != null) {
+                        result.getChoices().get(0).getDelta().setContent("");
                     }
                 }
                 return result;
@@ -380,7 +382,7 @@ public final class ResponsesChatCompletionConverter {
         return "input_text";
     }
 
-    private static List<ResponseTool> toTools(List<Tool> tools) {
+    private static List<ResponseTool> toTools(List<Tool> tools, String modelName) {
         if (tools == null || tools.isEmpty()) {
             return null;
         }
@@ -389,7 +391,11 @@ public final class ResponsesChatCompletionConverter {
             ResponseTool responseTool = new ResponseTool();
             responseTool.setType(tool.getType());
             if (tool.getFunction() != null) {
-                responseTool.setName(tool.getFunction().getName());
+                if (modelName.toLowerCase().contains("qwen") && tool.getFunction().getName().equals("web_search")) {
+                    responseTool.setName("web_search2");
+                } else {
+                    responseTool.setName(tool.getFunction().getName());
+                }
                 responseTool.setDescription(tool.getFunction().getDescription());
                 Parameters parameters = tool.getFunction().getParameters();
                 Boolean strict = tool.getFunction().getStrict();
@@ -417,9 +423,20 @@ public final class ResponsesChatCompletionConverter {
         return required.containsAll(parameters.getProperties().keySet());
     }
 
-    private static Object toToolChoice(String toolChoice) {
+    private static Object toToolChoice(String toolChoice, List<ResponseTool> requestTools) {
         if (StrUtil.isBlank(toolChoice)) {
-            return null;
+            AllowedToolsRequest request = new AllowedToolsRequest();
+            List<AllowedToolsRequest.Tool> tools = new ArrayList<>();
+            request.setMode("auto");
+            request.setTools(tools);
+            request.setType("allowed_tools");
+            for (ResponseTool requestTool : requestTools) {
+                AllowedToolsRequest.Tool tool = new AllowedToolsRequest.Tool();
+                tool.setType(requestTool.getType());
+                tool.setName(requestTool.getName());
+                tools.add(tool);
+            }
+            return request;
         }
         return toolChoice;
     }
