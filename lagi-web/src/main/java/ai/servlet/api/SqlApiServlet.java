@@ -13,7 +13,6 @@ import ai.servlet.annotation.Post;
 import com.google.common.collect.Lists;
 import com.google.gson.Gson;
 import org.apache.commons.io.IOUtils;
-import org.junit.Test;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -214,7 +213,6 @@ public class SqlApiServlet extends BaseServlet {
         return betweenHashes.replace("#", "");
     }
 
-    @Test
     public void mysql() {
         List<Map<String, Object>> list = new MysqlAdapter("mysql").sqlToValue("SELECT * FROM table_info;");
         Gson gson = new Gson();

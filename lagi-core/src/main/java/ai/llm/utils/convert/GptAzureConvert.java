@@ -6,6 +6,7 @@ import ai.llm.pojo.AzureChatCompletionChoice;
 import ai.llm.utils.LLMErrorConstants;
 import ai.openai.pojo.ChatCompletionResult;
 import com.google.gson.Gson;
+import lombok.extern.slf4j.Slf4j;
 import okhttp3.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -111,14 +112,15 @@ public class GptAzureConvert {
     }
 
     public static ChatCompletionResult convertStreamLine2ChatCompletionResult(String body) {
+        // 记录日志
         if (body.equals("[DONE]")) {
             return null;
         }
         ChatCompletionResult result = gson.fromJson(body, ChatCompletionResult.class);
-        result.getChoices().forEach(choice -> {
-            choice.setMessage(choice.getDelta());
-            choice.setDelta(null);
-        });
+//        result.getChoices().forEach(choice -> {
+//            choice.setMessage(choice.getDelta());
+////            choice.setDelta(null);
+//        });
         return result;
     }
 

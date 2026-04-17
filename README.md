@@ -80,6 +80,40 @@ The following database types are supported but not limited to:
     </div>
 </div>
 
+## Installation and Running
+
+Prerequisites: **JDK 8** must be installed on your machine. If not installed or for detailed steps on each platform, see the [Installation Guide (JDK installation and configuration)](docs/install_en.md).
+
+**Official install script**
+
+Run the command for your platform in a terminal to download and complete installation:
+
+- **Windows (PowerShell):**
+  ```powershell
+  iwr -useb https://downloads.landingbj.com/install.ps1 | iex
+  ```
+- **macOS / Linux:**
+  ```bash
+  curl -fsSL https://downloads.landingbj.com/install.sh | bash
+  ```
+
+**Recommended: Run with JAR**
+
+1. Place `LinkMind.jar` in any directory (e.g. `D:\LinkMind` or `~/LinkMind`).
+2. In that directory, run:
+   - **Windows (PowerShell or cmd):**
+     ```powershell
+     java -jar LinkMind.jar
+     ```
+   - **macOS / Linux:**
+     ```bash
+     java -jar LinkMind.jar
+     ```
+3. On first run, `config`, `data`, and the default `lagi.yml` will be generated automatically.
+4. Open **http://localhost:8080** in your browser to use LinkMind.
+
+For changing the port, specifying config/data directories, and more, see the [Installation Guide](docs/install_en.md).
+
 ## Product Features
 This product provides efficient, stable and easy-to-use functions through a series of advanced technologies and optimized designs to meet diverse user needs. The following are the main features:
 
@@ -146,13 +180,13 @@ Next, modify the [`src/main/resources/lagi.yml`](lagi-web/src/main/resources/lag
   api_key: your-apikey
 ```
 
-Then, use the Maven command to package the project, and the packaged war file will be generated in the `target` directory:
+Then, use the Maven command to package the project. The packaged jar and war files will be generated in the `target` directory:
 
 ```shell
-mvn package
+mvn clean package -pl lagi-web -am -DskipTests -U
 ```
 
-Finally, deploy the generated war package to the Tomcat server. After starting Tomcat, you can view the specific page of LinkMind by accessing the corresponding port through a browser.
+Finally, you can deploy the generated war package to a Tomcat server, or run the embedded Tomcat jar directly. After starting, access the corresponding port in your browser to view the LinkMind interface.
 
 ### Method 2: Using IDE
 
@@ -171,7 +205,7 @@ If you prefer to use an IDE for development, you can directly open the LinkMind 
 - Start Container Command: 
 
   ```bash
-  docker run -d --name lagi-web -p 8080:8080 landingbj/lagi
+  docker run -d --name lagi-web -p 8080:8080 landingbj/linkmind
   ```
 
 ## Tutorial
@@ -188,43 +222,130 @@ In order to help you better understand and use LinkMind, we provide you with det
 
 If you wish to integrate LinkMind into your project, you can refer to our [Integration documentation](https://github.com/landingbj/lagi/blob/main/docs/guide_en.md#quick-integrate-into-your-existing-project). This document will guide you through the process of seamlessly integrating LinkMind into your project. In addition, we provide frequently asked questions and best practices to help you avoid common pitfalls during integration, ensuring a smooth progress of your project. It covers comprehensive guidance from setting up the environment to implementing features. Whether you are a beginner or an experienced developer, you will be able to quickly integrate LinkMind into your project.
 
+## OpenClaw Plugins
+
+### Install from a Published Package
+
+Once the package is published, users can install it with:
+
+```bash
+openclaw plugins install linkmind-context@latest
+```
+
+OpenClaw checks ClawHub first and falls back to npm automatically.
+
+### OpenClaw Configuration
+
+Configure the plugin in your OpenClaw config file and select it as the active context engine:
+
+```json
+{
+  "plugins": {
+    "slots": {
+      "contextEngine": "linkmind-context"
+    },
+    "entries": {
+      "linkmind-context": {
+        "enabled": true,
+        "config": {
+          "apiUrl": "http://localhost:8080/v1",
+          "logLevel": "info"
+        }
+      }
+    }
+  }
+}
+```
+
+### Configuration Reference
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `apiUrl` | `string` | `http://localhost:8080/v1` | Base URL of the LinkMind service |
+| `logLevel` | `string` | `info` | Log Level |
+
 ## Extension
 
 If you are not satisfied with the adapted large model for LinkMind, you can also refer to our [Extension documentation](docs/extend_en.md) to extend LinkMind, adapting it to your preferred large model. This document not only covers the methods for adapting and extending functional models and vector databases but also provides expansion examples to help you quickly grasp the methods for extending LinkMind, meeting your specific requirements.
 
 If you find the vector databases currently integrated with LinkMind to be less than satisfactory for your needs, you can also refer to our [Extension documentation](https://github.com/landingbj/lagi/blob/main/docs/extend_en.md#Database-Extension) to expand LinkMind and adapt it to your preferred vector database. This will meet your diverse business requirements, enhance the overall performance and reliability of your system, and provide a more enriching and efficient data management experience.
 
-## Security
+## Security Filtering
 
-In order to better integrate LinkMind into your business, you can add the keywords you need to filter in the [sensitive_word.json](lagi-web/src/main/resources/sensitive_word.json) file, specify the priority keywords in the [priority_word.json](lagi-web/src/main/resources/priority_word.json) file, and set the stopping keywords in the [stopping_word.json](lagi-web/src/main/resources/stopping_word.json) file to change the return results of the conversation, guide the conversation in a specific direction, and automatically stop the conversation when needed.
+LinkMind (LianZhi) supports custom security filtering rules to control model content and guide conversation direction, with two configuration methods available: [`src/main/resources/lagi.yml`](lagi-web/src/main/resources/lagi.yml) (centralized configuration, recommended); ② Specified JSON file (separate file configuration).
 
-Example: 
+### 1. Sensitive Word Filtering
+Controls sensitive content in model input/output, supporting 3 strategies: `mask` (mask replacement), `erase` (content erasure), `block` (full sentence interception).
+#### Method 1: Configuration in [`src/main/resources/lagi.yml`](lagi-web/src/main/resources/lagi.yml)
+```yaml
+filters:
+  - name: sensitive # Output filtering
+    groups:
+      - level: mask # Mask replacement
+        rules: 'openai,FLG,...' # Replace commas with \\, for regex compatibility
+      - level: erase # Content erasure
+        rules: 'your context,...'
+      - level: block # Full sentence interception
+        rules: 'shit,CNM,...'
+  - name: sensitive_input # Input filtering, same format as above
+    groups:
+      - level: mask # Mask replacement
+        rules: 'openai,FLG,...' # Replace commas with \\, for regex compatibility
+      - level: erase # Content erasure
+        rules: 'your context,...'
+      - level: block # Full sentence interception
+        rules: 'shit,CNM,...'
+```
 
-Set the sensitive word filter, level has three values, 1: delete the entire sentence when the sensitive word is matched 2: replace with mask 3: erase (default). mask: mask string (default :...) . rules: represents a list of sensitive rules, where rule for each list element represents the regular expression matching the sensitive word, mask and level are used globally if not specified:   
-
-If `OPENAI` is successfully matched, the `OPENAI` is erased. If `hello` is successfully matched, the `hello` is replaced with `***`. If `people` is successfully matched, use `...` Substitution.
-
+#### Method 2: JSON File Configuration
+- Input Filtering: [sensitive_input.json](lagi-web/src/main/resources/sensitive_input.json)
+- Output Filtering: [sensitive_word.json](lagi-web/src/main/resources/sensitive_word.json)
 ```json
 {
-  "mask": "...",
-  "level": 3,
+  "mask": "...", // Default mask character
+  "level": 3, // 1=block/2=mask/3=erase (default)
   "rules": [
-    {"rule":"OPENAI"},
-    {"rule":"hello", "level": 2, "mask": "***"},
-    {"rule":"people", "level": 2}
+    {"rule":"OPENAI"}, {"rule":"hello","level":2,"mask":"***"}
+    {"rule":"(?<!\\d)1[3-9]\\d{9}(?!\\d)", "level": 2, "mask": "*", "type": "phone"},
+    {"rule":"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}", "level": 2, "mask": "*", "type": "email"},
+    {"rule":"(?<!\\d)\\d{17}[\\dxX](?!\\d)", "level": 2, "mask": "*", "type": "idcard"},
+    {"rule":"(?<!\\d)1[3-9]\\d{9}(?!\\d)", "level": 2, "mask": "*", "type": "bankcard"},
+    {"rule":"(密码|password|passwd|pwd|secret|token|api_key|apikey)\\s*[=:：]\\s*[\"']?[^\\s\"']+[\"']?", "level": 2, "mask": "*", "type": "password"},
+    {"rule":"sk-[\\da-z]{10,100}", "level": 2, "mask": "*", "type": "api-key"}
   ]
 }
 ```
 
-Example：Set priority keywords and stop keywords:
-
-```json
-[
-  "openai"
-]
+### 2. Priority Keywords
+Improves RAG retrieval matching weight:
+```yaml
+filters:
+  - name: priority
+    rules: 'car,weather,
+            社*保'
 ```
+- JSON: [priority_word.json](lagi-web/src/main/resources/priority_word.json), format: `["car","社*保"]`
 
-Here’s the English translation of your document:
+### 3. Conversation Stopping Keywords
+#### Stopping Keywords
+Splits and terminates conversation messages after matching:
+- YAML:
+```yaml
+filters:
+  - name: stopping
+    rules: 'bye,
+            开始*'
+```
+- JSON: [stopping_word.json](lagi-web/src/main/resources/stopping_word.json), format: `["bye","开始*"]`
+
+#### Conversation Resumption Keywords
+Marks conversation continuation (YAML configuration only):
+```yaml
+filters:
+  - name: continue
+    rules: 'about,next,资料'
+```
+- JSON: [continue_word.json](lagi-web/src/main/resources/continue_word.json), format: `["bye","开始*"]`
 
 ## Rerank and Embedding Models
 
@@ -259,12 +380,14 @@ For API references, see [API Documentation](docs/API_en.md).
 
 ## Downloads
 
-Thank you for your support of LinkMind ! To help you get started quickly and easily, we have provided a pre-packaged LinkMind application that is ready for immediate use.
+We provide pre-packaged applications for direct download and use:
 
-- **Jar File**: The core dependency library of LinkMind.
-  - File Name: lagi-core-1.1.0-jar-with-dependencies.jar
-  - Download Link: [Click here to download](https://downloads.landingbj.com/lagi/lagi-core-1.1.0-jar-with-dependencies.jar)
+- **Core library**: The core dependency library of LinkMind.
+  - File Name: lagi-core-jar-with-dependencies.jar
+  - Download Link: [Click here to download](https://downloads.landingbj.com/lagi/lib/lagi-core-1.2.0-jar-with-dependencies.jar)
 
-- **War File**: The Web application of LinkMind, which can be directly deployed to a web container.
-  - File Name: lagi-web.war
-  - Download Link: [Click here to download](https://downloads.landingbj.com/lagi/lagi-web.war)
+- **Application file**: The full package of LinkMind; you can run it directly after installing JDK.
+  - File Name: LinkMind.jar
+  - Download Link: [Click here to download](https://downloads.landingbj.com/lagi/installer/LinkMind.jar)
+
+Thank you for your attention and support of LinkMind! If you have any questions or suggestions, please feel free to contact us.

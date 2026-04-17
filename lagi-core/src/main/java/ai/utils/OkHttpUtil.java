@@ -80,6 +80,10 @@ public class OkHttpUtil {
     }
 
     public static String post(String url, Map<String, String> headers, Map<String, String> params, String json) throws IOException {
+        return post(url, headers, params, json, null);
+    }
+
+    public static String post(String url, Map<String, String> headers, Map<String, String> params, String json, Integer timeoutSeconds) throws IOException {
         MediaType JSON = MediaType.get("application/json; charset=utf-8");
 
         HttpUrl.Builder urlBuilder = HttpUrl.parse(url).newBuilder();
@@ -104,9 +108,62 @@ public class OkHttpUtil {
 
         Request request = requestBuilder.build();
 
-        try (Response response = client.newCall(request).execute()) {
+        OkHttpClient requestClient = client;
+        if (timeoutSeconds != null && timeoutSeconds > 0) {
+            requestClient = client.newBuilder()
+                    .callTimeout(timeoutSeconds, TimeUnit.SECONDS)
+                    .build();
+        }
+
+        try (Response response = requestClient.newCall(request).execute()) {
             if (!response.isSuccessful()) throw new IOException("Unexpected code " + response);
             return response.body().string();
+        }
+    }
+
+    /**
+     * POST JSON and return HTTP status and body without throwing on non-2xx responses.
+     */
+    public static HttpPostResult postJsonWithStatus(String url, String json) throws IOException {
+        return postJsonWithStatus(url, json, null);
+    }
+
+    public static HttpPostResult postJsonWithStatus(String url, String json, Integer timeoutSeconds) throws IOException {
+        MediaType jsonType = MediaType.get("application/json; charset=utf-8");
+        RequestBody body = RequestBody.create(json, jsonType);
+        Request request = new Request.Builder()
+                .url(url)
+                .post(body)
+                .addHeader("Content-Type", "application/json;charset=UTF-8")
+                .addHeader("Accept", "application/json;charset=UTF-8")
+                .build();
+        OkHttpClient requestClient = client;
+        if (timeoutSeconds != null && timeoutSeconds > 0) {
+            requestClient = client.newBuilder()
+                    .callTimeout(timeoutSeconds, TimeUnit.SECONDS)
+                    .build();
+        }
+        try (Response response = requestClient.newCall(request).execute()) {
+            String responseBody = response.body() != null ? response.body().string() : "";
+            return new HttpPostResult(response.code(), responseBody);
+        }
+    }
+
+    public static final class HttpPostResult {
+        private final int code;
+        private final String body;
+
+        public HttpPostResult(int code, String body) {
+            this.code = code;
+            this.body = body;
+        }
+
+        public int getCode() {
+            return code;
+        }
+
+        public String getBody() {
+            return body;
         }
     }
 

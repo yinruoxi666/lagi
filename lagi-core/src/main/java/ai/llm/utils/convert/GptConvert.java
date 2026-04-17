@@ -1,10 +1,15 @@
 package ai.llm.utils.convert;
 
 import ai.llm.utils.LLMErrorConstants;
+import ai.openai.pojo.ChatCompletionChoice;
 import ai.openai.pojo.ChatCompletionResult;
+import ai.openai.pojo.ChatMessage;
+import ai.utils.LagiGlobal;
 import com.google.gson.Gson;
+import lombok.extern.slf4j.Slf4j;
 import okhttp3.Response;
 
+@Slf4j
 public class GptConvert {
 
     private static final Gson gson = new Gson();
@@ -52,10 +57,12 @@ public class GptConvert {
             return null;
         }
         ChatCompletionResult result = gson.fromJson(body, ChatCompletionResult.class);
-        result.getChoices().forEach(choice -> {
-            choice.setMessage(choice.getDelta());
-            choice.setDelta(null);
-        });
+        if (result.getChoices() == null || result.getChoices().isEmpty()) {
+            return result;
+        }
+//        result.getChoices().forEach(choice -> {
+//            choice.setMessage(choice.getDelta());
+//        });
         return result;
     }
 }

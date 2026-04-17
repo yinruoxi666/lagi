@@ -2,9 +2,8 @@ package ai.manager;
 
 
 import ai.bigdata.IBigdata;
-import ai.common.pojo.VectorStoreConfig;
+import ai.config.ContextLoader;
 import ai.config.pojo.BigdataConfig;
-import ai.embedding.Embeddings;
 import cn.hutool.core.bean.BeanUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,22 +28,23 @@ public class BigdataManager {
     }
 
     public void register(List<BigdataConfig> bigdataConfigs) {
+        bigdataMap.clear();
         if (bigdataConfigs == null || bigdataConfigs.isEmpty()) {
             return;
         }
         bigdataConfigs.forEach(bigdataConfig -> {
-            if(Boolean.FALSE.equals(bigdataConfig.getEnable())) {
+            if (Boolean.FALSE.equals(bigdataConfig.getEnable())) {
                 return;
             }
             Class<?> clazz;
             try {
-                clazz = Class.forName(bigdataConfig.getDriver());
+                clazz = ContextLoader.getClass(bigdataConfig.getDriver());
                 Constructor<?> constructor = clazz.getConstructor(BigdataConfig.class);
                 IBigdata bigdata = (IBigdata) constructor.newInstance(bigdataConfig);
                 BeanUtil.copyProperties(bigdataConfig, bigdata);
-                IBigdata temp = bigdataMap.putIfAbsent(bigdataConfig.getName(), bigdata);
-                if (temp != null) {
-                    log.error("oss {} name {} is already exists!!", bigdata.getClass().getName(), bigdataConfig.getName());
+                IBigdata previous = bigdataMap.put(bigdataConfig.getName(), bigdata);
+                if (previous != null) {
+                    log.debug("Bigdata {} ({}) replaced on re-register", bigdataConfig.getName(), bigdata.getClass().getName());
                 }
             } catch (Exception e) {
                 log.error("oss {} name {} register failed error : {}", bigdataConfig.getDriver(), bigdataConfig.getName(), e.getMessage());

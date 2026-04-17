@@ -4,7 +4,9 @@ import ai.annotation.*;
 import ai.common.ModelService;
 import ai.dto.ModelInfo;
 import ai.dto.ModelPreferenceDto;
+import ai.llm.adapter.ILlmAdapter;
 import ai.llm.utils.CacheManager;
+import ai.llm.adapter.impl.ProxyLlmAdapter;
 import ai.manager.*;
 import ai.migrate.dao.UserModelPreferenceDao;
 import ai.servlet.annotation.Body;
@@ -53,11 +55,16 @@ public class PreferenceServlet extends RestfulServlet {
     }
 
     private <A extends Annotation> List<ModelInfo> convert2ModelInfo(ModelService modelService, Class<A> annotationClass) {
-        A annotation = modelService.getClass().getAnnotation(annotationClass);
-        if(annotation == null){
-            return Collections.emptyList();
+        String [] modelNames = {};
+        // Use the modelNames configured in the yaml file if they exist and are not empty
+        String configuredModel = modelService.getModel();
+        if (configuredModel != null && !configuredModel.trim().isEmpty()) {
+            modelNames = Arrays.stream(configuredModel.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .toArray(String[]::new);
         }
-        String [] modelNames = AnnotationUtil.getAnnotationValue(modelService.getClass(), annotationClass, "modelNames");
+
         return Arrays.stream(modelNames)
                 .map(m-> ModelInfo.builder().model(m).enabled(modelService.getEnable()).company("").description("").build())
                 .collect(Collectors.toList());

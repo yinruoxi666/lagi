@@ -1,82 +1,59 @@
 package ai.llm.adapter.impl;
 
-import ai.annotation.LLM;
-import ai.common.ModelService;
-import ai.common.exception.RRException;
-import ai.llm.adapter.ILlmAdapter;
-import ai.llm.pojo.LlmApiResponse;
-import ai.llm.utils.OpenAiApiUtil;
-import ai.llm.utils.convert.GptConvert;
-import ai.llm.utils.convert.LandingConvert;
+
 import ai.openai.pojo.ChatCompletionRequest;
 import ai.openai.pojo.ChatCompletionResult;
-import com.google.gson.Gson;
 import io.reactivex.Observable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-
-@LLM(modelNames = "qa")
-public class LandingAdapter extends ModelService implements ILlmAdapter {
-    private static final Logger logger = LoggerFactory.getLogger(LandingAdapter.class);
-    private static final int HTTP_TIMEOUT = 15 * 1000;
-    private static final String API_ADDRESS = "http://ai.landingbj.com/v1/chat/completions";
-
-    @Override
-    public boolean verify() {
-        if (getEndpoint() != null && !getEndpoint().contains("lagi.saasai.top")) {
-            return true;
-        }
-        if (getApiKey() == null || getApiKey().startsWith("you")) {
-            return false;
-        }
-        return ai.utils.ApikeyUtil.isApiKeyValid(getApiKey());
-    }
-
+public class LandingAdapter extends OpenAIStandardAdapter {
     @Override
     public ChatCompletionResult completions(ChatCompletionRequest chatCompletionRequest) {
-        setDefaultField(chatCompletionRequest);
-        String model = chatCompletionRequest.getModel();
-        String url = API_ADDRESS;
-        if (model.equals("cascade")) {
-            chatCompletionRequest.setModel(null);
-            chatCompletionRequest.setCategory(null);
-            if (getEndpoint() == null) {
-                url = "https://lagi.saasai.top/v1/chat/completions";
-            } else {
-                url = getEndpoint();
-            }
-        }
-        LlmApiResponse completions = OpenAiApiUtil.completions(getApiKey(), url, HTTP_TIMEOUT, chatCompletionRequest,
-                GptConvert::convert2ChatCompletionResult,
-                GptConvert::convertByResponse);
-        if (completions.getCode() != 200) {
-            logger.error("landing api error {}", completions.getMsg());
-            throw new RRException(completions.getCode(), completions.getMsg());
-        }
-        return completions.getData();
+        normalizeModelNameIfSlashSeparated(chatCompletionRequest);
+        setApiKey(chatCompletionRequest.getApiKey());
+        return super.completions(chatCompletionRequest);
     }
 
     @Override
     public Observable<ChatCompletionResult> streamCompletions(ChatCompletionRequest chatCompletionRequest) {
-        setDefaultField(chatCompletionRequest);
-        String url = API_ADDRESS;
-        if (model.equals("cascade")) {
-            chatCompletionRequest.setModel(null);
-            chatCompletionRequest.setCategory(null);
-            if (getEndpoint() == null) {
-                url = "https://lagi.saasai.top/v1/chat/completions";
-            } else {
-                url = getEndpoint();
+        normalizeModelNameIfSlashSeparated(chatCompletionRequest);
+        setApiKey(chatCompletionRequest.getApiKey());
+        return super.streamCompletions(chatCompletionRequest);
+    }
+
+    /**
+     * If model is like {@code Alibaba/qwen3-max}, keep only the part after the slash ({@code qwen3-max}).
+     */
+    private void normalizeModelNameIfSlashSeparated(ChatCompletionRequest chatCompletionRequest) {
+        if (chatCompletionRequest == null || chatCompletionRequest.getModel() == null) {
+            return;
+        }
+        String model = chatCompletionRequest.getModel().trim();
+        int slash = model.indexOf('/');
+        if (slash >= 0 && slash < model.length() - 1) {
+            String after = model.substring(slash + 1).trim();
+            if (!after.isEmpty()) {
+                chatCompletionRequest.setModel(after);
             }
         }
-        LlmApiResponse completions = OpenAiApiUtil.streamCompletions(getApiKey(), url, HTTP_TIMEOUT, chatCompletionRequest,
-                LandingConvert::convertSteamLine2ChatCompletionResult,
-                LandingConvert::convertByResponse);
-        if (completions.getCode() != 200) {
-            logger.error("landing stream api error {}", completions.getMsg());
-            throw new RRException(completions.getCode(), completions.getMsg());
+    }
+
+    @Override
+    public String getApiAddress() {
+        if (apiAddress == null) {
+            apiAddress = "https://lagi.saasai.top/v1/chat/completions";
         }
-        return completions.getStreamData();
+        return apiAddress;
+    }
+
+    @Override
+    public boolean verify() {
+        return true;
+    }
+
+    @Override
+    public void setApiKey(String apiKey) {
+        if (getApiKey() == null) {
+            this.apiKey = apiKey;
+        }
     }
 }

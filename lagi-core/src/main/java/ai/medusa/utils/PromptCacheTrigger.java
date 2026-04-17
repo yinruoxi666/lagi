@@ -18,14 +18,13 @@ import ai.openai.pojo.ChatMessage;
 import ai.utils.*;
 import ai.utils.qa.ChatCompletionUtil;
 import ai.vector.VectorDbService;
-import ai.vector.VectorStoreService;
 import cn.hutool.core.bean.BeanUtil;
+import com.google.common.collect.Lists;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -249,22 +248,29 @@ public class PromptCacheTrigger {
 
 
     public static List<Integer> analyzeChatBoundariesForIntent(ChatCompletionRequest chatCompletionRequest) {
-        List<ChatMessage> chatMessages = chatCompletionRequest.getMessages();
-        int finalIndex = chatMessages.size() - 1;
-        LinkedList<Integer> res = new LinkedList<>();
-        if(chatMessages.size() < 2) {
-            res.add(finalIndex);
-            return res;
-        }
-        List<QaPair> qaPairs = convert2QaPair(chatMessages, 30);
-        List<List<QaPair>> splitQaPairs = splitQaPairBySemantics(qaPairs);
-        if(!splitQaPairs.isEmpty() && !splitQaPairs.get(splitQaPairs.size() -1).isEmpty()) {
-            int lastQIndex = splitQaPairs.get(splitQaPairs.size() -1).get(0).getQIndex();
-            res.add(lastQIndex);
-        }
-        res.add(finalIndex);
-        return res;
+        return theFinalRoundOfConversation(chatCompletionRequest.getMessages());
     }
+
+    public static List<Integer> theFinalRoundOfConversation(List<ChatMessage> chatMessages) {
+        List<QaPair> qaPairs = convert2QaPair(chatMessages, 30);
+        if (qaPairs.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<List<QaPair>> splitQaPairs = splitQaPairBySemantics(qaPairs);
+        List<QaPair> lastQaPairs;
+        if (splitQaPairs.isEmpty() || splitQaPairs.get(splitQaPairs.size() - 1).isEmpty()) {
+            lastQaPairs = qaPairs;
+        } else {
+            lastQaPairs = splitQaPairs.get(splitQaPairs.size() - 1);
+        }
+        QaPair firstQaPair = lastQaPairs.get(0);
+        QaPair lastQaPair = lastQaPairs.get(lastQaPairs.size() - 1);
+
+        int startIndex = firstQaPair.getQIndex();
+        int endIndex = lastQaPair.getAIndex();
+        return Lists.newArrayList(startIndex, endIndex + 1);
+    }
+
 
     private static List<QaPair> convert2QaPair(List<String> questionList, List<String> answerList) {
         List<QaPair> qaPairs = new ArrayList<>();
@@ -283,22 +289,82 @@ public class PromptCacheTrigger {
 
     private static List<QaPair> convert2QaPair(List<ChatMessage> chatMessages, int deep) {
         List<QaPair> qaPairs = new ArrayList<>();
-        for (int i = chatMessages.size() - 2, count = 0; i > 0 && count < deep; i -= 2, count++) {
-            int aIndex = i;
-            int qIndex = i - 1;
-            ChatMessage a = chatMessages.get(aIndex);
-            ChatMessage q = chatMessages.get(qIndex);
-            String aa = a.getContent().trim();
-            aa = StrFilterUtil.filterPunctuations(aa);
-            int min = Math.min(aa.length(), 50);
-            aa = aa.substring(0, min);
-            String qq = q.getContent().trim();
-            qq = StrFilterUtil.filterPunctuations(qq);
-            QaPair qa = QaPair.builder().a(aa).aIndex(aIndex).q(qq).qIndex(qIndex).build();
-            qaPairs.add(qa);
+        if (chatMessages == null || chatMessages.size() < 2 || deep <= 0) {
+            return qaPairs;
         }
+
+        int count = 0;
+        int currentIndex = chatMessages.size() - 1;
+
+        while (currentIndex > 0 && count < deep) {
+            Integer assistantIndex = findValidAssistantIndex(chatMessages, currentIndex);
+            if (assistantIndex == null) {
+                break;
+            }
+
+            Integer userIndex = findValidUserIndex(chatMessages, assistantIndex - 1);
+            if (userIndex == null) {
+                currentIndex = assistantIndex - 1;
+                continue;
+            }
+
+            ChatMessage assistantMsg = chatMessages.get(assistantIndex);
+            ChatMessage userMsg = chatMessages.get(userIndex);
+
+            String answer = assistantMsg.getContent().trim();
+            answer = StrFilterUtil.filterPunctuations(answer);
+            answer = answer.substring(0, Math.min(answer.length(), 50));
+
+            String question = userMsg.getContent().trim();
+            question = StrFilterUtil.filterPunctuations(question);
+
+            QaPair qaPair = QaPair.builder()
+                    .a(answer)
+                    .aIndex(assistantIndex)
+                    .q(question)
+                    .qIndex(userIndex)
+                    .build();
+            qaPairs.add(qaPair);
+
+            count++;
+            currentIndex = userIndex - 1;
+        }
+
         Collections.reverse(qaPairs);
         return qaPairs;
+    }
+
+    public static Integer findValidAssistantIndex(List<ChatMessage> messages, int startIndex) {
+        for (int i = startIndex; i >= 0; i--) {
+            ChatMessage msg = messages.get(i);
+            if (LagiGlobal.LLM_ROLE_TOOL.equals(msg.getRole())
+                    || msg.getTool_calls() != null
+                    || msg.getContent() == null
+                    || msg.getContent().trim().isEmpty()) {
+                continue;
+            }
+            if (LagiGlobal.LLM_ROLE_ASSISTANT.equals(msg.getRole())) {
+                return i;
+            }
+        }
+        return null;
+    }
+
+
+    private static Integer findValidUserIndex(List<ChatMessage> messages, int startIndex) {
+        for (int i = startIndex; i >= 0; i--) {
+            ChatMessage msg = messages.get(i);
+            if (LagiGlobal.LLM_ROLE_TOOL.equals(msg.getRole())
+                    || msg.getTool_calls() != null
+                    || msg.getContent() == null
+                    || msg.getContent().trim().isEmpty()) {
+                continue;
+            }
+            if (LagiGlobal.LLM_ROLE_USER.equals(msg.getRole())) {
+                return i;
+            }
+        }
+        return null;
     }
 
     private static List<List<QaPair>> splitQaPairBySemantics(List<QaPair> qaPairs) {

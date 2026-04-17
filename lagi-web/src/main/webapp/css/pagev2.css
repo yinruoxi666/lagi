@@ -805,11 +805,8 @@ textarea:focus {
 
 .nav_foot {
     width: 100%;
-    height: 130px;
     color: rgb(0, 0, 0);
     display: flex;
-    /* align-items: center; */
-    /* justify-content: center; */
     padding: 16px;
 }
 
@@ -843,6 +840,7 @@ textarea:focus {
     width: 100%;
     padding: 0 16px;
     display: flex;
+    align-items: center;
     cursor: pointer;
 }
 
@@ -856,6 +854,9 @@ textarea:focus {
 .user-middle {
     flex: 1;
     padding-left: 8px;
+    display: flex;
+    align-items: center;
+    min-height: 36px;
 }
 
 .user-right {
@@ -5707,7 +5708,12 @@ html {
 .dark body,
 .dark html {
     --tw-bg-opacity: 1;
-    background-color: rgba(52, 53, 65, var(--tw-bg-opacity))
+    background-color: rgba(255, 255, 255, var(--tw-bg-opacity)) !important
+}
+
+body,
+html {
+    background-color: #ffffff !important
 }
 
 #__next,
@@ -10068,13 +10074,53 @@ pre[class*=language-] {
     transform: rotate(90deg); /* 向下旋转 */
 }
 
+/* Top-level sidebar row (not .sub-nav-link) */
+#conversationsNav > div > ol > li > a.active {
+    background-color: #2A2B32;
+}
+
+/* Leaf sub-menu (no expand-only row): gray when selected */
+#conversationsNav .third-nav .sub-nav-link.active,
+#conversationsNav .sub-nav > .sub-nav-item:not([data-sub-nav-id]) > .sub-nav-link.active {
+    background-color: #6b7280;
+}
+
 a.active {
-    background-color: #2A2B32; /* 适合的背景色，或者跟hover样式一致 */
+    background-color: #2A2B32;
 }
 
 /* 展开后的二级菜单背景色加深 */
 .sub-nav.bg-darker {
     background-color: #2a2b32; /* 加深的背景色 */
+}
+
+/* 三级菜单样式 */
+.third-nav {
+    display: block;
+    opacity: 0;
+    transform: translateY(-10px);
+    pointer-events: none;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    padding-left: 16px;
+}
+
+.third-nav.hidden {
+    display: none;
+}
+
+.third-nav:not(.hidden) {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.third-nav .sub-nav-item {
+    margin: 2px 0;
+}
+
+.third-nav .sub-nav-link {
+    font-size: 0.9em;
+    padding: 6px 8px;
 }
 
 

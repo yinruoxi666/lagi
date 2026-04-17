@@ -22,7 +22,6 @@ import ai.worker.SkillMap;
 import ai.worker.WorkerGlobal;
 import cn.hutool.core.bean.BeanUtil;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.hadoop.util.Lists;
 
 import java.util.Collections;
 import java.util.List;
@@ -117,6 +116,9 @@ public class BasicRoute extends Route {
                 double priority = ((ModelService) adapter).getPriority();
                 return RouteCompletionResult.builder().result(result).priority(priority).build();
             } catch (RRException e) {
+                if (LLMErrorConstants.isContentSafetyBlocked(e.getCode())) {
+                    throw e;
+                }
                 FreezingService.freezingAdapterByErrorCode(adapter, e.getCode());
             }
         }

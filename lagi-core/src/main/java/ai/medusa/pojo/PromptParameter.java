@@ -12,4 +12,5 @@ public class PromptParameter {
     private Double temperature;
     private Integer maxTokens;
     private String category;
+    private String role;
 }

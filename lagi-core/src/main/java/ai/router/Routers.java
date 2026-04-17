@@ -5,12 +5,10 @@ import ai.config.pojo.ModelFunctions;
 import ai.config.pojo.RouterConfig;
 import ai.config.pojo.WorkerConfig;
 import ai.router.utils.RouterParser;
-import ai.worker.Worker;
 import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.lang.reflect.Constructor;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;

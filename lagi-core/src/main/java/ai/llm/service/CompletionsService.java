@@ -67,8 +67,7 @@ public class CompletionsService implements ChatCompletion {
     }
 
     public static Policy getPolicy() {
-        Policy policy = BeanUtil.copyProperties(ContextLoader.configuration.getFunctions().getChat(), Policy.class);
-        return policy;
+        return FreezingService.getPolicy();
     }
 
     public static String getRoute() {
@@ -80,12 +79,19 @@ public class CompletionsService implements ChatCompletion {
         RRException r = new RRException(LLMErrorConstants.OTHER_ERROR, "{\"error\":\"backend is not enabled.\"}");
         if (chatCompletionRequest.getModel() != null) {
             ILlmAdapter appointAdapter = llmAdapterAIManager.getAdapter(chatCompletionRequest.getModel());
-            if (appointAdapter != null && notFreezingAdapter(appointAdapter)) {
+            if (appointAdapter == null) {
+                throw new RRException(LLMErrorConstants.NO_AVAILABLE_MODEL, "{\"error\":\"No available model.\"}");
+            }
+            if (notFreezingAdapter(appointAdapter)) {
                 try {
-                    ChatCompletionResult result = SensitiveWordUtil.filter(appointAdapter.completions(chatCompletionRequest));
+                    ChatCompletionResult result = appointAdapter.completions(chatCompletionRequest);
                     unfreezeAdapter(appointAdapter);
                     return result;
                 } catch (RRException e) {
+                    Policy policy = getPolicy();
+                    if (LLMErrorConstants.isContentSafetyBlocked(e.getCode()) || !policy.getEnablePolicy()) {
+                        throw e;
+                    }
                     freezingAdapterByErrorCode(appointAdapter, e.getCode());
                     r = e;
                 }
@@ -118,14 +124,25 @@ public class CompletionsService implements ChatCompletion {
 
     public Observable<ChatCompletionResult> streamCompletions(ChatCompletionRequest chatCompletionRequest, List<IndexSearchData> indexSearchDataList) {
         RRException r = new RRException(LLMErrorConstants.NO_AVAILABLE_MODEL, "{\"error\":\"Stream backend is not enabled.\"}");
+        String failedModel = null;
         if (chatCompletionRequest.getModel() != null) {
             ILlmAdapter adapter = llmAdapterAIManager.getAdapter(chatCompletionRequest.getModel());
-            if (adapter != null && notFreezingAdapter(adapter)) {
+            if (adapter == null) {
+                throw new RRException(LLMErrorConstants.NO_AVAILABLE_MODEL, "{\"error\":\"No available model.\"}");
+            }
+            if (notFreezingAdapter(adapter)) {
                 try {
                     Observable<ChatCompletionResult> result = adapter.streamCompletions(chatCompletionRequest);
                     unfreezeAdapter(adapter);
                     return result;
                 } catch (RRException e) {
+                    Policy policy = getPolicy();
+                    if (LLMErrorConstants.isContentSafetyBlocked(e.getCode()) || !policy.getEnablePolicy()) {
+                        throw e;
+                    }
+                    if (adapter instanceof ModelService) {
+                        failedModel = ((ModelService) adapter).getModel();
+                    }
                     freezingAdapterByErrorCode(adapter, e.getCode());
                     r = e;
                 }
@@ -134,6 +151,15 @@ public class CompletionsService implements ChatCompletion {
 
         chatCompletionRequest.setModel(null);
         List<ILlmAdapter> adapters = getLlmAdapters(indexSearchDataList);
+        if (failedModel != null) {
+            String finalFailedModel = failedModel;
+            adapters = adapters.stream().filter(item -> {
+                if (!(item instanceof ModelService)) {
+                    return true;
+                }
+                return !finalFailedModel.equals(((ModelService) item).getModel());
+            }).collect(Collectors.toList());
+        }
         String handle = getPolicy().getHandle();
         if (!PolicyConstants.POLLING.equals(handle)) {
             for (ILlmAdapter adapter : adapters) {
@@ -145,6 +171,9 @@ public class CompletionsService implements ChatCompletion {
                         unfreezeAdapter(adapter);
                         return result;
                     } catch (RRException e) {
+                        if (LLMErrorConstants.isContentSafetyBlocked(e.getCode())) {
+                            throw e;
+                        }
                         freezingAdapterByErrorCode(adapter, e.getCode());
                         r = e;
                     }
@@ -174,6 +203,9 @@ public class CompletionsService implements ChatCompletion {
                         unfreezeAdapter(adapter);
                         return chatCompletionResultObservable;
                     } catch (RRException e) {
+                        if (LLMErrorConstants.isContentSafetyBlocked(e.getCode())) {
+                            throw e;
+                        }
                         freezingAdapterByErrorCode(adapter, e.getCode());
                         r = e;
                     }
@@ -196,6 +228,9 @@ public class CompletionsService implements ChatCompletion {
                         unfreezeAdapter(appointAdapter);
                         return result;
                     } catch (RRException e) {
+                        if (LLMErrorConstants.isContentSafetyBlocked(e.getCode())) {
+                            throw e;
+                        }
                         freezingAdapterByErrorCode(appointAdapter, e.getCode());
                         r = e;
                     }
@@ -389,5 +424,20 @@ public class CompletionsService implements ChatCompletion {
         chatCompletionRequest.setMessages(messages);
         chatCompletionRequest.setCategory(category);
         return chatCompletionRequest;
+    }
+
+
+    public static void main(String[] args) {
+        ContextLoader.loadContext();
+        CompletionsService completionsService = new CompletionsService();
+        ChatCompletionRequest request = completionsService.getCompletionsRequest("千问,介绍一下你自己");
+//        completionsService.completions(request);
+
+        request.setStream(true);
+        Observable<ChatCompletionResult> chatCompletionResultObservable = completionsService.streamCompletions(request);
+        chatCompletionResultObservable.subscribe(result -> {
+            System.out.println(result.getChoices().get(0).getMessage().getContent());
+        });
+
     }
 }

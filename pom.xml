@@ -5,16 +5,55 @@
     <groupId>com.landingbj</groupId>
     <artifactId>lagi</artifactId>
     <packaging>pom</packaging>
-    <version>1.1.0</version>
+    <version>1.2.3</version>
 
     <modules>
         <module>lagi-web</module>
         <module>lagi-core</module>
+        <module>lagi-extension</module>
     </modules>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
+        <!-- Path to lagi-core libs: use reactor root so it's correct when plugin runs in any module -->
+        <lagi-core.libs>${session.executionRootDirectory}/lagi-core/libs</lagi-core.libs>
     </properties>
+    <build>
+        <plugins>
+            <!-- Install lagi-core lib JARs to local repo in initialize (before any module resolves deps) -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-install-plugin</artifactId>
+                <version>3.1.1</version>
+                <executions>
+                    <execution><id>install-bp</id><phase>initialize</phase><goals><goal>install-file</goal></goals>
+                        <configuration><file>${lagi-core.libs}/ai_bp.jar</file><groupId>com.landingbj</groupId><artifactId>bp</artifactId><version>1.0</version><packaging>jar</packaging><generatePom>true</generatePom></configuration>
+                    </execution>
+                    <execution><id>install-qa</id><phase>initialize</phase><goals><goal>install-file</goal></goals>
+                        <configuration><file>${lagi-core.libs}/ai_qa.jar</file><groupId>com.landingbj</groupId><artifactId>qa</artifactId><version>1.0</version><packaging>jar</packaging><generatePom>true</generatePom></configuration>
+                    </execution>
+                    <execution><id>install-index</id><phase>initialize</phase><goals><goal>install-file</goal></goals>
+                        <configuration><file>${lagi-core.libs}/ai_index.jar</file><groupId>com.landingbj</groupId><artifactId>index</artifactId><version>1.0</version><packaging>jar</packaging><generatePom>true</generatePom></configuration>
+                    </execution>
+                    <execution><id>install-core</id><phase>initialize</phase><goals><goal>install-file</goal></goals>
+                        <configuration><file>${lagi-core.libs}/ai_core.jar</file><groupId>com.landingbj</groupId><artifactId>core</artifactId><version>1.0</version><packaging>jar</packaging><generatePom>true</generatePom></configuration>
+                    </execution>
+                    <execution><id>install-learning</id><phase>initialize</phase><goals><goal>install-file</goal></goals>
+                        <configuration><file>${lagi-core.libs}/ai_learning.jar</file><groupId>com.landingbj</groupId><artifactId>learning</artifactId><version>1.0</version><packaging>jar</packaging><generatePom>true</generatePom></configuration>
+                    </execution>
+                    <execution><id>install-eigens</id><phase>initialize</phase><goals><goal>install-file</goal></goals>
+                        <configuration><file>${lagi-core.libs}/ai_eigens.jar</file><groupId>com.landingbj</groupId><artifactId>eigens</artifactId><version>1.0</version><packaging>jar</packaging><generatePom>true</generatePom></configuration>
+                    </execution>
+                    <execution><id>install-parallel</id><phase>initialize</phase><goals><goal>install-file</goal></goals>
+                        <configuration><file>${lagi-core.libs}/ai_parallel.jar</file><groupId>com.landingbj</groupId><artifactId>parallel</artifactId><version>1.0</version><packaging>jar</packaging><generatePom>true</generatePom></configuration>
+                    </execution>
+                    <execution><id>install-gather</id><phase>initialize</phase><goals><goal>install-file</goal></goals>
+                        <configuration><file>${lagi-core.libs}/ai_gather.jar</file><groupId>com.landingbj</groupId><artifactId>gather</artifactId><version>1.0</version><packaging>jar</packaging><generatePom>true</generatePom></configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>

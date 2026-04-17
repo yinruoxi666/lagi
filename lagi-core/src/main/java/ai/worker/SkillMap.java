@@ -1,6 +1,7 @@
 package ai.worker;
 
 import ai.agent.Agent;
+import ai.common.db.HikariDS;
 import ai.common.utils.LRUCache;
 import ai.common.utils.ThreadPoolManager;
 import ai.config.pojo.AgentConfig;
@@ -9,6 +10,7 @@ import ai.llm.service.CompletionsService;
 import ai.openai.pojo.ChatCompletionRequest;
 import ai.openai.pojo.ChatCompletionResult;
 import ai.openai.pojo.ChatMessage;
+import ai.utils.AiGlobal;
 import ai.utils.qa.ChatCompletionUtil;
 import ai.worker.pojo.AgentIntentScore;
 import ai.worker.pojo.IntentResponse;
@@ -27,24 +29,14 @@ import java.util.stream.Collectors;
 
 @Slf4j
 public class SkillMap {
-
-
     private static final ExecutorService executorService;
-
     private static final LRUCache<String, List<AgentIntentScore>> cachedSkillMap = new LRUCache<>(1000, 30L, TimeUnit.DAYS);
-
     private static final ConcurrentHashMap<String, ThreadLocal<Object>> lockMap = new ConcurrentHashMap<>();
-
-    private static final String DB_URL = "jdbc:sqlite:saas.db";
-
     private static final int maxTry = 3;
 
     static {
         try {
-            Class.forName("org.sqlite.JDBC");
-            // 创建数据库连接
-            Connection conn = DriverManager.getConnection(DB_URL);
-            // 创建表
+            Connection conn = HikariDS.getConnection(AiGlobal.DEFAULT_DB);
             String sql = "CREATE TABLE IF NOT EXISTS agent_scores (" +
                     "id INTEGER PRIMARY KEY AUTOINCREMENT," +
                     "agent_id TEXT NOT NULL," +
@@ -59,8 +51,6 @@ public class SkillMap {
             conn.close();
         } catch (SQLException e) {
             log.error("Error connecting to database", e);
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException(e);
         }
     }
 
@@ -74,7 +64,7 @@ public class SkillMap {
 
     public void saveToSQLite(String agentId, String agentName, String keyword, String question, Double score) {
         String sql = "INSERT INTO agent_scores(agent_id, agent_name,keyword, question, score) VALUES(?, ?, ?, ?, ?)";
-        try (Connection conn = DriverManager.getConnection(DB_URL);
+        try (Connection conn = HikariDS.getConnection(AiGlobal.DEFAULT_DB);
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, agentId);
             pstmt.setString(2, agentName);
@@ -90,7 +80,7 @@ public class SkillMap {
     private List<AgentIntentScore> getFromSQLite(String keyword) {
         String sql = "SELECT agent_id, agent_name, keyword, question, score FROM agent_scores WHERE keyword = ?";
         List<AgentIntentScore> scores = new ArrayList<>();
-        try (Connection conn = DriverManager.getConnection(DB_URL);
+        try (Connection conn = HikariDS.getConnection(AiGlobal.DEFAULT_DB);
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, keyword);
             ResultSet rs = pstmt.executeQuery();

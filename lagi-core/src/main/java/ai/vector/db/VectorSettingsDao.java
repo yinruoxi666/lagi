@@ -1,20 +1,17 @@
 package ai.vector.db;
 
+import ai.common.db.HikariDS;
 import ai.common.pojo.UserRagSetting;
+import ai.utils.AiGlobal;
 
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
 public class VectorSettingsDao {
-
-    private static final String DB_URL = "jdbc:sqlite:saas.db";
-
     static {
         try {
-            Class.forName("org.sqlite.JDBC");
-            // 创建数据库连接
-            Connection conn = DriverManager.getConnection(DB_URL);
+            Connection conn = HikariDS.getConnection(AiGlobal.DEFAULT_DB);
             conn.close();
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -25,7 +22,7 @@ public class VectorSettingsDao {
     public List<UserRagSetting> getUserRagVector(String category, String userId) throws SQLException {
         List<UserRagSetting> result = new ArrayList<>();
         String sql = "select id, user_id, file_type, category, chunk_size, temperature from user_rag_settings where category = ? and user_id = ?";
-        try (Connection conn = DriverManager.getConnection(DB_URL);
+        try (Connection conn = HikariDS.getConnection(AiGlobal.DEFAULT_DB);
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, category);
             ps.setString(2, userId);

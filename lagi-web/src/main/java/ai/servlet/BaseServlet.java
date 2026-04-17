@@ -130,4 +130,9 @@ public abstract class BaseServlet extends HttpServlet {
         }
         return files;
     }
+
+    protected void writeError(HttpServletResponse resp, int status, String errorMessage) throws IOException {
+        resp.setStatus(status);
+        resp.getWriter().write(errorMessage);
+    }
 }

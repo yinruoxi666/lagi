@@ -26,7 +26,8 @@ public class EmbeddingManager {
     private EmbeddingManager(){}
 
     public void register(List<EmbeddingConfig> embeddings) {
-        if(embeddings == null) {
+        embeddingMap.clear();
+        if (embeddings == null) {
             return;
         }
         embeddings.forEach(embeddingConfig -> {
@@ -36,9 +37,12 @@ public class EmbeddingManager {
     }
 
     public void register(String key, Embeddings embeddings) {
-        Embeddings temp = embeddingMap.putIfAbsent(key, embeddings);
-        if (temp != null) {
-            log.error("Adapter {} get {} is already exists!!", temp.getClass().getTypeName(), key);
+        if (key == null || embeddings == null) {
+            return;
+        }
+        Embeddings previous = embeddingMap.put(key, embeddings);
+        if (previous != null) {
+            log.debug("Embedding adapter {} ({}) replaced on re-register", key, previous.getClass().getTypeName());
         }
     }
 

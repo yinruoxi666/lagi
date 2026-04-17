@@ -1,9 +1,9 @@
 package ai.manager;
 
 import ai.common.ModelService;
-import ai.common.pojo.Backend;
 import ai.common.pojo.EmbeddingConfig;
 import ai.common.pojo.VectorStoreConfig;
+import ai.config.ContextLoader;
 import ai.config.pojo.RAGFunction;
 import ai.embedding.EmbeddingFactory;
 import ai.embedding.Embeddings;
@@ -34,6 +34,8 @@ public class VectorStoreManager {
     private VectorStoreManager(){}
 
     public void register(List<VectorStoreConfig> vectorStoreConfigs, RAGFunction ragFunction, List<EmbeddingConfig> embeddings) {
+        aiMap.clear();
+        LagiGlobal.RAG_ENABLE = false;
         if (vectorStoreConfigs == null || vectorStoreConfigs.isEmpty() || ragFunction == null) {
             return;
         }
@@ -46,13 +48,13 @@ public class VectorStoreManager {
                 },
                 LinkedHashMap::new
         ));
-//        if(Boolean.TRUE.equals(ragFunction.getEnable())) {
+        if(Boolean.TRUE.equals(ragFunction.getEnable())) {
             VectorStoreConfig vectorStoreConfig = vectorMap.get(ragFunction.getVector());
             Optional.ofNullable(vectorStoreConfig).ifPresent(v -> {
                 try {
                     String name = v.getName();
                     String driver = v.getDriver();
-                    Class<?> clazz = Class.forName(driver);
+                    Class<?> clazz = ContextLoader.getClass(driver);
                     Constructor<?> constructor = clazz.getConstructor(VectorStoreConfig.class, Embeddings.class);
                     BaseVectorStore vs = (BaseVectorStore) constructor.newInstance(v, EmbeddingFactory.getEmbedding(embeddings.get(0)));
                     register(name, vs);
@@ -61,7 +63,7 @@ public class VectorStoreManager {
                     log.error("registerVectorStore ({}) error", v.getName(), e);
                 }}
             );
-//        }
+        }
     }
 
     public void register(String key, VectorStore adapter) {
@@ -72,9 +74,9 @@ public class VectorStoreManager {
                 adapter = new ProxyVectorStore(baseVectorStore);
             }
         }
-        VectorStore temp = aiMap.putIfAbsent(key, adapter);
-        if (temp != null) {
-            log.error("Adapter {} name {} is already exists!!", adapter.getClass().getName(), key);
+        VectorStore previous = aiMap.put(key, adapter);
+        if (previous != null) {
+            log.debug("VectorStore {} ({}) replaced on re-register", key, adapter.getClass().getName());
         }
     }
 
@@ -113,4 +115,3 @@ public class VectorStoreManager {
     }
 
 }
-

@@ -34,8 +34,16 @@ build/
 ### Mac OS ###
 .DS_Store
 
+### Vibe Coding ###
+.claude/
+.codex/
+.cursor/
+/CLAUDE.md
+
+/extension
 /lagi-web/samples/
 /lagi-core/src/test/java/zxw/
 /tomcat*
 /lagi-web/src/main/webapp/static/
 /lagi-examples/
+/lagi-web/dependency-reduced-pom.xml

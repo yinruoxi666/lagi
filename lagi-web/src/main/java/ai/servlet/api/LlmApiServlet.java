@@ -1,15 +1,5 @@
 package ai.servlet.api;
 
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.util.*;
-import java.util.stream.Collectors;
-
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
-
 import ai.common.ModelService;
 import ai.common.exception.RRException;
 import ai.common.pojo.Configuration;
@@ -27,24 +17,25 @@ import ai.llm.schedule.QueueSchedule;
 import ai.llm.service.CompletionsService;
 import ai.llm.service.LlmRouterDispatcher;
 import ai.llm.utils.CompletionUtil;
+import ai.llm.utils.LLMErrorConstants;
+import ai.medusa.MedusaMonitor;
 import ai.medusa.MedusaService;
 import ai.medusa.pojo.CacheItem;
 import ai.medusa.pojo.PromptInput;
-import ai.medusa.MedusaMonitor;
-import ai.medusa.utils.PromptCacheTrigger;
 import ai.medusa.utils.PromptInputUtil;
+import ai.migrate.service.TokenUsageService;
 import ai.openai.pojo.ChatCompletionChoice;
-import ai.router.pojo.LLmRequest;
-import ai.servlet.BaseServlet;
-import ai.utils.ClientIpAddressUtil;
-import ai.vector.VectorDbService;
 import ai.openai.pojo.ChatCompletionRequest;
 import ai.openai.pojo.ChatCompletionResult;
 import ai.openai.pojo.ChatMessage;
+import ai.router.pojo.LLmRequest;
+import ai.servlet.BaseServlet;
+import ai.utils.ApikeyUtil;
+import ai.utils.ClientIpAddressUtil;
 import ai.utils.MigrateGlobal;
-import ai.utils.SensitiveWordUtil;
 import ai.utils.qa.ChatCompletionUtil;
 import ai.vector.VectorCacheLoader;
+import ai.vector.VectorDbService;
 import ai.worker.DefaultWorker;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
@@ -55,6 +46,17 @@ import com.google.common.collect.Lists;
 import io.reactivex.Observable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.*;
+import java.util.stream.Collectors;
+
+import static ai.starter.OpenClawInjector.DEFAULT_MODEL_ID;
 
 public class LlmApiServlet extends BaseServlet {
     private static final long serialVersionUID = 1L;
@@ -69,9 +71,11 @@ public class LlmApiServlet extends BaseServlet {
     private Boolean RAG_ENABLE = null;
     private Boolean MEDUSA_ENABLE = null;
     private final Boolean enableQueueHandle = ContextLoader.configuration.getFunctions().getChat().getEnableQueueHandle();
+    private final Boolean tokenCharge = ContextLoader.configuration.getFunctions().getChat().getTokenCharge();
     private final QueueSchedule queueSchedule = enableQueueHandle ? new QueueSchedule() : null;
     private final DefaultWorker defaultWorker = new DefaultWorker();
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final TokenUsageService tokenUsageService = TokenUsageService.getInstance();
 
     private static MedusaMonitor medusaMonitor;
 
@@ -89,6 +93,20 @@ public class LlmApiServlet extends BaseServlet {
     }
 
     @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        req.setCharacterEncoding("UTF-8");
+        resp.setHeader("Content-Type", "application/json;charset=utf-8");
+        String url = req.getRequestURI();
+        if (url.endsWith("/v1/models") || url.endsWith("/models")) {
+            PrintWriter out = resp.getWriter();
+            String modelsJson = "{\"object\":\"list\",\"data\":[{\"id\":\"gpt-5.4\",\"object\":\"model\",\"created\":1700000000,\"owned_by\":\"azure\"}]}";
+            out.print(modelsJson);
+            out.flush();
+            out.close();
+        }
+    }
+
+    @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         req.setCharacterEncoding("UTF-8");
         resp.setHeader("Content-Type", "application/json;charset=utf-8");
@@ -98,25 +116,25 @@ public class LlmApiServlet extends BaseServlet {
             this.completions(req, resp);
         } else if (method.equals("embeddings")) {
             this.embeddings(req, resp);
-        } else if(method.equals("go")) {
+        } else if (method.equals("go")) {
             this.go(req, resp);
-        } else if(method.equals("isMedusa")) {
+        } else if (method.equals("isMedusa")) {
             this.isMedusa(req, resp);
-        } else if(method.equals("isRAG")) {
+        } else if (method.equals("isRAG")) {
             this.isRAG(req, resp);
         }
     }
 
-    private void isRAG(HttpServletRequest req, HttpServletResponse resp) throws IOException{
+    private void isRAG(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         resp.setHeader("Content-Type", "application/json;charset=utf-8");
         String enable = req.getParameter("RAG");
         Map<String, Object> map = new HashMap<>();
         map.put("status", "success");
-        if (enable!=null&&!"".equals(enable)){
-            if(enable.equals("true")){
+        if (enable != null && !"".equals(enable)) {
+            if (enable.equals("true")) {
                 map.put("RAG", "RAG已开启");
                 this.RAG_ENABLE = true;
-            }else {
+            } else {
                 this.RAG_ENABLE = false;
                 map.put("RAG", "RAG已关闭");
             }
@@ -127,16 +145,16 @@ public class LlmApiServlet extends BaseServlet {
         out.close();
     }
 
-    private void isMedusa(HttpServletRequest req, HttpServletResponse resp) throws IOException{
+    private void isMedusa(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         resp.setHeader("Content-Type", "application/json;charset=utf-8");
         String enable = req.getParameter("medusa");
         Map<String, Object> map = new HashMap<>();
         map.put("status", "success");
-        if (enable!=null&&!"".equals(enable)){
-            if(enable.equals("true")){
+        if (enable != null && !"".equals(enable)) {
+            if (enable.equals("true")) {
                 map.put("medusa", "medusa已开启");
                 this.MEDUSA_ENABLE = true;
-            }else {
+            } else {
                 this.MEDUSA_ENABLE = false;
                 map.put("medusa", "medusa已关闭");
             }
@@ -148,11 +166,11 @@ public class LlmApiServlet extends BaseServlet {
 
     }
 
-    private void go(HttpServletRequest req, HttpServletResponse resp) throws IOException{
+    private void go(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         resp.setContentType("application/json;charset=utf-8");
         LLmRequest lLmRequest = reqBodyToObj(req, LLmRequest.class);
         ChatCompletionResult work = defaultWorker.work(lLmRequest.getWorker(), lLmRequest);
-        if(Boolean.FALSE.equals(lLmRequest.getStream())) {
+        if (Boolean.FALSE.equals(lLmRequest.getStream())) {
             responsePrint(resp, toJson(work));
             return;
         }
@@ -160,7 +178,6 @@ public class LlmApiServlet extends BaseServlet {
         convert2streamAndOutput(firstAnswer, resp, work);
     }
 
-    
 
     private ChatCompletionResult convertResponse(String response) {
         String format = StrUtil.format("{\"created\":0,\"choices\":[{\"index\":0,\"message\":{\"content\":\"{}\"}}]}", response);
@@ -176,8 +193,7 @@ public class LlmApiServlet extends BaseServlet {
             try {
                 String substring = firstAnswer.substring(i, end);
                 ChatCompletionResult result = convertResponse(substring);
-                ChatCompletionResult filter = SensitiveWordUtil.filter(result);
-                String msg = gson.toJson(filter);
+                String msg = gson.toJson(result);
                 out.print("data: " + msg + "\n\n");
                 out.flush();
             } catch (Exception e) {
@@ -201,39 +217,46 @@ public class LlmApiServlet extends BaseServlet {
         resp.setContentType("application/json;charset=utf-8");
         PrintWriter out = resp.getWriter();
         HttpSession session = req.getSession();
-        if (RAG_ENABLE == null){
-            RAG_ENABLE = RAG_CONFIG.getEnable();
-        }
+
         ChatCompletionRequest chatCompletionRequest = setCustomerModel(req, session);
+        String apiKey = chatCompletionRequest.getApiKey();
+
+        if (!ApikeyUtil.validateModelApiKey(apiKey)) {
+            resp.setStatus(LLMErrorConstants.UNAUTHORIZED_CODE);
+            responsePrint(resp, "{\"error\":\"LinkMind api key is invalid\"}");
+            return;
+        }
 
         boolean isMultiModal = CompletionUtil.isMultiModal(chatCompletionRequest);
-
-        ChatCompletionResult chatCompletionResult = null;
-
+        ChatCompletionResult chatCompletionResult;
         List<IndexSearchData> indexSearchDataList = null;
         String SAMPLE_COMPLETION_RESULT_PATTERN = "{\"created\":0,\"choices\":[{\"index\":0,\"message\":{\"content\":\"%s\"}}]}";
 
+        if (RAG_ENABLE == null) {
+            RAG_ENABLE = RAG_CONFIG.getEnable();
+        }
         if (Boolean.TRUE.equals(RAG_ENABLE)) {
             ModelService modelService = (ModelService) LlmRouterDispatcher
                     .getRagAdapter(null).stream().findFirst().orElse(null);
-            if(modelService != null  && RAG_CONFIG.getPriority() > modelService.getPriority()) {
+            if (modelService != null && RAG_CONFIG.getPriority() > modelService.getPriority()) {
                 indexSearchDataList = vectorDbService.searchByContext(chatCompletionRequest);
-                if(indexSearchDataList.isEmpty()) {
+                if (indexSearchDataList.isEmpty()) {
                     String s = String.format(SAMPLE_COMPLETION_RESULT_PATTERN, RAG_CONFIG.getDefaultText());
                     outPrintJson(resp, chatCompletionRequest, s);
-                    return ;
+                    return;
                 }
             }
         }
 
-        if (MEDUSA_ENABLE==null){
+        if (MEDUSA_ENABLE == null) {
             MEDUSA_ENABLE = MEDUSA_CONFIG.getEnable();
         }
-        if(Boolean.TRUE.equals(MEDUSA_ENABLE)) {
+        if (Boolean.TRUE.equals(MEDUSA_ENABLE)) {
             PromptInput promptInput = medusaService.getPromptInput(chatCompletionRequest);
             chatCompletionResult = medusaService.locate(promptInput);
             if (chatCompletionResult != null) {
                 outPrintChatCompletion(resp, chatCompletionRequest, chatCompletionResult);
+                enqueueUsageRecord(apiKey, chatCompletionRequest, chatCompletionResult);
                 logger.info("Cache hit: {}", PromptInputUtil.getNewestPrompt(promptInput));
                 promptInput.getMedusaMetadata().setCacheHit(true);
                 medusaService.triggerCachePutAndDiversify(promptInput, true);
@@ -242,17 +265,17 @@ public class LlmApiServlet extends BaseServlet {
                 medusaService.triggerCachePutAndDiversify(promptInput, true);
             }
         }
-        boolean hasTruncate = false;
+//        boolean hasTruncate = false;
         GetRagContext context = null;
         if (!isMultiModal) {
             if (chatCompletionRequest.getCategory() != null && Boolean.TRUE.equals(RAG_ENABLE)) {
                 String lastMessage = ChatCompletionUtil.getLastMessage(chatCompletionRequest);
                 String answer = VectorCacheLoader.get2L2(lastMessage);
-                if(StrUtil.isNotBlank(answer)) {
-                    outPrintJson(resp,  chatCompletionRequest,String.format(SAMPLE_COMPLETION_RESULT_PATTERN, answer));
+                if (StrUtil.isNotBlank(answer)) {
+                    outPrintJson(resp, chatCompletionRequest, String.format(SAMPLE_COMPLETION_RESULT_PATTERN, answer));
                     return;
                 }
-                if(indexSearchDataList == null) {
+                if (indexSearchDataList == null) {
                     indexSearchDataList = vectorDbService.searchByContext(chatCompletionRequest);
                 }
                 if (indexSearchDataList != null && !indexSearchDataList.isEmpty()) {
@@ -262,15 +285,15 @@ public class LlmApiServlet extends BaseServlet {
                     completionsService.addVectorDBContext(chatCompletionRequest, contextStr);
                     ChatMessage chatMessage = chatCompletionRequest.getMessages().get(chatCompletionRequest.getMessages().size() - 1);
                     chatCompletionRequest.setMessages(Lists.newArrayList(chatMessage));
-                    hasTruncate = true;
+//                    hasTruncate = true;
                 }
             } else {
                 indexSearchDataList = null;
             }
-            if(!hasTruncate) {
-                List<ChatMessage> chatMessages = CompletionUtil.truncateChatMessages(chatCompletionRequest.getMessages());
-                chatCompletionRequest.setMessages(chatMessages);
-            }
+//            if(!hasTruncate) {
+//                List<ChatMessage> chatMessages = CompletionUtil.truncateChatMessages(chatCompletionRequest.getMessages());
+//                chatCompletionRequest.setMessages(chatMessages);
+//            }
         }
 
         EnhanceChatCompletionRequest enhance = EnhanceChatCompletionRequest.builder()
@@ -281,13 +304,14 @@ public class LlmApiServlet extends BaseServlet {
         if (chatCompletionRequest.getStream() != null && chatCompletionRequest.getStream()) {
             try {
                 Observable<ChatCompletionResult> result;
-                if(enableQueueHandle) {
+                if (enableQueueHandle) {
                     result = queueSchedule.streamSchedule(chatCompletionRequest, indexSearchDataList);
                 } else {
                     result = completionsService.streamCompletions(chatCompletionRequest, indexSearchDataList);
                 }
                 resp.setHeader("Content-Type", "text/event-stream;charset=utf-8");
-                streamOutPrint(medusaService.getPromptInput(chatCompletionRequest), result, context, indexSearchDataList, out);
+                streamOutPrint(medusaService.getPromptInput(chatCompletionRequest), result,
+                        context, indexSearchDataList, out, chatCompletionRequest, apiKey);
             } catch (RRException e) {
                 resp.setStatus(e.getCode());
                 responsePrint(resp, e.getMsg());
@@ -296,7 +320,7 @@ public class LlmApiServlet extends BaseServlet {
         } else {
             try {
                 ChatCompletionResult result;
-                if(enableQueueHandle) {
+                if (enableQueueHandle) {
                     result = queueSchedule.schedule(chatCompletionRequest, indexSearchDataList);
                 } else {
                     result = completionsService.completions(chatCompletionRequest, indexSearchDataList);
@@ -309,6 +333,7 @@ public class LlmApiServlet extends BaseServlet {
                     medusaMonitor.put(medusaService.getPromptInput(chatCompletionRequest), result);
                 }
                 responsePrint(resp, toJson(result));
+                enqueueUsageRecord(apiKey, chatCompletionRequest, result);
             } catch (RRException e) {
                 resp.setStatus(e.getCode());
                 responsePrint(resp, e.getMsg());
@@ -328,7 +353,7 @@ public class LlmApiServlet extends BaseServlet {
 
 
     private void outPrintChatCompletion(HttpServletResponse resp, ChatCompletionRequest chatCompletionRequest, ChatCompletionResult chatCompletionResult) throws IOException {
-        if(Boolean.TRUE.equals(chatCompletionRequest.getStream())) {
+        if (Boolean.TRUE.equals(chatCompletionRequest.getStream())) {
             streamOutPrint(resp, chatCompletionResult);
         } else {
             outPrint(resp, chatCompletionResult);
@@ -336,7 +361,7 @@ public class LlmApiServlet extends BaseServlet {
     }
 
     private void outPrintJson(HttpServletResponse resp, ChatCompletionRequest chatCompletionRequest, String s) throws IOException {
-        if(Boolean.TRUE.equals(chatCompletionRequest.getStream())) {
+        if (Boolean.TRUE.equals(chatCompletionRequest.getStream())) {
             streamOutPrint(resp, s);
         } else {
             outPrint(resp, s);
@@ -344,12 +369,12 @@ public class LlmApiServlet extends BaseServlet {
     }
 
 
-    private void outPrint(HttpServletResponse resp,  ChatCompletionResult chatCompletionResult) throws IOException {
+    private void outPrint(HttpServletResponse resp, ChatCompletionResult chatCompletionResult) throws IOException {
         resp.setContentType("application/json;charset=utf-8");
         responsePrint(resp, toJson(chatCompletionResult));
     }
 
-    private void outPrint(HttpServletResponse resp,  String json) throws IOException {
+    private void outPrint(HttpServletResponse resp, String json) throws IOException {
         resp.setContentType("application/json;charset=utf-8");
         responsePrint(resp, json);
     }
@@ -376,52 +401,46 @@ public class LlmApiServlet extends BaseServlet {
 
 
     private ChatCompletionRequest setCustomerModel(HttpServletRequest req, HttpSession session) throws IOException {
-        ModelPreferenceDto preference = JSONUtil.toBean((String) session.getAttribute("preference"), ModelPreferenceDto.class) ;
-        ChatCompletionRequest chatCompletionRequest = objectMapper.readValue(requestToJson(req), ChatCompletionRequest.class);
-        if(chatCompletionRequest.getModel() == null
+        ModelPreferenceDto preference = JSONUtil.toBean((String) session.getAttribute("preference"), ModelPreferenceDto.class);
+        String json = requestToJson(req);
+//        System.out.println("ChatCompletionRequest json: " + json);
+        ChatCompletionRequest chatCompletionRequest = objectMapper.readValue(json, ChatCompletionRequest.class);
+        if (chatCompletionRequest.getModel() == null
                 && preference != null
                 && preference.getLlm() != null) {
             chatCompletionRequest.setModel(preference.getLlm());
         }
+        if (chatCompletionRequest.getModel() != null && chatCompletionRequest.getModel().equals(DEFAULT_MODEL_ID)) {
+            chatCompletionRequest.setModel(null);
+        }
+        String apikey = ApikeyUtil.extractBearerToken(req.getHeader("Authorization"));
+        chatCompletionRequest.setApiKey(apikey);
         return chatCompletionRequest;
     }
 
-    private static ChatCompletionRequest getCompletionRequest(ChatCompletionRequest chatCompletionRequest) {
-        List<Integer> integers = PromptCacheTrigger.analyzeChatBoundariesForIntent(chatCompletionRequest);
-        ChatCompletionRequest medusaRequest = null;
-        if(!integers.isEmpty()) {
-            Integer i = integers.get(0);
-            List<ChatMessage> chatMessages = chatCompletionRequest.getMessages().subList(i, chatCompletionRequest.getMessages().size());
-            medusaRequest = new ChatCompletionRequest();
-            medusaRequest.setTemperature(chatCompletionRequest.getTemperature());
-            medusaRequest.setMax_tokens(chatCompletionRequest.getMax_tokens());
-            medusaRequest.setCategory(chatCompletionRequest.getCategory());
-            medusaRequest.setMessages(chatMessages);
-        } else {
-            medusaRequest = chatCompletionRequest;
-        }
-        return medusaRequest;
-    }
-
-    private void streamOutPrint(PromptInput promptInput, Observable<ChatCompletionResult> observable, GetRagContext context, List<IndexSearchData> indexSearchDataList, PrintWriter out) {
+    private void streamOutPrint(PromptInput promptInput, Observable<ChatCompletionResult> observable,
+                                GetRagContext context, List<IndexSearchData> indexSearchDataList,
+                                PrintWriter out, ChatCompletionRequest chatCompletionRequest, String apiKey) {
         final ChatCompletionResult[] lastResult = {null};
         String key = UUID.randomUUID().toString();
         observable.subscribe(
                 data -> {
                     lastResult[0] = data;
-                    ChatCompletionResult filter = SensitiveWordUtil.filter(data, true);
+//                    ChatCompletionResult filter = SensitiveWordUtil.filter(data, true);
+//                    SecurityFilterImpl had filter
+                    ChatCompletionResult filter = data;
                     if (filter == null) {
                         return;
                     }
-                    if (filter.getChoices() != null && !filter.getChoices().isEmpty() && filter.getChoices().get(0).getFinish_reason() != null ) {
+                    if (filter.getChoices() != null && !filter.getChoices().isEmpty() && filter.getChoices().get(0).getFinish_reason() != null) {
                         ChatCompletionChoice chatCompletionChoice = filter.getChoices().get(0);
                         String finishReason = chatCompletionChoice.getFinish_reason();
                         chatCompletionChoice.setFinish_reason(null);
                         String msg = gson.toJson(filter);
                         outputChunk(out, msg);
                         chatCompletionChoice.setFinish_reason(finishReason);
-//                        chatCompletionChoice.getDelta().setContent("");
-                        chatCompletionChoice.getMessage().setContent("");
+                        chatCompletionChoice.getDelta().setContent("");
+//                        chatCompletionChoice.getMessage().setContent("");
                         msg = gson.toJson(filter);
                         outputChunk(out, msg);
                     } else {
@@ -450,10 +469,11 @@ public class LlmApiServlet extends BaseServlet {
                     }
                 },
                 () -> {
-                    if(lastResult[0] == null) {
+                    if (lastResult[0] == null) {
                         return;
                     }
-                    extracted(lastResult,indexSearchDataList,context, out);
+                    extracted(lastResult, indexSearchDataList, context, out);
+                    enqueueUsageRecord(apiKey, chatCompletionRequest, lastResult[0]);
                     out.flush();
                     out.close();
                     if (medusaMonitor != null && promptInput != null && lastResult[0] != null) {
@@ -462,6 +482,27 @@ public class LlmApiServlet extends BaseServlet {
                     }
                 }
         );
+    }
+
+    private void enqueueUsageRecord(String apiKey, ChatCompletionRequest request, ChatCompletionResult result) {
+        if (!Boolean.TRUE.equals(tokenCharge) || result == null || result.getUsage() == null) {
+            return;
+        }
+        String modelName = resolveModelNameForUsage(request, result);
+        if (StrUtil.isBlank(modelName)) {
+            return;
+        }
+        tokenUsageService.recordUsage(result.getId(), apiKey, modelName, result.getUsage());
+    }
+
+    private String resolveModelNameForUsage(ChatCompletionRequest request, ChatCompletionResult result) {
+        if (result != null && StrUtil.isNotBlank(result.getModel())) {
+            return result.getModel().trim();
+        }
+        if (request != null && StrUtil.isNotBlank(request.getModel())) {
+            return request.getModel().trim();
+        }
+        return null;
     }
 
     private void outputChunk(PrintWriter out, String msg) {
@@ -474,8 +515,8 @@ public class LlmApiServlet extends BaseServlet {
                 && indexSearchDataList != null && !indexSearchDataList.isEmpty()) {
             List<String> imageList = new ArrayList<>();
             for (IndexSearchData indexSearchData : indexSearchDataList) {
-                    List<String> strLsit = vectorDbService.getImageFiles(indexSearchData);
-                if (strLsit!=null){
+                List<String> strLsit = vectorDbService.getImageFiles(indexSearchData);
+                if (strLsit != null) {
                     imageList.addAll(strLsit);
                 }
             }
@@ -487,12 +528,12 @@ public class LlmApiServlet extends BaseServlet {
             for (int j = 0; j < lastResult.length; j++) {
                 for (int i = 0; i < lastResult[j].getChoices().size(); i++) {
                     ChatMessage message = new ChatMessage();
-                        message.setFilename(filenames);
-                        message.setFilepath(filePaths);
-                        message.setContext(ragContext.getContext());
-                        message.setContextChunkIds(chunkIds);
-                        message.setImageList(imageList);
-                        message.setContent("");
+                    message.setFilename(filenames);
+                    message.setFilepath(filePaths);
+                    message.setContext(ragContext.getContext());
+                    message.setContextChunkIds(chunkIds);
+                    message.setImageList(imageList);
+                    message.setContent("");
                     lastResult[0].getChoices().get(i).setMessage(message);
 
                 }

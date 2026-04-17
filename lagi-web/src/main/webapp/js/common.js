@@ -35,15 +35,52 @@ function debounce(fun,wait=1500){
 }
 
 function alert(e){
+    const tText = window.tText || ((s) => s);
     $("#msg").remove();
-    $("#alert-box").show();
-    $("#alert-box").append('<div id="msg" class="msg"><div id="msg_top" class="msg_top">信息<span class="msg_close">×</span></div><div id="msg_cont" class="msg_cont">'+e+'</div><div class="msg_clear" id="msg_clear">确定</div></div>');
-    $(".msg_close").click(function (){
+    const $alertBox = $("#alert-box");
+    if (!$alertBox.parent().is("body")) {
+        $alertBox.appendTo("body");
+    }
+    $alertBox.css({
+        display: "flex",
+        position: "fixed",
+        left: "0",
+        top: "0",
+        right: "0",
+        bottom: "0",
+        transform: "none",
+        background: "rgba(15,23,42,0.45)",
+        zIndex: "3000",
+        alignItems: "center",
+        justifyContent: "center",
+        backdropFilter: "blur(1px)",
+        margin: "0",
+        padding: "0",
+        width: "auto",
+        height: "auto"
+    });
+    $alertBox.append(
+        '<div id="msg" class="msg" style="position:relative;top:auto;left:auto;margin-top:0;width:min(460px,92vw);background:#fff;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 12px 34px rgba(15,23,42,.2);overflow:hidden;">' +
+        '<div id="msg_top" class="msg_top" style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid #e5e7eb;font-size:16px;font-weight:600;color:#111827;">' +
+        tText('信息') +
+        '<span class="msg_close" style="font-size:20px;line-height:1;cursor:pointer;color:#6b7280;">×</span></div>' +
+        '<div id="msg_cont" class="msg_cont" style="padding:16px 14px;color:#374151;line-height:1.6;word-break:break-word;">' + tText(String(e)) + '</div>' +
+        '<div style="padding:0 14px 14px;">' +
+        '<button class="msg_clear" id="msg_clear" style="width:100%;height:38px;border:none;border-radius:8px;background:#6366f1;color:#fff;font-size:14px;cursor:pointer;">' + tText('确定') + '</button>' +
+        '</div></div>'
+    );
+    $alertBox.off("click.alertBox").on("click.alertBox", function(event) {
+        if (event.target && event.target.id === "alert-box") {
+            $("#msg").remove();
+            $("#alert-box").hide();
+        }
+    });
+    $(".msg_close").off("click").on("click", function (){
         $("#msg").remove();
         $("#alert-box").hide();
     });
 
-    $(".msg_clear").click(function (){
+    $(".msg_clear").off("click").on("click", function (){
         $("#msg").remove();
         $("#alert-box").hide();
     });
@@ -51,12 +88,42 @@ function alert(e){
 
 
 function confirm(e){
+    const tText = window.tText || ((s) => s);
     $("#confirm-msg").remove();
-    $("#confirm-box").show();
-    $("#confirm-box").append('<div id="confirm-msg" class="msg msg-container" ><div id="msg_top"  class="msg_top" >信息<span class="msg_close">×</span></div><div id="msg_cont" class="msg_cont" >'+e+'</div><div id="msg_cancel" class="msg_cancel left" >取消</div><div class="msg_close right" id="msg_sure">确定</div></div>');
+    const $confirmBox = $("#confirm-box");
+    if (!$confirmBox.parent().is("body")) {
+        $confirmBox.appendTo("body");
+    }
+    $confirmBox.css({
+        display: "flex",
+        position: "fixed",
+        left: "0",
+        top: "0",
+        right: "0",
+        bottom: "0",
+        transform: "none",
+        background: "rgba(15,23,42,0.45)",
+        zIndex: "3000",
+        alignItems: "center",
+        justifyContent: "center",
+        backdropFilter: "blur(1px)",
+        margin: "0",
+        padding: "0",
+        width: "auto",
+        height: "auto"
+    });
+    $confirmBox.append(
+        '<div id="confirm-msg" class="msg msg-container" style="position:relative;top:auto;left:auto;margin-top:0;width:min(460px,92vw);background:#fff;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 12px 34px rgba(15,23,42,.2);overflow:hidden;">' +
+        '<div id="msg_top" class="msg_top" style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid #e5e7eb;font-size:16px;font-weight:600;color:#111827;">' + tText('信息') +
+        '<span class="msg_close" style="font-size:20px;line-height:1;cursor:pointer;color:#6b7280;">×</span></div>' +
+        '<div id="msg_cont" class="msg_cont" style="padding:16px 14px;color:#374151;line-height:1.6;word-break:break-word;">' + tText(String(e)) + '</div>' +
+        '<div style="display:flex;gap:10px;padding:0 14px 14px;">' +
+        '<button id="msg_cancel" class="msg_cancel left" style="flex:1;height:38px;border:1px solid #d1d5db;border-radius:8px;background:#fff;color:#374151;font-size:14px;cursor:pointer;">' + tText('取消') + '</button>' +
+        '<button class="msg_close right" id="msg_sure" style="flex:1;height:38px;border:none;border-radius:8px;background:#6366f1;color:#fff;font-size:14px;cursor:pointer;">' + tText('确定') + '</button>' +
+        '</div></div>'
+    );
 
-    const confirmBox = document.getElementById('confirm-box');
-    const customConfirm = document.getElementById('confirm-msg');
+    const confirmBox = document.getElementById("confirm-box");
     const closeBtn = document.getElementsByClassName('msg_close')[0];
     const confirmYes = document.getElementById('msg_sure');
     const confirmNo = document.getElementById('msg_cancel');
@@ -83,14 +150,14 @@ function confirm(e){
             resolve(false);
         }
 
-        // 点击模态背景关闭对话框
-        window.onclick = function(event) {
-            if (event.target == customConfirm) {
+        // Close dialog when clicking on overlay only.
+        $confirmBox.off("click.confirmBox").on("click.confirmBox", function(event) {
+            if (event.target && event.target.id === "confirm-box") {
                 $("#confirm-msg").remove();
                 $("#confirm-box").hide();
                 resolve(false);
             }
-        }
+        });
     });
 
 }

@@ -5,11 +5,13 @@ import ai.audio.adapter.IAudioCloneAdapter;
 import ai.common.ModelService;
 import ai.common.pojo.Backend;
 import ai.common.pojo.Driver;
+import ai.config.ContextLoader;
 import ai.config.pojo.ModelFunctions;
 import ai.image.adapter.IImage2TextAdapter;
 import ai.image.adapter.IImageGenerationAdapter;
 import ai.image.adapter.ImageEnhanceAdapter;
 import ai.llm.adapter.ILlmAdapter;
+import ai.llm.responses.ResponseProtocolUtil;
 import ai.wrapper.IWrapper;
 import ai.ocr.IOcr;
 import ai.oss.UniversalOSS;
@@ -20,6 +22,7 @@ import ai.video.adapter.Video2EnhanceAdapter;
 import ai.video.adapter.Video2trackAdapter;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
+import cn.hutool.core.util.StrUtil;
 import com.google.common.collect.Lists;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -44,9 +47,9 @@ public class MultimodalAIManager {
             String modelListStr = modelService.getModel();
             List<String> modelNameList = Arrays.stream(modelListStr.split(",")).map(String::trim).collect(Collectors.toList());
             if(modelService instanceof ILlmAdapter) {
-                register(modelNameList, LlmManager.getInstance(), (ILlmAdapter) modelService, modelFunctions.getChat().getBackends());
+                registerChatModels(modelNameList, LlmManager.getInstance(), (ILlmAdapter) modelService, modelFunctions.getChat().getBackends());
                 register(modelNameList, LlmInstructionManager.getInstance(), (ILlmAdapter) modelService, modelFunctions.getDoc2instruct());
-                register(modelNameList, Html2ContentManager.getInstance(), (ILlmAdapter) modelService, modelFunctions.getChat().getBackends());
+                registerChatModels(modelNameList, Html2ContentManager.getInstance(), (ILlmAdapter) modelService, modelFunctions.getChat().getBackends());
             }
             if(modelService instanceof IAudioAdapter) {
                 register(modelNameList, TTSManager.getInstance(), (IAudioAdapter) modelService, modelFunctions.getText2speech());
@@ -87,6 +90,39 @@ public class MultimodalAIManager {
         });
     }
 
+    @SuppressWarnings("unchecked")
+    private static <T> void registerChatModels(List<String> modelNames, AIManager<T> aiManager, T adapter, List<Backend> functions) {
+        try {
+            if (functions == null) {
+                return;
+            }
+            ModelService original = (ModelService) adapter;
+            for (String modelName : modelNames) {
+                Backend functionConfig = functions.stream()
+                        .filter(Objects::nonNull)
+                        .filter(func -> Boolean.TRUE.equals(func.getEnable()))
+                        .filter(func -> StrUtil.equals(func.getBackend(), original.getBackend()))
+                        .filter(func -> StrUtil.isBlank(func.getModel()) || StrUtil.equals(func.getModel(), modelName))
+                        .findFirst()
+                        .orElse(null);
+                if (functionConfig == null) {
+                    continue;
+                }
+                ModelService cloned = cloneModelService(original);
+                if (cloned == null) {
+                    continue;
+                }
+                cloned.setModel(modelName);
+                BeanUtil.copyProperties(functionConfig, cloned, CopyOptions.create(null, true));
+                cloned.setModel(modelName);
+                cloned.setProtocol(ResponseProtocolUtil.normalize(cloned.getProtocol()));
+                aiManager.register(modelName, (T) cloned);
+            }
+        } catch (Exception e) {
+            log.error("MultimodalAIManager register chat model error", e);
+        }
+    }
+
     private static  <T> void register(List<String> modelNames, AIManager<T> aiManager, T adapter, List<Backend> functions) {
         try {
             if(functions == null) {
@@ -118,9 +154,18 @@ public class MultimodalAIManager {
         }
     }
 
+    private static ModelService cloneModelService(ModelService source) {
+        ModelService clone = createAdapter(source.getClass().getName());
+        if (clone == null) {
+            return null;
+        }
+        BeanUtil.copyProperties(source, clone, CopyOptions.create(null, true));
+        return clone;
+    }
+
     private static boolean doesImplementInterface(String className, String interfaceName) {
         try {
-            Class<?> targetClass = Class.forName(className);
+            Class<?> targetClass = ContextLoader.getClass(className);
             Class<?> targetInterface = Class.forName(interfaceName);
             Class<?>[] implementedInterfaces = targetClass.getInterfaces();
             return Arrays.asList(implementedInterfaces).contains(targetInterface);
@@ -216,7 +261,7 @@ public class MultimodalAIManager {
         ModelService modelService = null;
         Class<?> clazz = null;
         try {
-            clazz = Class.forName(driver);
+            clazz = ContextLoader.getClass(driver);
         } catch (Exception e) {
             log.error( "class {} not fount {}", driver,  e.getMessage());
         }

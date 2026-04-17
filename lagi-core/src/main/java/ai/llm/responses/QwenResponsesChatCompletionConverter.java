@@ -1,0 +1,191 @@
+package ai.llm.responses;
+
+import ai.openai.pojo.*;
+import cn.hutool.core.util.StrUtil;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+
+public final class QwenResponsesChatCompletionConverter {
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    private QwenResponsesChatCompletionConverter() {
+    }
+
+    public static QwenResponseCreateRequest toRequest(ChatCompletionRequest request,
+                                                      ResponseSessionContext sessionContext,
+                                                      String modelName) {
+        QwenResponseCreateRequest responseRequest = new QwenResponseCreateRequest();
+        responseRequest.setModel(modelName);
+        responseRequest.setInstructions(extractInstructions(sessionContext));
+        responseRequest.setInput(toInputItems(sessionContext.getInputMessages()));
+//        responseRequest.setPrevious_response_id(sessionContext.getPreviousResponseId());
+        responseRequest.setPrevious_response_id(null);
+        responseRequest.setStream(Boolean.TRUE.equals(request.getStream()));
+        responseRequest.setMax_output_tokens(request.getMax_tokens());
+        responseRequest.setTools(toTools(request.getTools()));
+        responseRequest.setTool_choice(toToolChoice(request.getTool_choice()));
+        responseRequest.setParallel_tool_calls(request.getParallel_tool_calls());
+        responseRequest.setText(toText(request.getResponse_format()));
+        responseRequest.setTemperature(request.getTemperature());
+        responseRequest.setTop_p(request.getTop_p());
+        return responseRequest;
+    }
+
+    private static List<ChatMessage> toInputItems(List<ChatMessage> messages) {
+        List<ChatMessage> items = new ArrayList<>();
+        if (messages == null || messages.isEmpty()) {
+            return items;
+        }
+
+        List<ChatMessage> toolMessagesBuffer = new ArrayList<>();
+
+        for (ChatMessage message : messages) {
+            if ("tool".equals(message.getRole())) {
+                toolMessagesBuffer.add(message);
+            } else {
+                if (!toolMessagesBuffer.isEmpty()) {
+                    String mergedContent = new Gson().toJson(toolMessagesBuffer);
+                    ChatMessage mergedToolMessage = new ChatMessage();
+                    mergedToolMessage.setRole("user");
+                    mergedToolMessage.setContent(mergedContent);
+                    mergedToolMessage.setTool_call_id(null);
+                    items.add(mergedToolMessage);
+                    toolMessagesBuffer.clear();
+                }
+                items.add(message);
+            }
+        }
+
+        if (!toolMessagesBuffer.isEmpty()) {
+            String mergedContent = new Gson().toJson(toolMessagesBuffer);
+            ChatMessage mergedToolMessage = new ChatMessage();
+            mergedToolMessage.setRole("user");
+            mergedToolMessage.setContent(mergedContent);
+            mergedToolMessage.setTool_call_id(null);
+            items.add(mergedToolMessage);
+        }
+
+        return items;
+    }
+
+
+    private static String extractInstructions(ResponseSessionContext sessionContext) {
+        List<ChatMessage> messages = sessionContext.getNormalizedMessages();
+        if (messages == null || messages.isEmpty()) {
+            messages = sessionContext.getInputMessages();
+        }
+        if (messages == null || messages.isEmpty()) {
+            return null;
+        }
+        String instructions = messages.stream()
+                .filter(message -> message != null && "system".equals(message.getRole()) && StrUtil.isNotBlank(message.getContent()))
+                .map(ChatMessage::getContent)
+                .collect(Collectors.joining("\n\n"));
+        return StrUtil.isBlank(instructions) ? null : instructions;
+    }
+
+    private static QwenResponseInputItem createMessageItem(String role, String content) {
+        QwenResponseInputItem item = new QwenResponseInputItem();
+        item.setRole(role);
+        item.setContent(toMessageContent(role, content));
+        return item;
+    }
+
+    private static Object toMessageContent(String role, String content) {
+        if (!"user".equals(role)) {
+            return content == null ? "" : content;
+        }
+        if (StrUtil.isBlank(content)) {
+            return "";
+        }
+//        try {
+//            List<MultiModalContent> multimodalContents = MAPPER.readValue(content, new TypeReference<List<MultiModalContent>>() {});
+//            List<QwenResponseInputContent> responseContents = new ArrayList<>();
+//            List<String> textParts = new ArrayList<>();
+//            boolean hasImage = false;
+//            for (MultiModalContent multimodalContent : multimodalContents) {
+//                QwenResponseInputContent inputContent = new QwenResponseInputContent();
+//                if ("text".equals(multimodalContent.getType())) {
+//                    inputContent.setType("text");
+//                    inputContent.setText(multimodalContent.getText());
+//                    textParts.add(multimodalContent.getText());
+//                } else if ("image_url".equals(multimodalContent.getType()) && multimodalContent.getImageUrl() != null) {
+//                    inputContent.setType("image_url");
+//                    inputContent.setImageUrl(multimodalContent.getImageUrl());
+//                    hasImage = true;
+//                } else {
+//                    continue;
+//                }
+//                responseContents.add(inputContent);
+//            }
+//            if (!responseContents.isEmpty()) {
+//                if (!hasImage) {
+//                    return textParts.stream()
+//                            .filter(StrUtil::isNotBlank)
+//                            .collect(Collectors.joining("\n"));
+//                }
+//                return responseContents;
+//            }
+//        } catch (Exception ignored) {
+//        }
+        return content;
+    }
+
+    private static List<ResponseTool> toTools(List<Tool> tools) {
+        if (tools == null || tools.isEmpty()) {
+            return null;
+        }
+        List<ResponseTool> responseTools = new ArrayList<>();
+        for (Tool tool : tools) {
+            if (tool == null) {
+                continue;
+            }
+            ResponseTool responseTool = new ResponseTool();
+            responseTool.setType(tool.getType());
+            if (tool.getFunction() != null) {
+                responseTool.setName(tool.getFunction().getName());
+                responseTool.setDescription(tool.getFunction().getDescription());
+                responseTool.setParameters(tool.getFunction().getParameters());
+                responseTool.setStrict(tool.getFunction().getStrict());
+            }
+            responseTools.add(responseTool);
+        }
+        return responseTools.isEmpty() ? null : responseTools;
+    }
+
+    private static Object toToolChoice(String toolChoice) {
+        if (StrUtil.isBlank(toolChoice)) {
+            return null;
+        }
+        return toolChoice;
+    }
+
+    private static ResponseText toText(ResponseFormat responseFormat) {
+        if (responseFormat == null) {
+            return null;
+        }
+        if ("json_object".equals(responseFormat.getType())) {
+            ResponseTextFormat format = new ResponseTextFormat();
+            format.setType(responseFormat.getType());
+            ResponseText text = new ResponseText();
+            text.setFormat(format);
+            return text;
+        }
+        if (!"json_schema".equals(responseFormat.getType()) || responseFormat.getJson_schema() == null) {
+            throw ResponseProtocolUtil.invalidRequest("qwen responses protocol only supports json_object or json_schema response_format");
+        }
+        ResponseTextFormat format = new ResponseTextFormat();
+        format.setType(responseFormat.getType());
+        format.setName(responseFormat.getJson_schema().getName());
+        format.setSchema(responseFormat.getJson_schema().getSchema());
+        format.setStrict(responseFormat.getJson_schema().getStrict());
+        ResponseText text = new ResponseText();
+        text.setFormat(format);
+        return text;
+    }
+}

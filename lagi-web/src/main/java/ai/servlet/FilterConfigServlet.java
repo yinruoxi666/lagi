@@ -28,6 +28,14 @@ public class FilterConfigServlet extends RestfulServlet {
 
     private String getLagiYmlPath() {
         if (lagiYmlPath == null) {
+            String configFile = System.getProperty(ai.starter.InstallerUtil.CONFIG_FILE_PROPERTY);
+            if (configFile != null && !configFile.isEmpty()) {
+                File f = new File(configFile);
+                if (f.exists() && f.isFile()) {
+                    lagiYmlPath = configFile;
+                    return lagiYmlPath;
+                }
+            }
             String userDir = System.getProperty("user.dir");
             String[] possiblePaths = {
                 userDir + "/lagi-web/src/main/resources/lagi.yml",
@@ -125,7 +133,13 @@ public class FilterConfigServlet extends RestfulServlet {
             if (filtersObj == null) {
                 return new ArrayList<>();
             }
-            
+
+            filtersObj = ((Map<String, Object>) filtersObj).get("items");
+
+            if (filtersObj == null) {
+                return new ArrayList<>();
+            }
+
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> filtersList = (List<Map<String, Object>>) filtersObj;
             List<FilterConfig> filterConfigs = new ArrayList<>();

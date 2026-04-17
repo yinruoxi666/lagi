@@ -8,14 +8,16 @@ import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 @Slf4j
 public class FilterMonitorUtil {
     private static final SqliteAdapter sqliteAdapter = new SqliteAdapter();
-    private static final ExecutorService executorService = Executors.newFixedThreadPool(2);
+    private static final ExecutorService executorService = Executors.newSingleThreadExecutor();
     private static volatile boolean tableInitialized = false;
+    private static final int MAX_RETRY = 3;
 
     private static synchronized void ensureTableExists() {
         if (tableInitialized) {
@@ -50,54 +52,64 @@ public class FilterMonitorUtil {
         }
         
         executorService.submit(() -> {
-            Connection conn = null;
-            PreparedStatement pstmt = null;
             try {
                 ensureTableExists();
-                conn = sqliteAdapter.getCon();
-                if (conn == null || conn.isClosed()) {
-                    log.warn("数据库连接不可用，跳过记录过滤操作");
-                    return;
-                }
-                
-                String sql = "INSERT INTO lagi_filter_monitor (filter_name, action_type, content, create_time) VALUES (?, ?, ?, datetime('now', 'localtime'))";
-                pstmt = conn.prepareStatement(sql);
-                pstmt.setString(1, filterName != null ? filterName : "");
-                pstmt.setString(2, actionType != null ? actionType : "");
-                
-                String contentToSave = content;
-                if (contentToSave != null) {
-                    if (contentToSave.length() > 1000) {
-                        contentToSave = contentToSave.substring(0, 1000);
+                int retry = 0;
+                while (retry <= MAX_RETRY) {
+                    try (Connection conn = sqliteAdapter.getCon()) {
+                        if (conn == null || conn.isClosed()) {
+                            log.warn("数据库连接不可用，跳过记录过滤操作");
+                            return;
+                        }
+
+                        String sql = "INSERT INTO lagi_filter_monitor (filter_name, action_type, content, create_time) VALUES (?, ?, ?, datetime('now', 'localtime'))";
+                        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                            pstmt.setString(1, filterName != null ? filterName : "");
+                            pstmt.setString(2, actionType != null ? actionType : "");
+
+                            String contentToSave = content;
+                            if (contentToSave != null) {
+                                if (contentToSave.length() > 1000) {
+                                    contentToSave = contentToSave.substring(0, 1000);
+                                }
+                                try {
+                                    byte[] bytes = contentToSave.getBytes(StandardCharsets.UTF_8);
+                                    String utf8Content = new String(bytes, StandardCharsets.UTF_8);
+                                    pstmt.setString(3, utf8Content);
+                                } catch (Exception e) {
+                                    pstmt.setString(3, contentToSave.replaceAll("[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F]", ""));
+                                }
+                            } else {
+                                pstmt.setString(3, null);
+                            }
+
+                            pstmt.executeUpdate();
+                            log.debug("记录过滤操作: filterName={}, actionType={}", filterName, actionType);
+                            return;
+                        }
+                    } catch (SQLException e) {
+                        if (!isSqliteBusy(e) || retry == MAX_RETRY) {
+                            throw e;
+                        }
+                        retry++;
+                        sleepQuietly(100L * retry);
                     }
-                    try {
-                        byte[] bytes = contentToSave.getBytes(StandardCharsets.UTF_8);
-                        String utf8Content = new String(bytes, StandardCharsets.UTF_8);
-                        pstmt.setString(3, utf8Content);
-                    } catch (Exception e) {
-                        pstmt.setString(3, contentToSave.replaceAll("[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F]", ""));
-                    }
-                } else {
-                    pstmt.setString(3, null);
                 }
-                
-                pstmt.executeUpdate();
-                log.debug("记录过滤操作: filterName={}, actionType={}", filterName, actionType);
             } catch (Exception e) {
                 log.error("记录过滤操作失败: filterName={}, actionType={}", filterName, actionType, e);
-            } finally {
-                try {
-                    if (pstmt != null) {
-                        pstmt.close();
-                    }
-                    if (conn != null && !conn.isClosed()) {
-                        conn.close();
-                    }
-                } catch (Exception e) {
-                    log.error("关闭数据库连接失败", e);
-                }
             }
         });
     }
-}
 
+    private static boolean isSqliteBusy(SQLException e) {
+        return e.getMessage() != null && e.getMessage().contains("SQLITE_BUSY");
+    }
+
+    private static void sleepQuietly(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException ignored) {
+            Thread.currentThread().interrupt();
+        }
+    }
+}

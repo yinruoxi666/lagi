@@ -69,7 +69,7 @@ models:
     type: Alibaba
     enable: true
     model:  qwen-turbo,
-      qwen-plus,qwen-max,qwen-max-1201,qwen-max-longcontext,
+      qwen-plus,qwen-max,qwen-max-1201,qwen-max-longcontext,qwen3.5-plus,qwen3.6-plus,
       asr,
       vision,
       ocr
@@ -281,13 +281,22 @@ functions:
         model: cascade
         enable: false
         stream: true
-        priority: 10
+        protocol: completion
+        priority: 350
 
       - backend: kimi
         model: moonshot-v1-128k
         enable: false
         stream: true
-        priority: 100
+        protocol: completion
+        priority: 150
+
+      - backend: chatgpt
+        model: gpt-3.5-turbo
+        enable: false
+        stream: true
+        protocol: completion
+        priority: 120
 
       - backend: spark
         model: 4.0Ultra
@@ -477,22 +486,24 @@ functions:
 # The following is the configuration of agents, name is the name of the agent,
 # type is the type of the agent, class is the implement class of the agent.
 agents:
-  # Agent for stock queries, providing stock market information, analysis, and related services.
-  - name: stock
-    wrong_case: 抱歉
-    token: your-token
-    app_id: your-app-id
-    driver: ai.agent.chat.coze.CozeAgent
-
-  # Agent for weather queries, helping users obtain real-time weather information and forecasts.
-  - name: weather
-    token: 608e9106a83367945955c772dd5217fe
-    driver: ai.agent.customer.WeatherAgent
+  enable: true
+  items:
+    # Agent for stock queries, providing stock market information, analysis, and related services.
+    - name: stock
+      wrong_case: 抱歉
+      token: your-token
+      app_id: your-app-id
+      driver: ai.agent.chat.coze.CozeAgent
+    # Agent for weather queries, helping users obtain real-time weather information and forecasts.
+    - name: weather
+      token: 608e9106a83367945955c772dd5217fe
+      driver: ai.agent.customer.WeatherAgent
 
 include_agents: agent.yml
 
 
 mcps:
+  enable: true
   # set default driver
   servers:
     - name: amap_mcp
@@ -501,59 +512,92 @@ mcps:
 include_mcps: mcp.yml
 
 
-pnps:
-  # pnp for QQ chat application automation, enabling social interactions and services.
-  - name: qq
-    api_key: your-api-key
-    driver: ai.pnps.social.QQPnp
+
+
+# The following is the configuration of workers, name is the name of the worker,
+
+skills:
+  enable: false
+  # skill root path
+  roots: ["classpath:skills"]
+  workspace: "skills"
+  # server 服务优先 cli 客户端优先  block 不启用
+  rule: cli
+  # Tell the server which skills are available.
+  items:
+    - name: extract_content_with_image
+      description: 将本地 PDF、TXT、Word、PPT 文件分割为文本和图片chunk。
+    - name: brand-guidelines
+      description: Applies Anthropic's official brand colors and typography to any sort of artifact that may benefit from having Anthropic's look-and-feel. Use it when brand colors or style guidelines, visual formatting, or company design standards apply.
+    - name: claude-api
+      description: "Build apps with the Claude API or Anthropic SDK. TRIGGER when: code imports `anthropic`/`@anthropic-ai/sdk`/`claude_agent_sdk`, or user asks to use Claude API, Anthropic SDKs, or Agent SDK. DO NOT TRIGGER when: code imports `openai`/other AI SDK, general programming, or ML/data-science tasks."
+    - name: doc-coauthoring
+      description: Guide users through a structured workflow for co-authoring documentation. Use when user wants to write documentation, proposals, technical specs, decision docs, or similar structured content. This workflow helps users efficiently transfer context, refine content through iteration, and verify the doc works for readers. Trigger when user mentions writing docs, creating proposals, drafting specs, or similar documentation tasks.
+    - name: mcp-builder
+      description: Guide for creating high-quality MCP (Model Context Protocol) servers that enable LLMs to interact with external services through well-designed tools. Use when building MCP servers to integrate external APIs or services, whether in Python (FastMCP) or Node/TypeScript (MCP SDK).
+    - name: pdf
+      description: Use this skill whenever the user wants to do anything with PDF files. This includes reading or extracting text/tables from PDFs, combining or merging multiple PDFs into one, splitting PDFs apart, rotating pages, adding watermarks, creating new PDFs, filling PDF forms, encrypting/decrypting PDFs, extracting images, and OCR on scanned PDFs to make them searchable. If the user mentions a .pdf file or asks to produce one, use this skill.
+    - name: skill-creator
+      description: Create new skills, modify and improve existing skills, and measure skill performance. Use when users want to create a skill from scratch, edit, or optimize an existing skill, run evals to test a skill, benchmark skill performance with variance analysis, or optimize a skill's description for better triggering accuracy.
+    - name: theme-factory
+      description: Toolkit for styling artifacts with a theme. These artifacts can be slides, docs, reportings, HTML landing pages, etc. There are 10 pre-set themes with colors/fonts that you can apply to any artifact that has been creating, or can generate a new theme on-the-fly.
+    - name: webapp-testing
+      description: Toolkit for interacting with and testing local web applications using Playwright. Supports verifying frontend functionality, debugging UI behavior, capturing browser screenshots, and viewing browser logs.
+
+
+  # agent is the agent used by the worker, class is the implement class of the worker.
+  workers:
+    - name: qq-robot
+      agent: qq
+      route: pass(qq)
+      worker: ai.worker.social.RobotWorker
+
+    - name: wechat-robot
+      agent: wechat
+      route: pass(wechat)
+      worker: ai.worker.social.RobotWorker
+
+    - name: ding-robot
+      agent: ding
+      route: pass(ding)
+      worker: ai.worker.social.RobotWorker
+
+    # Example for Airport Enhancement
+    - name: asr4flights
+      worker: ai.worker.social.Asr4FlightsWorker
+
+    - name: BestWorker
+      route: best(weather&oil)
+      worker: ai.worker.DefaultBestWorker
+
+    - name: appointedWorker
+      route: pass(%)
+      worker: ai.worker.DefaultAppointWorker
+
+  pnps:
+    # pnp for QQ chat application automation, enabling social interactions and services.
+    - name: qq
+      api_key: your-api-key
+      driver: ai.pnps.social.QQPnp
 
 include_pnps: pnp.yml
 
 
-# The following is the configuration of workers, name is the name of the worker,
-# agent is the agent used by the worker, class is the implement class of the worker.
-workers:
-  - name: qq-robot
-    agent: qq
-    route: pass(qq)
-    worker: ai.worker.social.RobotWorker
-
-  - name: wechat-robot
-    agent: wechat
-    route: pass(wechat)
-    worker: ai.worker.social.RobotWorker
-
-  - name: ding-robot
-    agent: ding
-    route: pass(ding)
-    worker: ai.worker.social.RobotWorker
-
-  # Example for Airport Enhancement
-  - name: asr4flights
-    worker: ai.worker.social.Asr4FlightsWorker
-
-  - name: BestWorker
-    route: best(weather&oil)
-    worker: ai.worker.DefaultBestWorker
-
-  - name: appointedWorker
-    route: pass(%)
-    worker: ai.worker.DefaultAppointWorker
-
-
 routers:
-  - name: best
-    rule: (|,&)
-    # A|B -> polling,  A or B, means randomly round-robin within A and B;
-    # A,B -> failover, first A, if A fail, then B;
-    # A&B -> parallel, call A and B concurrently, choose the proper only one result;
-    # The rule could be combined like ((A&B&C),(E|F)) which means first call ABC simultaneously, if fail, then call E or F randomly.
+  enable: true
+  items:
+    - name: best
+      rule: (|,&)
+      # A|B -> polling,  A or B, means randomly round-robin within A and B;
+      # A,B -> failover, first A, if A fail, then B;
+      # A&B -> parallel, call A and B concurrently, choose the proper only one result;
+      # The rule could be combined like ((A&B&C),(E|F)) which means first call ABC simultaneously, if fail, then call E or F randomly.
 
-  - name: pass
-    rule: (%)
-    # % is a wildcard to represent agent name.
-    # if specified, invoke this agent.
-    # if just % is given, % would be decided by parameter at calling time.
+    - name: pass
+      rule: (%)
+      # % is a wildcard to represent agent name.
+      # if specified, invoke this agent.
+      # if just % is given, % would be decided by parameter at calling time.
 
 
 
@@ -561,35 +605,43 @@ routers:
 
 # Filter rules for sensitive words or sentence, with priority and etc.
 filters:
-  # Sensitive words filter
-  - name: sensitive
-    groups:
-      # Mask sensitive words/sentences with stars "*"
-      - level: mask
-        rules: 'openai,FLG,
-                维尼熊,
-                เสรีภาพ,ประชาธิปไตย,กษัตริย์,รัฐประหาร,สื่อ,ม็อบ,อิสรภาพ'
-      # Erase sensitive words/sentences
-      - level: erase
-        # Rule Explanation: A single rule supports regular expressions but requires using \\, to replace the original ,
-        rules: 'your context,
-                根据\w{0\\,6}上下文,依据您提供的上下文,
-                ぶんみゃくにもとづいて,せいじてき,いけん,しそう'
-      # Block the output of sensitive words/sentences
-      - level: block
-        rules: 'shit,CNM,
-                六四,
-                цензура,протест,революция,права человека'
-  # Index words with high priority
-  - name: priority
-    rules: 'car,weather,
-            社*保'
-  # Keywords to mark the lifecycle end of a multiple round conversation
-  # Or the beginning of a new conversation.
-  - name: stopping
-    rules: 'bye,
-            开始*'
-  # Keywords to mark the continuation of conversation, within multiple round.
-  - name: continue
-    rules: 'about,next,then,
-            资料'
+  enable: true
+  items:
+    # Sensitive words filter
+    - name: sensitive
+      groups:
+        # Mask sensitive words/sentences with stars "*"
+        - level: mask
+          rules: >-
+            openai,FLG,
+            维尼熊,
+            เสรีภาพ,ประชาธิปไตย,กษัตริย์,รัฐประหาร,สื่อ,ม็อบ,อิสรภาพ
+        # Erase sensitive words/sentences
+        - level: erase
+          # Rule Explanation: A single rule supports regular expressions but requires using \\, to replace the original ,
+          rules: >-
+            your context,
+            根据\w{0\\,6}上下文,依据您提供的上下文,
+            ぶんみゃくにもとづいて,せいじてき,いけん,しそう
+        # Block the output of sensitive words/sentences
+        - level: block
+          rules: >-
+            shit,CNM,
+            六四,
+            цензура,протест,революция,права человека
+    # Index words with high priority
+    - name: priority
+      rules: >-
+        car,weather,
+        社*保
+    # Keywords to mark the lifecycle end of a multiple round conversation
+    # Or the beginning of a new conversation.
+    - name: stopping
+      rules: >-
+        bye,
+        开始*
+    # Keywords to mark the continuation of conversation, within multiple round.
+    - name: continue
+      rules: >-
+        about,next,then,
+        资料

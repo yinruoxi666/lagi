@@ -16,12 +16,18 @@ import com.google.gson.Gson;
 import okhttp3.Response;
 
 import java.util.ArrayList;
+import java.util.Locale;
 import java.util.List;
 
 
 public class QwenConvert {
 
     private static Gson gson = new Gson();
+    private static final String DATA_INSPECTION_FAILED = "datainspectionfailed";
+    private static final String DATA_INSPECTION_FAILED_SNAKE = "data_inspection_failed";
+    private static final String SAFETY_REJECTED = "user request is rejected by safety system";
+    private static final String SAFETY_BLOCKED = "safety system";
+    private static final String SENSITIVE_BLOCKED = "contains suspected sensitive";
 
     public static Integer convertByHttpResponse(Response response) {
         int code = response.code();
@@ -59,8 +65,11 @@ public class QwenConvert {
         if(e instanceof ApiException) {
             ApiException apiException = (ApiException) e;
             Status status = apiException.getStatus();
-            Integer code = status.getStatusCode();
             String msg = JSONUtil.toJsonStr(status);
+            if (isSafetyBlockedMessage(msg)) {
+                return new RRException(LLMErrorConstants.CONTENT_SAFETY_BLOCKED, msg);
+            }
+            Integer code = status.getStatusCode();
 //            https://help.aliyun.com/zh/model-studio/developer-reference/error-code?spm=a2c4g.11186623.0.i1
             if(code == 400) {
                 return new RRException(LLMErrorConstants.INVALID_REQUEST_ERROR, msg);
@@ -87,6 +96,25 @@ public class QwenConvert {
         return new RRException(LLMErrorConstants.OTHER_ERROR, "{\"error\": \"unknown error\"}");
    }
 
+    public static RRException convertResponseException(Integer code, String msg) {
+        if (isSafetyBlockedMessage(msg)) {
+            return new RRException(LLMErrorConstants.CONTENT_SAFETY_BLOCKED, msg);
+        }
+        return new RRException(code, msg);
+    }
+
+    public static boolean isSafetyBlockedMessage(String msg) {
+        if (msg == null) {
+            return false;
+        }
+        String normalized = msg.toLowerCase(Locale.ROOT);
+        return normalized.contains(DATA_INSPECTION_FAILED)
+                || normalized.contains(DATA_INSPECTION_FAILED_SNAKE)
+                || normalized.contains(SAFETY_REJECTED)
+                || (normalized.contains(SAFETY_BLOCKED) && normalized.contains("reject"))
+                || normalized.contains(SENSITIVE_BLOCKED);
+    }
+
    public static ChatCompletionResult convertStreamLine2ChatCompletionResult(String body) {
        if (body.equals("[DONE]")) {
            return null;
@@ -104,7 +132,7 @@ public class QwenConvert {
         ChatMessage chatMessage = new ChatMessage();
         chatMessage.setContent(response.getOutput().getChoices().get(0).getMessage().getContent());
         chatMessage.setRole("assistant");
-        choice.setMessage(chatMessage);
+        choice.setDelta(chatMessage);
         choice.setFinish_reason(response.getOutput().getFinishReason());
         List<ChatCompletionChoice> choices = new ArrayList<>();
         choices.add(choice);

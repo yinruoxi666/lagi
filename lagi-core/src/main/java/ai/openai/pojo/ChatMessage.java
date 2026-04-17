@@ -8,9 +8,9 @@ import lombok.*;
 
 import java.io.Serializable;
 import java.util.List;
+import java.util.Objects;
 
 @Data
-@EqualsAndHashCode
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
@@ -31,4 +31,19 @@ public class ChatMessage implements Serializable {
     private List<String> contextChunkIds;
     private List<ToolCall> tool_calls;
     private String tool_call_id;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        ChatMessage that = (ChatMessage) o;
+        return Objects.equals(role, that.role) &&
+                Objects.equals(content, that.content);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(role, content == null ? "" : content);
+    }
+
 }

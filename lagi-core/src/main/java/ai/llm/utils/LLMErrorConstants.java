@@ -47,4 +47,15 @@ public class LLMErrorConstants {
      *  没有可用的模型
      */
     public static final Integer NO_AVAILABLE_MODEL = 608;
+
+    /**
+     * 内容安全拦截，禁止继续 fallback 到其他模型
+     */
+    public static final Integer CONTENT_SAFETY_BLOCKED = 609;
+
+    public static final Integer UNAUTHORIZED_CODE = 401;
+
+    public static boolean isContentSafetyBlocked(Integer errorCode) {
+        return CONTENT_SAFETY_BLOCKED.equals(errorCode);
+    }
 }

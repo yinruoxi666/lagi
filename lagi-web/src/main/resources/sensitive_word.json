@@ -1,15 +1,807 @@
 {
-  "mask": "...",
-  "level": 3,
-  "rules": [
-    {"rule":"\"\"\"", "level": 2, "mask": "\""},
-	{"rule":"<id>[\\w\\-]+</id>", "level": 2, "mask": ""},
-	{"rule":"front-hand-up", "level": 2, "mask": ""},
-	{"rule":"turn-right-hand-up", "level": 2, "mask": ""},
-	{"rule":"one-finger-refuse", "level": 2, "mask": ""},
-	{"rule":"```json", "level": 2, "mask": ""},
-	{"rule":"\"answer\": \"", "level": 2, "mask": ""},
-	{"rule":"```", "level": 2, "mask": ""},
-	{"rule":"---", "level": 2, "mask": ""}
-  ]
+	"mask": "...",
+	"level": 3,
+	"rules": [
+		{"rule":"\"\"\"", "level": 2, "mask": "\""},
+		{"rule":"<id>[\\w\\-]+</id>", "level": 2, "mask": ""},
+		{"rule":"front-hand-up", "level": 2, "mask": ""},
+		{"rule":"turn-right-hand-up", "level": 2, "mask": ""},
+		{"rule":"one-finger-refuse", "level": 2, "mask": ""},
+		{"rule":"```json", "level": 2, "mask": ""},
+		{"rule":"\"answer\": \"", "level": 2, "mask": ""},
+		{"rule":"```", "level": 2, "mask": ""},
+		{"rule":"---", "level": 2, "mask": ""},
+		{
+			"rule": "(?<!\\d)1[3-9]\\d{9}(?!\\d)",
+			"level": 2,
+			"mask": "*",
+			"type": "phone"
+		},
+		{
+			"rule": "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}",
+			"level": 2,
+			"mask": "*",
+			"type": "email"
+		},
+		{
+			"rule": "(?<!\\d)\\d{17}[\\dxX](?!\\d)",
+			"level": 2,
+			"mask": "*",
+			"type": "idcard"
+		},
+		{
+			"rule": "(?<!\\d)\\d{12,19}(?!\\d)",
+			"level": 3,
+			"mask": "***",
+			"type": "corporate_bankcard"
+		},
+		{
+			"rule": "(密码|password|passwd|pwd|secret|token|api_key|apikey)\\s*[=:：]\\s*[\"']?[^\\s\"']+[\"']?",
+			"level": 2,
+			"mask": "*",
+			"type": "password"
+		},
+		{
+			"rule": "sk-[\\da-z]{10,100}",
+			"level": 2,
+			"mask": "*",
+			"type": "api-key"
+		},
+		{
+			"rule": "[a-zA-Z0-9]{4,10}(-[a-zA-Z0-9]{1,10}){1,5}",
+			"level": 2,
+			"mask": "*",
+			"type": "api-key"
+		},
+		{
+			"rule": "base64\\s+(-d|--decode)\\s+.*?\\\\|\\s*(bash|sh|powershell|cmd)",
+			"level": 3,
+			"mask": "***",
+			"type": "base64_hidden_execution"
+		},
+		{
+			"rule": "(del|erase)\\s+(/f|/s|/q){1,3}|rmdir\\s+(/s|/q){1,2}|rd\\s+(/s|/q){1,2}",
+			"level": 3,
+			"mask": "***",
+			"type": "windows_batch_delete"
+		},
+		{
+			"rule": "format\\s+[a-zA-Z]:\\s+(/q|/y){0,2}",
+			"level": 3,
+			"mask": "***",
+			"type": "windows_format_disk"
+		},
+		{
+			"rule": "net\\s+(user|localgroup|share)|wmic\\s+useraccount",
+			"level": 2,
+			"mask": "***",
+			"type": "windows_user_info_leak"
+		},
+		{
+			"rule": "powershell\\s+(-ExecutionPolicy|-ep)\\s+[a-zA-Z]+\\s+(-Command|-c)\\s+.*?|-Bypass\\s+.*?|-NoProfile\\s+.*?",
+			"level": 3,
+			"mask": "***",
+			"type": "powershell_dangerous_exec"
+		},
+		{
+			"rule": "rm\\s+(-r|-f|-rf|-fr){1,2}\\s+.*?",
+			"level": 3,
+			"mask": "***",
+			"type": "linux_mac_force_delete"
+		},
+		{
+			"rule": "cat\\s+(/etc/passwd|/etc/shadow|/etc/group|~/.ssh/.*?)|grep\\s+.*?\\s+(/etc/passwd|/etc/shadow)",
+			"level": 2,
+			"mask": "***",
+			"type": "linux_mac_read_sensitive_file"
+		},
+		{
+			"rule": "(sudo|su)\\s+.*?|user(add|del|mod)|passwd\\s+.*?|chmod\\s+(777|666)\\s+.*?",
+			"level": 2,
+			"mask": "***",
+			"type": "linux_mac_permission_operate"
+		},
+		{
+			"rule": "(scp|ssh|rsync)\\s+.*?@.*?:\\s*.*?|curl\\s+(-X|--request)\\s+(POST|GET)\\s+.*?(password|token)",
+			"level": 2,
+			"mask": "***",
+			"type": "remote_transfer_info_leak"
+		},
+		{
+			"rule": "(身份证|手机号|邮箱|银行卡)\\s*[=:：＝]\\s*[^&<>]{0,50}",
+			"level": 2,
+			"mask": "*",
+			"type": "personal_info_extend"
+		},
+		{
+			"rule": "(CVV|cvv2|安全码|安全碼)\\s*[=:：]\\s*\\d{3,4}",
+			"level": 3,
+			"mask": "***",
+			"type": "cvv_code"
+		},
+		{
+			"rule": "(支付密码|交易密码|payment_password)\\s*[=:：]\\s*\\d{6}",
+			"level": 3,
+			"mask": "***",
+			"type": "payment_password"
+		},
+		{
+			"rule": "(有效期|expiry|valid)\\s*[=:：]\\s*\\d{2}[-/]\\d{2}",
+			"level": 3,
+			"mask": "***",
+			"type": "card_expiry"
+		},
+		{
+			"rule": "(GPS|坐标|位置|地址|经纬度)\\s*[=:：]\\s*[^\\s]+",
+			"level": 3,
+			"mask": "***",
+			"type": "location_trace"
+		},
+		{
+			"rule": "(病历|诊断|处方|住院号|就诊卡号)\\s*[=:：]\\s*[^\\s]+",
+			"level": 3,
+			"mask": "***",
+			"type": "medical_record"
+		},
+		{
+			"rule": "[\\u4e00-\\u9fa5]{2,5}医院[\\u4e00-\\u9fa5]{2,5}科[\\u4e00-\\u9fa5]{2,5}医生",
+			"level": 3,
+			"mask": "***",
+			"type": "medical_info"
+		},
+		{
+			"rule": "(?i)\\bAuthorization\\s*:\\s*Bearer\\s+[A-Za-z0-9_\\-\\.]{16,}\\b",
+			"level": 3,
+			"mask": "***",
+			"type": "bearer_token"
+		},
+		{
+			"rule": "(?i)\\b(access_token|refresh_token|id_token|token)\\s*[=:：]\\s*[\"']?[A-Za-z0-9_\\-\\.]{16,256}[\"']?",
+			"level": 3,
+			"mask": "***",
+			"type": "auth_token"
+		},
+		{
+			"rule": "(?i)\\b(jwe|jwt)\\s*[=:：]\\s*[A-Za-z0-9_\\-]{10,}\\.[A-Za-z0-9_\\-]{10,}\\.[A-Za-z0-9_\\-]{10,}\\b",
+			"level": 3,
+			"mask": "***",
+			"type": "jwt_token"
+		},
+		{
+			"rule": "(?i)\\b(api[_-]?key|secret[_-]?key|client[_-]?secret|app[_-]?secret)\\s*[=:：]\\s*[\"']?[^\\s\"']{8,128}[\"']?",
+			"level": 3,
+			"mask": "***",
+			"type": "api_secret"
+		},
+		{
+			"rule": "(?i)\\b(AKIA|ASIA)[0-9A-Z]{16}\\b",
+			"level": 3,
+			"mask": "***",
+			"type": "aws_access_key_id"
+		},
+		{
+			"rule": "(?i)\\bAIza[0-9A-Za-z_\\-]{35}\\b",
+			"level": 3,
+			"mask": "***",
+			"type": "google_api_key"
+		},
+		{
+			"rule": "(?i)\\b(ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{20,200})\\b",
+			"level": 3,
+			"mask": "***",
+			"type": "github_token"
+		},
+		{
+			"rule": "(?i)\\b(xox[baprs]-[A-Za-z0-9-]{10,200})\\b",
+			"level": 3,
+			"mask": "***",
+			"type": "slack_token"
+		},
+		{
+			"rule": "-----BEGIN (RSA|DSA|EC|OPENSSH|ED25519)? ?PRIVATE KEY-----[\\s\\S]{0,5000}?-----END (RSA|DSA|EC|OPENSSH|ED25519)? ?PRIVATE KEY-----",
+			"level": 3,
+			"mask": "***",
+			"type": "private_key_block"
+		},
+		{
+			"rule": "(?i)\\bssh-(rsa|ed25519)\\s+[A-Za-z0-9+/]{50,}={0,3}(\\s+[^\\s]+)?\\b",
+			"level": 3,
+			"mask": "***",
+			"type": "ssh_public_key"
+		},
+		{
+			"rule": "(?i)\\b(cookie|set-cookie)\\s*:\\s*[^\\r\\n]{10,500}",
+			"level": 3,
+			"mask": "***",
+			"type": "http_cookie"
+		},
+		{
+			"rule": "(?i)\\b(sessionid|session_id|sid|jsessionid)\\s*[=:：]\\s*[A-Za-z0-9_\\-]{8,128}\\b",
+			"level": 3,
+			"mask": "***",
+			"type": "session_id"
+		},
+		{
+			"rule": "(?<!\\d)\\d{10}(?!\\d)",
+			"level": 2,
+			"mask": "*",
+			"type": "passport"
+		},
+		{
+			"rule": "(?<!\\d)\\d{18}(?!\\d)|(?<!\\d)\\d{15}(?!\\d)",
+			"level": 2,
+			"mask": "*",
+			"type": "idcard_15_18"
+		},
+		{
+			"rule": "[京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼][A-Z][A-Z0-9]{5}",
+			"level": 2,
+			"mask": "*",
+			"type": "car_plate"
+		},
+		{
+			"rule": "(IP|ipaddress)\\s*[=:：]\\s*(\\d{1,3}\\.){3}\\d{1,3}",
+			"level": 2,
+			"mask": "*",
+			"type": "ip_address"
+		},
+		{
+			"rule": "(MAC|macaddress)\\s*[=:：]\\s*([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})",
+			"level": 2,
+			"mask": "*",
+			"type": "mac_address"
+		},
+		{
+			"rule": "(UUID|guid)\\s*[=:：]\\s*[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}",
+			"level": 2,
+			"mask": "*",
+			"type": "uuid"
+		},
+		{
+			"rule": "(token|access_token|refresh_token)\\s*[=:：]\\s*[\\w\\d\\-\\_]{16,64}",
+			"level": 3,
+			"mask": "***",
+			"type": "auth_token_short"
+		},
+		{
+			"rule": "chroot\\s+.*?|mount\\s+.*?|umount\\s+.*?",
+			"level": 3,
+			"mask": "***",
+			"type": "linux_system_operate"
+		},
+		{
+			"rule": "wget\\s+.*?|curl\\s+.*?|apt-get\\s+install|yum\\s+install",
+			"level": 3,
+			"mask": "***",
+			"type": "linux_download_exec"
+		},
+		{
+			"rule": "nmap\\s+.*?|masscan\\s+.*?|zenmap\\s+.*?",
+			"level": 3,
+			"mask": "***",
+			"type": "port_scan"
+		},
+		{
+			"rule": "tail\\s+/var/log/.*?|less\\s+/var/log/.*?",
+			"level": 2,
+			"mask": "***",
+			"type": "linux_read_log"
+		},
+		{
+			"rule": "crontab\\s+-e|at\\s+.*?|systemctl\\s+start",
+			"level": 3,
+			"mask": "***",
+			"type": "linux_task_schedule"
+		},
+		{
+			"rule": "reg\\s+delete|reg\\s+add|reg\\s+export",
+			"level": 3,
+			"mask": "***",
+			"type": "windows_registry"
+		},
+		{
+			"rule": "taskkill\\s+/f|tasklist|schtasks\\s+/create",
+			"level": 3,
+			"mask": "***",
+			"type": "windows_process"
+		},
+		{
+			"rule": "bitsadmin\\s+.*?|certutil\\s+.*?|msiexec\\s+.*?",
+			"level": 3,
+			"mask": "***",
+			"type": "windows_lolbins"
+		},
+		{
+			"rule": "netsh\\s+firewall|wmic\\s+process|diskpart",
+			"level": 3,
+			"mask": "***",
+			"type": "windows_system"
+		},
+		{
+			"rule": "select.*?from.*?information_schema|union.*?select.*?sleep",
+			"level": 3,
+			"mask": "***",
+			"type": "sql_inject_deep"
+		},
+		{
+			"rule": "load_file|outfile|dumpfile|into\\s+outfile",
+			"level": 3,
+			"mask": "***",
+			"type": "sql_file_read"
+		},
+		{
+			"rule": "onerror|onmouseover|onfocus|javascript:",
+			"level": 3,
+			"mask": "***",
+			"type": "xss_deep"
+		},
+		{
+			"rule": "file_put_contents|fwrite|move_uploaded_file",
+			"level": 3,
+			"mask": "***",
+			"type": "file_upload"
+		},
+		{
+			"rule": "system\\(|exec\\(|passthru\\(|shell_exec\\(",
+			"level": 3,
+			"mask": "***",
+			"type": "command_exec"
+		},
+		{
+			"rule": "mysql://|postgresql://|mongodb://|redis://",
+			"level": 3,
+			"mask": "***",
+			"type": "db_connection"
+		},
+		{
+			"rule": "root\\s*[=:：]\\s*[^\\s]+|sa\\s*[=:：]\\s*[^\\s]+",
+			"level": 3,
+			"mask": "***",
+			"type": "db_admin_account"
+		},
+		{
+			"rule": "redis\\s+-a|redis-cli\\s+.*?|mongosh\\s+.*?",
+			"level": 3,
+			"mask": "***",
+			"type": "db_command"
+		},
+		{
+			"rule": "encrypt\\s+files|lock\\s+pc|decrypt\\s+only",
+			"level": 3,
+			"mask": "***",
+			"type": "ransomware_deep"
+		},
+		{
+			"rule": "monero|bitcoin|eth|btc|usdt|tron",
+			"level": 3,
+			"mask": "***",
+			"type": "crypto_mine"
+		},
+		{
+			"rule": "trojan|virus|backdoor|keylogger|rat",
+			"level": 3,
+			"mask": "***",
+			"type": "malware"
+		},
+		{
+			"rule": "hydra|medusa|john|hashcat|brute\\s+force",
+			"level": 3,
+			"mask": "***",
+			"type": "brute_attack"
+		},
+		{
+			"rule": "metasploit|msfconsole|empire|cobaltstrike",
+			"level": 3,
+			"mask": "***",
+			"type": "penetration_tool"
+		},
+		{
+			"rule": "proxy|vpn|socks5|tor\\s+network|darkweb",
+			"level": 2,
+			"mask": "***",
+			"type": "anonymous_network"
+		},
+		{
+			"rule": "phishing|spoof|fake\\s+website|clone\\s+site",
+			"level": 3,
+			"mask": "***",
+			"type": "phishing"
+		},
+		{
+			"rule": "carding|cvv\\s+shop|dump\\s+data|fullz",
+			"level": 3,
+			"mask": "***",
+			"type": "card_black"
+		},
+		{
+			"rule": "sms\\s+bomber|call\\s+bomber|spam\\s+tool",
+			"level": 3,
+			"mask": "***",
+			"type": "harass_tool"
+		},
+		{
+			"rule": "(公司名|企业|统一社会信用代码)\\s*[=:：]\\s*\\w+",
+			"level": 2,
+			"mask": "*",
+			"type": "company_info"
+		},
+		{
+			"rule": "(纳税人识别号|税号)\\s*[=:：]\\s*[A-Z0-9]{18}",
+			"level": 2,
+			"mask": "*",
+			"type": "tax_id"
+		},
+		{
+			"rule": "(营业执照|license)\\s*[=:：]\\s*[^\\s]+",
+			"level": 2,
+			"mask": "*",
+			"type": "business_license"
+		},
+		{
+			"rule": "Referer\\s*:\\s*.*?|User-Agent\\s*:\\s*.*?",
+			"level": 2,
+			"mask": "*",
+			"type": "http_header"
+		},
+		{
+			"rule": "X-Forwarded-For|X-Real-IP|Client-IP",
+			"level": 2,
+			"mask": "*",
+			"type": "proxy_ip"
+		},
+		{
+			"rule": "access\\s+log|error\\s+log|request\\s+body",
+			"level": 2,
+			"mask": "*",
+			"type": "server_log"
+		},
+		{
+			"rule": "(?i)\\bHUAWEI_[A-Z0-9]{10,30}",
+			"level": 3,
+			"mask": "***",
+			"type": "huawei_cloud_key"
+		},
+		{
+			"rule": "(?i)\\bBAIDU[A-Z0-9]{12,24}",
+			"level": 3,
+			"mask": "***",
+			"type": "baidu_cloud_key"
+		},
+		{
+			"rule": "(?i)\\bBYTECLIENT_[A-Za-z0-9]{16,32}",
+			"level": 3,
+			"mask": "***",
+			"type": "bytecloud_key"
+		},
+		{
+			"rule": "(?i)\\bAZURE_[A-Za-z0-9]{20,40}",
+			"level": 3,
+			"mask": "***",
+			"type": "azure_key"
+		},
+		{
+			"rule": "(?i)\\bDO[A-Z0-9]{32,64}",
+			"level": 3,
+			"mask": "***",
+			"type": "digitalocean_key"
+		},
+		{
+			"rule": "(?i)\\bALI[_-]?(KEY|SECRET)[A-Z0-9]{16,32}",
+			"level": 3,
+			"mask": "***",
+			"type": "aliyun_ext_key"
+		},
+		{
+			"rule": "__import__\\(['\\\"]os['\\\"]\\)\\.popen|subprocess\\.Popen",
+			"level": 3,
+			"mask": "***",
+			"type": "python_rce"
+		},
+		{
+			"rule": "require\\(['\\\"]child_process['\\\"]|execSync\\(|spawn\\(",
+			"level": 3,
+			"mask": "***",
+			"type": "nodejs_rce"
+		},
+		{
+			"rule": "Runtime\\.getRuntime\\(\\)\\.exec|ProcessBuilder",
+			"level": 3,
+			"mask": "***",
+			"type": "java_rce"
+		},
+		{
+			"rule": "Response\\.WriteFile|Server\\.Execute|Eval\\(",
+			"level": 3,
+			"mask": "***",
+			"type": "dotnet_rce"
+		},
+		{
+			"rule": "(?i)phpinfo\\(\\)|eval\\(base64_decode\\(",
+			"level": 3,
+			"mask": "***",
+			"type": "php_webshell_deep"
+		},
+		{
+			"rule": "(?i)assert\\(.+\\)|preg_replace\\(.+\\/e\\)",
+			"level": 3,
+			"mask": "***",
+			"type": "php_assert"
+		},
+		{
+			"rule": "mkfs\\.ext4|mkfs\\.xfs|dd\\s+if=.*?of=.*?",
+			"level": 3,
+			"mask": "***",
+			"type": "linux_disk_destroy"
+		},
+		{
+			"rule": "iptables\\s+-F|ufw\\s+disable|firewall-cmd\\s+--stop",
+			"level": 3,
+			"mask": "***",
+			"type": "linux_firewall_off"
+		},
+		{
+			"rule": "bcedit|bcdboot|bootrec|fixmbr",
+			"level": 3,
+			"mask": "***",
+			"type": "windows_boot_edit"
+		},
+		{
+			"rule": "takeown\\s+/f|icacls\\s+.*?\\/grant",
+			"level": 3,
+			"mask": "***",
+			"type": "windows_permission"
+		},
+		{
+			"rule": "launchctl\\s+load|sudo\\s+launchctl",
+			"level": 3,
+			"mask": "***",
+			"type": "macos_daemon"
+		},
+		{
+			"rule": "killall\\s+-9|pkill\\s+-f",
+			"level": 3,
+			"mask": "***",
+			"type": "process_kill"
+		},
+		{
+			"rule": "(?i)\\b[WHE]\\d{8}\\b",
+			"level": 2,
+			"mask": "*",
+			"type": "hk_macau_pass"
+		},
+		{
+			"rule": "(?i)\\bT\\d{8}\\b",
+			"level": 2,
+			"mask": "*",
+			"type": "taiwan_pass"
+		},
+		{
+			"rule": "(?<!\\d)\\d{11}(?!\\d)",
+			"level": 2,
+			"mask": "*",
+			"type": "residence_permit"
+		},
+		{
+			"rule": "(?<!\\d)[A-Z0-9]{10,12}(?!\\d)",
+			"level": 2,
+			"mask": "*",
+			"type": "military_official"
+		},
+		{
+			"rule": "(?<!\\d)\\d{7,9}(?!\\d)",
+			"level": 2,
+			"mask": "*",
+			"type": "soldier_id"
+		},
+		{
+			"rule": "(?i)\\bsig\\s*[=:：]\\s*[A-Fa-f0-9]{32,64}",
+			"level": 3,
+			"mask": "***",
+			"type": "sign_md5_sha"
+		},
+		{
+			"rule": "(?i)\\bappid\\s*[=:：]\\s*\\d{5,12}",
+			"level": 2,
+			"mask": "*",
+			"type": "app_id"
+		},
+		{
+			"rule": "(?i)\\bmerchant\\s*[=:：]\\s*\\d{8,16}",
+			"level": 3,
+			"mask": "***",
+			"type": "merchant_id"
+		},
+		{
+			"rule": "(?i)\\bnonce\\s*[=:：]\\s*[A-Za-z0-9]{8,32}",
+			"level": 2,
+			"mask": "*",
+			"type": "nonce_str"
+		},
+		{
+			"rule": "(?i)\\btimestamp\\s*[=:：]\\s*\\d{10,13}",
+			"level": 2,
+			"mask": "*",
+			"type": "timestamp"
+		},
+		{
+			"rule": "(?i)file:\\/\\/|gopher:\\/\\/|dict:\\/\\/|ftp:\\/\\/",
+			"level": 3,
+			"mask": "***",
+			"type": "ssrf_protocol"
+		},
+		{
+			"rule": "(?i)<!ENTITY\\s+.*?SYSTEM|XXE\\s+attack",
+			"level": 3,
+			"mask": "***",
+			"type": "xxe_attack"
+		},
+		{
+			"rule": "\\.\\.\\/|\\.\\.\\\\|etc\\\\passwd|windows\\\\system32",
+			"level": 3,
+			"mask": "***",
+			"type": "path_traversal"
+		},
+		{
+			"rule": "(?i)include\\(|require_once\\(|auto_prepend_file",
+			"level": 3,
+			"mask": "***",
+			"type": "file_include"
+		},
+		{
+			"rule": "(?i)ysoserial|JAVA\\.IO\\.OBJECTINPUTSTREAM|readObject\\(",
+			"level": 3,
+			"mask": "***",
+			"type": "deserial_attack"
+		},
+		{
+			"rule": "redis\\s+127\\.0\\.0\\.1|config\\s+set\\s+dir",
+			"level": 3,
+			"mask": "***",
+			"type": "redis_unauth"
+		},
+		{
+			"rule": "\\$gt|\\$ne|\\$where|\\$expr\\s*:",
+			"level": 3,
+			"mask": "***",
+			"type": "mongodb_inject"
+		},
+		{
+			"rule": "(?i)elasticsearch\\/_search|script\\.inline",
+			"level": 3,
+			"mask": "***",
+			"type": "es_script"
+		},
+		{
+			"rule": "(?i)clickhouse:\\/\\/|influxdb:\\/\\/",
+			"level": 3,
+			"mask": "***",
+			"type": "timeseries_db"
+		},
+		{
+			"rule": "(?i)\\bU盾\\s*[=:：]\\s*\\w+",
+			"level": 3,
+			"mask": "***",
+			"type": "u_key"
+		},
+		{
+			"rule": "(?i)\\b结算卡\\s*[=:：]\\s*\\d{16,19}",
+			"level": 3,
+			"mask": "***",
+			"type": "settle_card"
+		},
+		{
+			"rule": "(?i)\\b对公账户\\s*[=:：]\\s*\\d{12,20}",
+			"level": 3,
+			"mask": "***",
+			"type": "company_account"
+		},
+		{
+			"rule": "frp\\s+server|frpc\\.ini|ngrok\\s+http",
+			"level": 3,
+			"mask": "***",
+			"type": "intranet_tunnel"
+		},
+		{
+			"rule": "(?i)openvpn\\s+--config|wireguard\\s+wg0",
+			"level": 3,
+			"mask": "***",
+			"type": "vpn_config"
+		},
+		{
+			"rule": "(?i)rtsp:\\/\\/|onvif\\s+user|admin\\/12345",
+			"level": 3,
+			"mask": "***",
+			"type": "camera_weak"
+		},
+		{
+			"rule": "(?i)modbus\\s+read|s7\\+\\+|profinet",
+			"level": 3,
+			"mask": "***",
+			"type": "industrial_attack"
+		},
+		{
+			"rule": "(?i)mqtt\\s+publish|coap\\s+post",
+			"level": 3,
+			"mask": "***",
+			"type": "iot_protocol"
+		},
+		{
+			"rule": "\\.env\\s*[=:：]|config\\.json|application\\.yml",
+			"level": 3,
+			"mask": "***",
+			"type": "config_file"
+		},
+		{
+			"rule": "id_rsa|id_dsa|putty\\.ppk|keystore\\.jks",
+			"level": 3,
+			"mask": "***",
+			"type": "key_file"
+		},
+		{
+			"rule": "(?i)\\.git\\/config|\\.svn\\/entries",
+			"level": 3,
+			"mask": "***",
+			"type": "vcs_leak"
+		},
+		{
+			"rule": "(?i)\\.locky|\\.crypt|\\.ransom|\\.enc",
+			"level": 3,
+			"mask": "***",
+			"type": "ransom_suffix"
+		},
+		{
+			"rule": "(?i)teamviewer\\s+--password|anydesk\\s+access",
+			"level": 3,
+			"mask": "***",
+			"type": "remote_control"
+		},
+		{
+			"rule": "(?i)remote\\s+desktop|mstsc\\s+\\/v",
+			"level": 3,
+			"mask": "***",
+			"type": "rdp_attack"
+		},
+		{
+			"rule": "(?i)\\bandroid_id\\s*[=:：]\\s*[A-Fa-f0-9]{16}",
+			"level": 2,
+			"mask": "*",
+			"type": "android_id"
+		},
+		{
+			"rule": "(?i)\\bidfa\\s*[=:：]\\s*[0-9a-fA-F-]{36}",
+			"level": 2,
+			"mask": "*",
+			"type": "ios_idfa"
+		},
+		{
+			"rule": "(?i)\\bimei2\\s*[=:：]\\s*\\d{15}",
+			"level": 2,
+			"mask": "*",
+			"type": "imei2"
+		},
+		{
+			"rule": "(?i)四六级|考研|答案|作弊|代考|枪手",
+			"level": 2,
+			"mask": "*",
+			"type": "exam_cheat"
+		},
+		{
+			"rule": "(?i)学历造假|文凭买卖|证书挂靠",
+			"level": 2,
+			"mask": "*",
+			"type": "cert_fake"
+		},
+		{
+			"rule": "(?i)multipart\\/form-data|filename\\*?=.*?\\.php",
+			"level": 3,
+			"mask": "***",
+			"type": "file_upload_attack"
+		},
+		{
+			"rule": "(?i)Content-Disposition\\s*:\\s*attachment",
+			"level": 2,
+			"mask": "*",
+			"type": "file_download"
+		}
+	]
 }

@@ -70,4 +70,7 @@ public class AIManager<T> {
         });
     }
 
+    public void clear() {
+        aiMap.clear();
+    }
 }

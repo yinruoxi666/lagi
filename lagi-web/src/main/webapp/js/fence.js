@@ -1,5 +1,17 @@
 let fenceData = [];
 let fenceRefreshInterval = null;
+const tTextFence = window.tText || ((s) => s);
+const tHtmlFence = window.tHtml || ((s) => s);
+
+/** 与 lagi_filter_monitor.filter_name 一致：输入/输出敏感词分开展示 */
+function formatFenceFilterName(raw) {
+    if (!raw) return '';
+    const map = {
+        sensitive_input: tTextFence('敏感词（输入）'),
+        sensitive: tTextFence('敏感词（输出）')
+    };
+    return map[raw] || raw;
+}
 
 let currentPage = 1;
 let pageSize = 20;
@@ -21,7 +33,7 @@ function loadFencePage() {
     autoRefreshEnabled = false;
     currentPage = 1;
     const html = `
-        <div id="fence-container" style="padding: 20px; height: 100%; display: flex; flex-direction: column;">
+        <div id="fence-container" style="padding: 20px; min-height: 100%; background: #fff; display: flex; flex-direction: column;">
             <div style="margin-bottom: 20px;">
                 <h2 style="margin-bottom: 10px;">电子围栏监控</h2>
                 <button id="refreshBtn" onclick="refreshFenceData()" style="padding: 8px 16px; background: #1296db; color: white; border: none; border-radius: 4px; cursor: pointer;">刷新</button>
@@ -70,7 +82,7 @@ function loadFencePage() {
             </div>
         </div>
     `;
-    $('#item-content').html(html);
+    $('#item-content').html(tHtmlFence(html));
     refreshFenceData();
 }
 
@@ -121,7 +133,7 @@ function updateFenceDisplay() {
     tbody.empty();
     
     if (fenceData.length === 0) {
-        tbody.append('<tr><td colspan="4" style="padding: 40px; text-align: center; color: #999;">暂无监控数据</td></tr>');
+        tbody.append(`<tr><td colspan="4" style="padding: 40px; text-align: center; color: #999;">${tTextFence('暂无监控数据')}</td></tr>`);
         $('#fencePagination').hide();
         renderChart();
         return;
@@ -136,7 +148,7 @@ function updateFenceDisplay() {
         const row = `
             <tr style="border-bottom: 1px solid #eee;">
                 <td style="padding: 12px;">${item.create_time || ''}</td>
-                <td style="padding: 12px;">${item.filter_name || ''}</td>
+                <td style="padding: 12px;">${formatFenceFilterName(item.filter_name)}</td>
                 <td style="padding: 12px;">${item.action_type || ''}</td>
                 <td style="padding: 12px; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.content || ''}">${item.content || ''}</td>
             </tr>
@@ -149,7 +161,7 @@ function updateFenceDisplay() {
 }
 
 function updatePagination() {
-    $('#pageInfo').text(`第 ${currentPage} 页 / 共 ${totalPages} 页`);
+    $('#pageInfo').text(`${tTextFence('第 ')}${currentPage}${tTextFence(' 页 / 共 ')}${totalPages}${tTextFence(' 页')}`);
     $('#prevPageBtn').prop('disabled', currentPage <= 1);
     $('#nextPageBtn').prop('disabled', currentPage >= totalPages);
     if (totalPages <= 1) {
@@ -252,10 +264,10 @@ function toggleAutoRefresh() {
     autoRefreshEnabled = !autoRefreshEnabled;
     const btn = $('#autoRefreshBtn');
     if (autoRefreshEnabled) {
-        btn.text('自动刷新: 开启');
+        btn.text(tTextFence('自动刷新: 开启'));
         fenceRefreshInterval = setInterval(refreshFenceData, 5000);
     } else {
-        btn.text('自动刷新: 关闭');
+        btn.text(tTextFence('自动刷新: 关闭'));
         if (fenceRefreshInterval) {
             clearInterval(fenceRefreshInterval);
             fenceRefreshInterval = null;

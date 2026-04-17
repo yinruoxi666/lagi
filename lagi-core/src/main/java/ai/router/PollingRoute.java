@@ -8,7 +8,6 @@ import ai.openai.pojo.ChatCompletionResult;
 import ai.router.pojo.RouteAgentResult;
 import ai.router.pojo.RouteCompletionResult;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.hadoop.util.Lists;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -58,15 +57,27 @@ public class PollingRoute extends Route {
         // no ipaddress use sample polling
         if (chatCompletionRequest instanceof EnhanceChatCompletionRequest) {
             EnhanceChatCompletionRequest enhanceChatCompletionRequest = (EnhanceChatCompletionRequest) chatCompletionRequest;
-            int hash = enhanceChatCompletionRequest.getIp().hashCode();
-            while (!pollingRoutes.isEmpty()) {
-                int index = Math.abs(hash) % pollingRoutes.size();
-                Route route = pollingRoutes.get(index);
-                RouteCompletionResult result = route.invokeLlm(chatCompletionRequest);
-                if (result != null) {
-                    return result;
+            String ip = enhanceChatCompletionRequest.getIp();
+            if (ip != null) {
+                int hash = ip.hashCode();
+                while (!pollingRoutes.isEmpty()) {
+                    int index = Math.abs(hash) % pollingRoutes.size();
+                    Route route = pollingRoutes.get(index);
+                    RouteCompletionResult result = route.invokeLlm(chatCompletionRequest);
+                    if (result != null) {
+                        return result;
+                    }
+                    pollingRoutes.remove(index);
                 }
-                pollingRoutes.remove(index);
+            } else {
+                while (!pollingRoutes.isEmpty()) {
+                    Route route = PollingScheduler.routeSchedule(pollingRoutes);
+                    RouteCompletionResult result = route.invokeLlm(chatCompletionRequest);
+                    if (result != null) {
+                        return result;
+                    }
+                    pollingRoutes.remove(route);
+                }
             }
         } else {
             while (!pollingRoutes.isEmpty()) {

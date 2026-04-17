@@ -1,5 +1,7 @@
 let filterConfigData = [];
 let filteredConfigData = [];
+const tTextFilter = window.tText || ((s) => s);
+const tHtmlFilter = window.tHtml || ((s) => s);
 
 function loadFilterConfigPage() {
     $('#queryBox').hide();
@@ -11,7 +13,7 @@ function loadFilterConfigPage() {
     $('#item-content').css('overflow-y', 'auto');
     hideBallDiv();
     const html = `
-        <div id="filter-config-container" style="padding: 20px; height: 100%; overflow-y: auto;">
+        <div id="filter-config-container" style="padding: 20px; min-height: 100%; background: #fff; overflow-y: auto;">
             <div style="margin-bottom: 20px;">
                 <h2 style="margin-bottom: 10px;">安全配置管理</h2>
                 <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
@@ -67,7 +69,7 @@ function loadFilterConfigPage() {
             </div>
         </div>
     `;
-    $('#item-content').html(html);
+    $('#item-content').html(tHtmlFilter(html));
     loadFilterConfigs();
 }
 
@@ -107,12 +109,12 @@ function renderFilterConfigList() {
     container.empty();
 
     if (filteredConfigData.length === 0 && filterConfigData.length > 0) {
-        container.html('<div style="text-align: center; padding: 40px; color: #999;">未找到匹配的过滤器</div>');
+        container.html(`<div style="text-align: center; padding: 40px; color: #999;">${tTextFilter('未找到匹配的过滤器')}</div>`);
         return;
     }
 
     if (filterConfigData.length === 0) {
-        container.html('<div style="text-align: center; padding: 40px; color: #999;">暂无过滤器配置，请点击"新增过滤器"添加</div>');
+        container.html(`<div style="text-align: center; padding: 40px; color: #999;">${tTextFilter('暂无过滤器配置，请点击"新增过滤器"添加')}</div>`);
         return;
     }
 
@@ -130,10 +132,10 @@ function renderFilterConfigList() {
                     </div>
                 </div>
                 ${filter.groups ? renderGroups(filter.groups) : ''}
-                ${filter.rules ? `<div style="margin-top: 12px;"><strong>规则:</strong> <div style="margin-top: 8px; padding: 8px; background: #f5f5f5; border-radius: 4px; white-space: pre-wrap;">${filter.rules}</div></div>` : ''}
+                ${filter.rules ? `<div style="margin-top: 12px;"><strong>规则:</strong> <div style="margin-top: 8px; padding: 8px; background: #fff; border: 1px solid #eee; border-radius: 4px; white-space: pre-wrap;">${filter.rules}</div></div>` : ''}
             </div>
         `;
-        container.append(card);
+        container.append(tHtmlFilter(card));
     });
 }
 
@@ -141,20 +143,20 @@ function renderGroups(groups) {
     if (!groups || groups.length === 0) return '';
     let html = '<div style="margin-top: 12px;"><strong>分组:</strong><div style="margin-top: 8px;">';
     groups.forEach((group, idx) => {
-        html += `<div style="padding: 8px; background: #f5f5f5; border-radius: 4px; margin-bottom: 8px;">
+        html += `<div style="padding: 8px; background: #fff; border: 1px solid #eee; border-radius: 4px; margin-bottom: 8px;">
             <div><strong>级别:</strong> ${group.level || ''}</div>
             <div style="margin-top: 4px;"><strong>规则:</strong> <div style="margin-top: 4px; white-space: pre-wrap;">${group.rules || ''}</div></div>
         </div>`;
     });
     html += '</div></div>';
-    return html;
+    return tHtmlFilter(html);
 }
 
 let currentEditIndex = -1;
 
 function showAddFilterDialog() {
     currentEditIndex = -1;
-    $('#modalTitle').text('新增过滤器');
+    $('#modalTitle').text(tTextFilter('新增过滤器'));
     $('#filterName').val('');
     $('#filterName').prop('disabled', false);
     $('#filterRules').val('');
@@ -171,7 +173,7 @@ function onFilterTypeChange() {
     // 如果是新增模式且选择了敏感词，显示分组配置
     if (currentEditIndex < 0 && filterType === 'sensitive') {
         if (groupsContainer.find('.group-container').length === 0) {
-            groupsContainer.html(`
+            groupsContainer.html(tHtmlFilter(`
                 <label style="display: block; margin-bottom: 8px;">分组配置 (敏感词需要配置级别和规则):</label>
                 <div class="group-container" style="border: 1px solid #ddd; border-radius: 4px; padding: 12px; margin-bottom: 12px;">
                     <div style="margin-bottom: 8px;">
@@ -184,7 +186,7 @@ function onFilterTypeChange() {
                     </div>
                 </div>
                 <button type="button" onclick="addGroup()" style="padding: 6px 12px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; margin-bottom: 8px;">添加分组</button>
-            `);
+            `));
         }
         rulesContainer.hide();
     } else if (filterType === 'sensitive') {
@@ -199,7 +201,7 @@ function onFilterTypeChange() {
 
 function addGroup() {
     const groupsContainer = $('#groupsContainer');
-    const newGroup = $(`
+    const newGroup = $(tHtmlFilter(`
         <div class="group-container" style="border: 1px solid #ddd; border-radius: 4px; padding: 12px; margin-bottom: 12px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                 <label style="display: block; margin-bottom: 4px;">级别 (1=删除, 2=掩码, 3=擦除):</label>
@@ -213,18 +215,18 @@ function addGroup() {
                 <textarea class="group-rules" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; min-height: 60px;" placeholder="例如: 维尼熊,敏感词,规则*"></textarea>
             </div>
         </div>
-    `);
+    `));
     groupsContainer.find('button[onclick="addGroup()"]').before(newGroup);
 }
 
 function editFilterConfig(index) {
     if (index < 0 || index >= filterConfigData.length) {
-        alert('过滤器不存在');
+        alert(tTextFilter('过滤器不存在'));
         return;
     }
     currentEditIndex = index;
     const filter = filterConfigData[index];
-    $('#modalTitle').text('编辑过滤器');
+    $('#modalTitle').text(tTextFilter('编辑过滤器'));
     $('#filterName').val(filter.name || '');
     $('#filterName').prop('disabled', true);
     $('#filterRules').val(filter.rules || '');
@@ -232,7 +234,7 @@ function editFilterConfig(index) {
     const groupsContainer = $('#groupsContainer');
     groupsContainer.empty();
     if (filter.groups && filter.groups.length > 0) {
-        groupsContainer.append('<label style="display: block; margin-bottom: 8px;">分组配置:</label>');
+        groupsContainer.append(tHtmlFilter('<label style="display: block; margin-bottom: 8px;">分组配置:</label>'));
         filter.groups.forEach((group, idx) => {
             const groupDiv = `
                 <div class="group-container" style="border: 1px solid #ddd; border-radius: 4px; padding: 12px; margin-bottom: 12px;">
@@ -249,14 +251,14 @@ function editFilterConfig(index) {
                     </div>
                 </div>
             `;
-            groupsContainer.append(groupDiv);
+            groupsContainer.append(tHtmlFilter(groupDiv));
         });
         if (filter.name === 'sensitive') {
-            groupsContainer.append('<button type="button" onclick="addGroup()" style="padding: 6px 12px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; margin-bottom: 8px;">添加分组</button>');
+            groupsContainer.append(tHtmlFilter('<button type="button" onclick="addGroup()" style="padding: 6px 12px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; margin-bottom: 8px;">添加分组</button>'));
         }
     } else if (filter.name === 'sensitive') {
         // 敏感词但没有分组，添加一个空分组
-        groupsContainer.append('<label style="display: block; margin-bottom: 8px;">分组配置:</label>');
+        groupsContainer.append(tHtmlFilter('<label style="display: block; margin-bottom: 8px;">分组配置:</label>'));
         const groupDiv = `
             <div class="group-container" style="border: 1px solid #ddd; border-radius: 4px; padding: 12px; margin-bottom: 12px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
@@ -272,8 +274,8 @@ function editFilterConfig(index) {
                 </div>
             </div>
         `;
-        groupsContainer.append(groupDiv);
-        groupsContainer.append('<button type="button" onclick="addGroup()" style="padding: 6px 12px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; margin-bottom: 8px;">添加分组</button>');
+        groupsContainer.append(tHtmlFilter(groupDiv));
+        groupsContainer.append(tHtmlFilter('<button type="button" onclick="addGroup()" style="padding: 6px 12px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; margin-bottom: 8px;">添加分组</button>'));
     }
 
     // 根据过滤器类型显示/隐藏规则和分组
@@ -296,14 +298,14 @@ function saveFilterConfig() {
     const rules = $('#filterRules').val().trim();
 
     if (!name) {
-        alert('请选择过滤器类型');
+        alert(tTextFilter('请选择过滤器类型'));
         return;
     }
 
     // 验证过滤器名称只能是系统支持的4种类型
     const validTypes = ['sensitive', 'priority', 'stopping', 'continue'];
     if (!validTypes.includes(name)) {
-        alert('过滤器类型只能是: sensitive(敏感词)、priority(优先级)、stopping(停止词)、continue(继续词)');
+        alert(tTextFilter('过滤器类型只能是: sensitive(敏感词)、priority(优先级)、stopping(停止词)、continue(继续词)'));
         return;
     }
 
@@ -342,13 +344,13 @@ function saveFilterConfig() {
             if (response && response.code === 0) {
                 hideFilterModal();
                 loadFilterConfigs();
-                alert(isEdit ? '编辑成功' : '保存成功');
+                alert(isEdit ? tTextFilter('编辑成功') : tTextFilter('保存成功'));
             } else {
-                alert('保存失败: ' + (response && response.message ? response.message : '未知错误'));
+                alert(tTextFilter('保存失败') + ': ' + (response && response.message ? response.message : tTextFilter('未知错误')));
             }
         },
         error: function(xhr, status, error) {
-            let errorMsg = '保存失败';
+            let errorMsg = tTextFilter('保存失败');
             if (xhr.responseJSON && xhr.responseJSON.message) {
                 errorMsg += ': ' + xhr.responseJSON.message;
             } else if (xhr.responseText) {
@@ -372,7 +374,7 @@ let deleteConfirmName = null;
 function deleteFilterConfig(name) {
     // 显示自定义确认对话框
     deleteConfirmName = name;
-    $('#deleteConfirmMessage').text('确定要删除过滤器 "' + name + '" 吗？此操作不可恢复。');
+    $('#deleteConfirmMessage').text(tTextFilter('确定要删除过滤器 "') + name + tTextFilter('" 吗？此操作不可恢复。'));
     $('#deleteConfirmModal').css('display', 'flex');
 
     // 清除之前的回调，避免重复绑定
@@ -407,13 +409,13 @@ function performDelete(name) {
         success: function(response) {
             if (response.code === 0) {
                 loadFilterConfigs();
-                alert('删除成功');
+                alert(tTextFilter('删除成功'));
             } else {
-                alert('删除失败: ' + (response.message || '未知错误'));
+                alert(tTextFilter('删除失败') + ': ' + (response.message || tTextFilter('未知错误')));
             }
         },
         error: function(xhr, status, error) {
-            let errorMsg = '删除失败';
+            let errorMsg = tTextFilter('删除失败');
             if (xhr.responseJSON && xhr.responseJSON.message) {
                 errorMsg += ': ' + xhr.responseJSON.message;
             } else if (xhr.responseText) {

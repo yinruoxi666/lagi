@@ -25,6 +25,7 @@ window.maxScale = -1;
 
 
 function loadBall() {
+    const tTextBall = window.tText || ((s) => s);
     // 检测设备类型：是否为手机
     const isMobile = window.innerWidth <= 900;
 
@@ -55,6 +56,7 @@ function loadBall() {
         "税务助手", "智能财务", "危机预测", "客户服务", "自然灾害预警",
         "环保数据", "气候变化", "星座运势", "心理测试", "名人信息"]
     ;
+    const localizedWords = words.map(w => tTextBall(w));
 
     // const words = isMobile ? ["股票助手", "汇率助手", "文心助手", "元器助手"]
     //      :
@@ -86,7 +88,7 @@ function loadBall() {
     oDiv = document.getElementById('ball-div');
 
     // 动态添加 <span> 标签
-    words.forEach(word => {
+    localizedWords.forEach(word => {
         const spanTag = document.createElement('span');
         spanTag.innerText = word;
         oDiv.appendChild(spanTag);
@@ -138,7 +140,7 @@ function loadBall() {
     });
 
     let highlightWord =  function (word) {
-        const targetIndex = words.indexOf(word);
+        const targetIndex = localizedWords.indexOf(word);
         if (targetIndex === -1) return;
 
 
@@ -161,10 +163,10 @@ function loadBall() {
     let getHighWord =  function (word) {
        let highWord = "";
        let maxLenth = 0;
-        for(let i = 0; i < words.length ; i++) {
-            let con =  longestCommonSubsequence(word,  words[i]);
+        for(let i = 0; i < localizedWords.length ; i++) {
+            let con =  longestCommonSubsequence(word,  localizedWords[i]);
             if(con >= 2 && con > maxLenth) {
-                highWord = words[i];
+                highWord = localizedWords[i];
                 maxLenth = con.length;
             }
         }
@@ -310,9 +312,23 @@ function loadBall() {
     function doPosition() {
         const l = oDiv.offsetWidth * 0.42;
         const t = oDiv.offsetHeight * 0.43;
+        // for(let i = 0; i < mcList.length; i++) {
+        //     let tag = mcList[i];
+        //     aA[i].style.fontSize = Math.ceil(12 * tag.scale / 2) + 8 + 'px';
+        //     aA[i].style.left = tag.cx + l + 'px';
+        //     aA[i].style.top = tag.cy + t + 'px';
+        //     aA[i].style.opacity = tag.alpha;
+        // }
         for(let i = 0; i < mcList.length; i++) {
             let tag = mcList[i];
-            aA[i].style.fontSize = Math.ceil(12 * tag.scale / 2) + 8 + 'px';
+            // 基础字体大小
+            let baseFontSize = Math.ceil(12 * tag.scale / 2) + 8;
+            // 根据文字长度调整（字数越多，字体越小）
+            let textLength = aA[i].innerText.length;
+            if (textLength > 3) {
+                baseFontSize = Math.max(10, baseFontSize - (textLength - 3) * 2);
+            }
+            aA[i].style.fontSize = baseFontSize + 'px';
             aA[i].style.left = tag.cx + l + 'px';
             aA[i].style.top = tag.cy + t + 'px';
             aA[i].style.opacity = tag.alpha;

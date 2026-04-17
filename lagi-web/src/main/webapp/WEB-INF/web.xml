@@ -6,7 +6,7 @@
 
     <context-param>
         <param-name>version</param-name>
-        <param-value>2401020054</param-value>
+        <param-value>2604141544</param-value>
     </context-param>
 
     <welcome-file-list>
@@ -151,6 +151,10 @@
     </servlet>
     <servlet-mapping>
         <servlet-name>llm</servlet-name>
+        <url-pattern>/v1/models</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>llm</servlet-name>
         <url-pattern>/v1/chat/completions</url-pattern>
     </servlet-mapping>
     <servlet-mapping>
@@ -172,6 +176,27 @@
     <servlet-mapping>
         <servlet-name>llm</servlet-name>
         <url-pattern>/chat/isMedusa</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
+        <servlet-name>tokenStatistics</servlet-name>
+        <servlet-class>ai.servlet.api.TokenStatisticsApiServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>tokenStatistics</servlet-name>
+        <url-pattern>/v1/token-statistics/overview</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>tokenStatistics</servlet-name>
+        <url-pattern>/v1/token-statistics/details</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>tokenStatistics</servlet-name>
+        <url-pattern>/v1/token-statistics/guard</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>tokenStatistics</servlet-name>
+        <url-pattern>/v1/token-statistics/sessions</url-pattern>
     </servlet-mapping>
 
     <servlet>
@@ -365,4 +390,39 @@
         <url-pattern>/filterConfig/*</url-pattern>
     </servlet-mapping>
 
+    <servlet>
+        <servlet-name>embeddings</servlet-name>
+        <servlet-class>ai.servlet.api.EmbeddingApiServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>embeddings</servlet-name>
+        <url-pattern>/embeddings</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
+        <servlet-name>OpenClawApiServlet</servlet-name>
+        <servlet-class>ai.servlet.api.openclaw.ContextApiServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>OpenClawApiServlet</servlet-name>
+        <url-pattern>/v1/openclaw/context/*</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
+        <servlet-name>credit</servlet-name>
+        <servlet-class>ai.servlet.CreditServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>credit</servlet-name>
+        <url-pattern>/credit/*</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
+        <servlet-name>apiKey</servlet-name>
+        <servlet-class>ai.servlet.ApiKeyServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>apiKey</servlet-name>
+        <url-pattern>/apiKey/*</url-pattern>
+    </servlet-mapping>
 </web-app>
