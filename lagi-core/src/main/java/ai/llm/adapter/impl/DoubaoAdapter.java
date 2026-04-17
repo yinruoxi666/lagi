@@ -1,5 +1,7 @@
 package ai.llm.adapter.impl;
 
+import ai.openai.pojo.ChatCompletionRequest;
+
 public class DoubaoAdapter extends OpenAIStandardAdapter {
     @Override
     public String getApiAddress() {
@@ -8,4 +10,13 @@ public class DoubaoAdapter extends OpenAIStandardAdapter {
         }
         return apiAddress;
     }
+
+    @Override
+    protected void setDefaultField(ChatCompletionRequest request) {
+        super.setDefaultField(request);
+        if (Boolean.TRUE.equals(function) || function == null) {
+            request.setTool_choice("auto");
+        }
+    }
+
 }
