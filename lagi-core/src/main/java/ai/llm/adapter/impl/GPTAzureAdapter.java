@@ -44,6 +44,8 @@ public class GPTAzureAdapter extends ModelService implements ILlmAdapter {
     @Override
     public ChatCompletionResult completions(ChatCompletionRequest chatCompletionRequest) {
         setDefaultField(chatCompletionRequest);
+        // 如果模型大于是5.x,将max_tokens参数转换为max_completion_tokens
+        setMaxCompletionTokens(chatCompletionRequest);
         Map<String, String> headers = new HashMap<>();
         headers.put("Content-Type", "application/json");
         headers.put("api-key", getApiKey());
@@ -68,6 +70,7 @@ public class GPTAzureAdapter extends ModelService implements ILlmAdapter {
     @Override
     public Observable<ChatCompletionResult> streamCompletions(ChatCompletionRequest chatCompletionRequest) {
         setDefaultField(chatCompletionRequest);
+        setMaxCompletionTokens(chatCompletionRequest);
         String apiUrl = getApiAddress();
         String apiKey = getApiKey();
         Map<String, String> headers = new HashMap<>();
@@ -90,5 +93,12 @@ public class GPTAzureAdapter extends ModelService implements ILlmAdapter {
             throw new RRException(code, llmApiResponse.getMsg());
         }
         return llmApiResponse.getStreamData();
+    }
+
+    private void setMaxCompletionTokens(ChatCompletionRequest chatCompletionRequest) {
+            if (chatCompletionRequest.getModel() != null && chatCompletionRequest.getModel().startsWith("gpt-5")) {
+                chatCompletionRequest.setMax_completion_tokens(chatCompletionRequest.getMax_tokens());
+                chatCompletionRequest.setMax_tokens(null);
+            }
     }
 }

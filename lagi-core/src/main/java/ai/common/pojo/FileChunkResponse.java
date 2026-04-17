@@ -26,5 +26,6 @@ public class FileChunkResponse {
     @Data
     public static class Image {
         private String path;
+        private Integer offset;
     }
 }

@@ -81,20 +81,22 @@ public class ChromaV2VectorStore extends BaseVectorStore {
     }
 
     private List<IndexRecord> queryInternal(QueryCondition queryCondition, String category) {
+        Map<String, Object> where = normalizeFilterMap(queryCondition.getWhere());
+        Map<String, Object> whereDocument = normalizeFilterMap(queryCondition.getWhereDocument());
         if (queryCondition.getText() == null || queryCondition.getText().trim().isEmpty()) {
             GetEmbedding getEmbedding = GetEmbedding.builder()
                     .category(category)
-                    .where(queryCondition.getWhere())
+                    .where(where)
                     .limit(queryCondition.getN())
                     .offset(0)
-                    .whereDocument(queryCondition.getWhereDocument())
+                    .whereDocument(whereDocument)
                     .build();
             return get(getEmbedding);
         }
         List<List<Float>> queryEmbeddings = this.embeddingFunction.createEmbedding(Collections.singletonList(queryCondition.getText()));
         ChromaQueryRequest request = ChromaQueryRequest.builder()
-                .where(queryCondition.getWhere())
-                .whereDocument(queryCondition.getWhereDocument())
+                .where(where)
+                .whereDocument(whereDocument)
                 .queryEmbeddings(queryEmbeddings)
                 .nResults(queryCondition.getN())
                 .build();
@@ -220,10 +222,12 @@ public class ChromaV2VectorStore extends BaseVectorStore {
     @Override
     public List<IndexRecord> get(GetEmbedding getEmbedding) {
         String category = resolveCategory(getEmbedding.getCategory());
+        Map<String, Object> where = normalizeFilterMap(getEmbedding.getWhere());
+        Map<String, Object> whereDocument = normalizeFilterMap(getEmbedding.getWhereDocument());
         GetEmbedding request = GetEmbedding.builder()
                 .ids(getEmbedding.getIds())
-                .where(getEmbedding.getWhere())
-                .whereDocument(getEmbedding.getWhereDocument())
+                .where(where)
+                .whereDocument(whereDocument)
                 .limit(getEmbedding.getLimit())
                 .offset(getEmbedding.getOffset())
                 .include(getEmbedding.getInclude())
@@ -294,10 +298,12 @@ public class ChromaV2VectorStore extends BaseVectorStore {
     @Override
     public void delete(DeleteEmbedding deleteEmbedding) {
         String category = resolveCategory(deleteEmbedding.getCategory());
+        Map<String, Object> where = normalizeFilterMap(deleteEmbedding.getWhere());
+        Map<String, Object> whereDocument = normalizeFilterMap(deleteEmbedding.getWhereDocument());
         DeleteEmbedding request = DeleteEmbedding.builder()
                 .ids(deleteEmbedding.getIds())
-                .where(deleteEmbedding.getWhere())
-                .whereDocument(deleteEmbedding.getWhereDocument())
+                .where(where)
+                .whereDocument(whereDocument)
                 .build();
         postCollectionAction(category, "delete", request);
     }
@@ -653,6 +659,55 @@ public class ChromaV2VectorStore extends BaseVectorStore {
             result.put(entry.getKey(), entry.getValue());
         }
         return result;
+    }
+
+    private Map<String, Object> normalizeFilterMap(Map<String, Object> source) {
+        if (source == null || source.isEmpty()) {
+            return null;
+        }
+        Map<String, Object> normalized = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry : source.entrySet()) {
+            if (entry.getKey() == null) {
+                continue;
+            }
+            Object normalizedValue = normalizeFilterValue(entry.getValue());
+            if (normalizedValue != null) {
+                normalized.put(entry.getKey(), normalizedValue);
+            }
+        }
+        return normalized.isEmpty() ? null : normalized;
+    }
+
+    private Object normalizeFilterValue(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Map) {
+            Map<?, ?> sourceMap = (Map<?, ?>) value;
+            Map<String, Object> normalizedMap = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> entry : sourceMap.entrySet()) {
+                if (entry.getKey() == null) {
+                    continue;
+                }
+                Object normalizedValue = normalizeFilterValue(entry.getValue());
+                if (normalizedValue != null) {
+                    normalizedMap.put(String.valueOf(entry.getKey()), normalizedValue);
+                }
+            }
+            return normalizedMap.isEmpty() ? null : normalizedMap;
+        }
+        if (value instanceof Collection) {
+            Collection<?> sourceCollection = (Collection<?>) value;
+            List<Object> normalizedList = new ArrayList<>();
+            for (Object item : sourceCollection) {
+                Object normalizedItem = normalizeFilterValue(item);
+                if (normalizedItem != null) {
+                    normalizedList.add(normalizedItem);
+                }
+            }
+            return normalizedList.isEmpty() ? null : normalizedList;
+        }
+        return value;
     }
 
     private boolean hasText(String value) {

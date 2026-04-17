@@ -9,6 +9,7 @@ import ai.vector.loader.pojo.Document;
 import ai.vector.loader.pojo.DocumentParagraph;
 import ai.vector.loader.pojo.SplitConfig;
 import ai.vector.loader.util.DocxParser;
+import cn.hutool.core.collection.CollUtil;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.imageio.ImageIO;
@@ -147,9 +148,11 @@ public class DocLoader implements DocumentLoader {
                 images = new ArrayList<>();
             }
             if (paragraph.getImages() != null) {
+                final int offset = document.getText().length();
                 List<FileChunkResponse.Image> collect = paragraph.getImages().stream().map(image -> {
                     FileChunkResponse.Image image1 = new FileChunkResponse.Image();
-                    image1.setPath(image);
+                    image1.setPath(image.getPath());
+                    image1.setOffset(offset);
                     return image1;
                 }).collect(Collectors.toList());
                 images.addAll(collect);
@@ -167,6 +170,7 @@ public class DocLoader implements DocumentLoader {
 
     private List<DocumentParagraph> mergeParagraphs(File dir, List<DocumentParagraph> paragraphs) {
         List<DocumentParagraph> res = new ArrayList<>();
+        int offset = 0;
         for (DocumentParagraph paragraph : paragraphs) {
             if ("txt".equals(paragraph.getType())) {
                 if (paragraph.getTxt() == null) {
@@ -184,16 +188,22 @@ public class DocLoader implements DocumentLoader {
                 }
             }
             if ("image".equals(paragraph.getType())) {
-                List<String> strings = convert2LocalImagePath(dir, paragraph);
+                List<DocumentParagraph.Image> strings = convert2LocalImagePath(dir, paragraph);
                 paragraph.setImages(strings);
                 if (res.isEmpty()) {
+                    paragraph.getImages().forEach(image -> {
+                        image.setOffset(0);
+                    });
                     DocumentParagraph documentParagraph = new DocumentParagraph("txt", null, "0", "", paragraph.getImages(), null);
                     res.add(documentParagraph);
                 } else {
                     DocumentParagraph documentParagraph = res.get(res.size() - 1);
-                    List<String> images = documentParagraph.getImages();
+                    List<DocumentParagraph.Image> images = documentParagraph.getImages();
                     if (images == null) {
                         images = new ArrayList<>();
+                    }
+                    for (DocumentParagraph.Image image : paragraph.getImages()) {
+                        image.setOffset(documentParagraph.getTxt().length());
                     }
                     images.addAll(paragraph.getImages());
                     documentParagraph.setImages(images);
@@ -214,14 +224,18 @@ public class DocLoader implements DocumentLoader {
     }
 
 
-    private List<String> convert2LocalImagePath(File dir, DocumentParagraph paragraph) {
-        List<String> imagesTemp = paragraph.getImages();
+    private List<DocumentParagraph.Image> convert2LocalImagePath(File dir, DocumentParagraph paragraph) {
+
+//        List<String> imagesTemp = paragraph.getImages();
+        List<DocumentParagraph.Image> imagesTemp = paragraph.getImages();
         return imagesTemp.stream().map(image -> {
+            DocumentParagraph.Image image1 = new DocumentParagraph.Image();
             // 下载到本地
             String filename = UUID.randomUUID() + ".jpg";
             String absolutePath = Paths.get(dir.getAbsolutePath(), filename).toFile().getAbsolutePath();
-            Base64Util.toFile(absolutePath, image);
-            return dir.getName() + "/" + filename;
+            Base64Util.toFile(absolutePath, image.getPath());
+            image1.setPath(dir.getName() + "/" + filename);
+            return image1;
         }).collect(Collectors.toList());
     }
 

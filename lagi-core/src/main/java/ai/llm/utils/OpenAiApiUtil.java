@@ -22,6 +22,7 @@ import java.net.SocketTimeoutException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 
 public class OpenAiApiUtil {
@@ -70,18 +71,19 @@ public class OpenAiApiUtil {
                                              Function<String, ChatCompletionResult> convertResponseFunc,
                                              Function<Response, Integer> convertErrorFunc,
                                              Map<String, String> headers, Proxy proxy) {
-        java.net.Authenticator.setDefault(new java.net.Authenticator() {
-            @Override
-            protected java.net.PasswordAuthentication getPasswordAuthentication() {
-                return new java.net.PasswordAuthentication("socks5", "digimeta".toCharArray());
-            }
-        });
+//        java.net.Authenticator.setDefault(new java.net.Authenticator() {
+//            @Override
+//            protected java.net.PasswordAuthentication getPasswordAuthentication() {
+//                return new java.net.PasswordAuthentication("socks5", "digimeta".toCharArray());
+//            }
+//        });
+        log.info("OpenAiApiUtil completions apiUrl: {}, json: {}", apiUrl, json);
         OkHttpClient client = new OkHttpClient.Builder()
                 .connectTimeout(timeout, TimeUnit.SECONDS)
                 .readTimeout(timeout, TimeUnit.SECONDS)
                 .writeTimeout(timeout, TimeUnit.SECONDS)
                 .connectionPool(CONNECTION_POOL)
-                .proxy(proxy)
+//                .proxy(proxy)
                 .build();
         MediaType mediaType = MediaType.get("application/json");
         RequestBody body = RequestBody.create(json, mediaType);
@@ -162,6 +164,21 @@ public class OpenAiApiUtil {
         LlmApiResponse result = LlmApiResponse.builder().build();
         EventSource.Factory factory = EventSources.createFactory(client);
         ObservableList<ChatCompletionResult> res = new ObservableList<>();
+        // 记录调用开始时间
+        final long startTime = System.currentTimeMillis();
+        // 记录状态(0：未记录；1:已记录)
+        AtomicBoolean recorded = new AtomicBoolean(false);
+        String raw = null;
+        String key = "\"model\":\"";
+        int start = json.indexOf(key);
+        if (start >= 0) {
+            start += key.length();
+            int end = json.indexOf('"', start);
+            if (end > 0) {
+                raw = json.substring(start, end);
+            }
+        }
+        final String model = raw;
         factory.newEventSource(request, new EventSourceListener() {
             @Override
             public void onOpen(@NotNull EventSource eventSource, @NotNull Response response) {
@@ -184,6 +201,10 @@ public class OpenAiApiUtil {
             @Override
             public void onEvent(@NotNull EventSource eventSource, @Nullable String id, @Nullable String type, @NotNull String data) {
 //                log.info("ServerSentEventUtil streamCompletions onEvent: data = {}" , data);
+                if (!recorded.get()) {
+                    log.info("model:{}, First stream data received after {} ms", model, System.currentTimeMillis() - startTime);
+                    recorded.set(true);
+                }
                 ChatCompletionResult chatCompletionResult = convertResponseFunc.apply(data);
                 if (chatCompletionResult != null) {
                     res.add(chatCompletionResult);
@@ -227,6 +248,5 @@ public class OpenAiApiUtil {
 //        result.setStreamData(res.getObservable());
         return result;
     }
-
 
 }

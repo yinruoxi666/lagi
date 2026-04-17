@@ -63,7 +63,13 @@ public class DocxParser {
                     List<String> imagesInParagraph = getImagesInParagraph(paragraph);
                     if(!imagesInParagraph.isEmpty()) {
                         documentParagraph.setType("image");
-                        documentParagraph.setImages(imagesInParagraph);
+                        List<DocumentParagraph.Image> imageList = new ArrayList<>();
+                        for (String image : imagesInParagraph) {
+                            DocumentParagraph.Image imageMerge = new DocumentParagraph.Image();
+                            imageMerge.setPath(image);
+                            imageList.add(imageMerge);
+                        }
+                        documentParagraph.setImages(imageList);
                     } else {
                         documentParagraph.setType("txt");
                         documentParagraph.setSubType("txt");
@@ -92,7 +98,13 @@ public class DocxParser {
                             if (!imagesInParagraph.isEmpty()) {
                                 DocumentParagraph imageParagraph = new DocumentParagraph();
                                 imageParagraph.setType("image");
-                                imageParagraph.setImages(imagesInParagraph);
+                                List<DocumentParagraph.Image> imageList = new ArrayList<>();
+                                for (String image : imagesInParagraph) {
+                                    DocumentParagraph.Image imageMerge = new DocumentParagraph.Image();
+                                    imageMerge.setPath(image);
+                                    imageList.add(imageMerge);
+                                }
+                                documentParagraph.setImages(imageList);
                                 res.getParagraphs().add(imageParagraph);
                             }
                         }

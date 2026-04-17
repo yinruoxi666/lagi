@@ -2,12 +2,10 @@ package ai.vector;
 
 import ai.bigdata.BigdataService;
 import ai.bigdata.pojo.TextIndexData;
-import ai.common.pojo.FileChunkResponse;
-import ai.common.pojo.FileInfo;
-import ai.common.pojo.IndexSearchData;
-import ai.common.pojo.VectorStoreConfig;
+import ai.common.pojo.*;
 import ai.common.utils.FileUtils;
 import ai.common.utils.ThreadPoolManager;
+import ai.embedding.impl.QwenEmbeddings;
 import ai.intent.IntentService;
 import ai.intent.enums.IntentStatusEnum;
 import ai.intent.impl.SampleIntentServiceImpl;
@@ -484,6 +482,7 @@ public class VectorStoreService {
 
     public List<IndexSearchData> searchByContext(ChatCompletionRequest request, Map<String, Object> where) {
         List<ChatMessage> messages = request.getMessages();
+        log.info("intent detect start");
         IntentResult intentResult = intentService.detectIntent(request, where);
         if (intentResult.getIndexSearchDataList() != null) {
             return intentResult.getIndexSearchDataList();
@@ -553,7 +552,6 @@ public class VectorStoreService {
                 .collect(Collectors.toList());
 
         Set<String> seenTexts = ConcurrentHashMap.newKeySet();
-
         return futureResultList.stream()
                 .map(future -> {
                     try {
@@ -562,6 +560,7 @@ public class VectorStoreService {
                         throw new RuntimeException(e);
                     }
                 })
+                .peek(item -> log.info("Extended item json info: {}", gson.toJson(item)))
                 .filter(dataList -> !dataList.isEmpty())
                 .map(dataList -> dataList.stream()
                         .filter(Objects::nonNull)
@@ -586,7 +585,7 @@ public class VectorStoreService {
         StringBuilder sb = new StringBuilder(mergedIndexSearchData.getText());
         // 如果image不为空，则合并image
         JsonArray mergedImages = new JsonArray();
-        if (mergedIndexSearchData.getImage() != null && mergedIndexSearchData.getImage().isEmpty()) {
+        if (mergedIndexSearchData.getImage() != null && !mergedIndexSearchData.getImage().isEmpty()) {
             try {
                 JsonArray images = gson.fromJson(mergedIndexSearchData.getImage(), JsonArray.class);
                 if (images != null) {
@@ -599,6 +598,8 @@ public class VectorStoreService {
                         mergedIndexSearchData.getId(), e.getMessage());
             }
         }
+        // 设置初始文本偏移offset
+        int offset = sb.length();
         for (int i = 1; i < indexSearchDataList.size(); i++) {
             sb.append(splitChar).append(indexSearchDataList.get(i).getText());
             // 合并image
@@ -607,6 +608,12 @@ public class VectorStoreService {
                     JsonArray images = gson.fromJson(indexSearchDataList.get(i).getImage(), JsonArray.class);
                     if (images != null) {
                         for (int j = 0; j < images.size(); j++) {
+                            // 修改image中的文本偏移offset
+                            JsonObject image = images.get(j).getAsJsonObject();
+                            if (image.has("offset")) {
+                                int imageOffset = image.get("offset").getAsInt();
+                                image.addProperty("offset", imageOffset + offset + splitChar.length());
+                            }
                             mergedImages.add(images.get(j));
                         }
                     }
@@ -615,7 +622,8 @@ public class VectorStoreService {
                             indexSearchDataList.get(i).getId(), e.getMessage());
                 }
             }
-
+            // 更新文本偏移offset
+            offset += splitChar.length() + indexSearchDataList.get(i).getText().length();
         }
         mergedIndexSearchData.setText(sb.toString());
         if (mergedImages.size() > 0) {
@@ -1148,4 +1156,6 @@ public class VectorStoreService {
             }
         }
     }
+
+
 }
