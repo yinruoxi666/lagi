@@ -291,7 +291,7 @@
         <dependency>
             <groupId>com.volcengine</groupId>
             <artifactId>volcengine-java-sdk-ark-runtime</artifactId>
-            <version>0.2.20</version>
+            <version>0.2.44</version>
         </dependency>
         <dependency>
             <groupId>com.aliyun</groupId>

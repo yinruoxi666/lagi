@@ -180,7 +180,7 @@ public class QwenAdapter extends ModelService implements ILlmAdapter {
             List<ToolCallBase> collect = null;
             if(toolCalls != null) {
                 collect = toolCalls.stream().map(toolCall -> {
-                    com.alibaba.dashscope.tools.ToolCallFunction build = com.alibaba.dashscope.tools.ToolCallFunction.builder().build();
+                    com.alibaba.dashscope.tools.ToolCallFunction build = new com.alibaba.dashscope.tools.ToolCallFunction();
                     BeanUtil.copyProperties(toolCall, build);
                     return build;
                 }).collect(Collectors.toList());

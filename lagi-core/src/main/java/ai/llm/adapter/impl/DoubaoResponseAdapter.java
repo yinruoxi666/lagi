@@ -39,7 +39,7 @@ public class DoubaoResponseAdapter extends ModelService {
                 .input(ResponsesInput.builder().addListItem(
                         ItemEasyMessage.builder().role(ResponsesConstants.MESSAGE_ROLE_USER).content(
                                 MessageContent.builder()
-                                        .addListItem(DoubaoTranslationInputContentItem.builder()
+                                        .addListItem(DoubaoTranslationInputContentItem.translationBuilder()
                                                 .text(text).transFromTo("zh","en").build())
                                         .build())
                                 .build())

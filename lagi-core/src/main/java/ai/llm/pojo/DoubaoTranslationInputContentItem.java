@@ -1,31 +1,19 @@
 package ai.llm.pojo;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.volcengine.ark.runtime.model.responses.content.InputContentItem;
 import com.volcengine.ark.runtime.model.responses.content.InputContentItemText;
 
 import java.util.HashMap;
 import java.util.Map;
 
-public class DoubaoTranslationInputContentItem extends InputContentItem {
-    @JsonProperty("text")
-    private String text;
+public class DoubaoTranslationInputContentItem extends InputContentItemText {
     @JsonProperty("translation_options")
     private Map<String, String> options;
 
     public DoubaoTranslationInputContentItem() {
-        super("input_text");
         options = new HashMap<>();
         options.put("source_language","zh");
         options.put("target_language","en");
-    }
-
-    public String getText() {
-        return this.text;
-    }
-
-    public void setText(String text) {
-        this.text = text;
     }
 
     public Map<String, String> getOptions() {
@@ -36,7 +24,7 @@ public class DoubaoTranslationInputContentItem extends InputContentItem {
         this.options = options;
     }
 
-    public static DoubaoTranslationInputContentItem.Builder builder() {
+    public static DoubaoTranslationInputContentItem.Builder translationBuilder() {
         return new DoubaoTranslationInputContentItem.Builder();
     }
 
