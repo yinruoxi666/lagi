@@ -27,6 +27,8 @@ public class ChromaV2VectorStore extends BaseVectorStore {
     private final Embeddings embeddingFunction;
     private final Map<String, Object> colMetadata;
     private final Map<String, String> collectionIdCache = new ConcurrentHashMap<>();
+    private volatile String tenantUuid;
+    private volatile boolean tenantAndDatabaseReady;
 
     static {
         OBJECT_MAPPER.setSerializationInclusion(JsonInclude.Include.NON_NULL);
@@ -181,13 +183,31 @@ public class ChromaV2VectorStore extends BaseVectorStore {
     @Override
     public void deleteCollection(String category) {
         String targetCategory = resolveCategory(category);
-        String collectionId = findCollectionIdByName(targetCategory);
-        if (!hasText(collectionId)) {
+        ensureTenantAndDatabase();
+        try {
+            deleteJson(collectionPath(targetCategory));
             collectionIdCache.remove(targetCategory);
-            return;
+        } catch (ChromaHttpException e) {
+            if (e.getStatusCode() != 404) {
+                throw e;
+            }
+            collectionIdCache.remove(targetCategory);
+            resetTenantAndCollectionState();
+            ensureTenantAndDatabase();
+            String retryCollectionId = findCollectionIdByName(targetCategory);
+            if (!hasText(retryCollectionId)) {
+                return;
+            }
+            try {
+                deleteJson(collectionPath(retryCollectionId));
+                collectionIdCache.remove(targetCategory);
+            } catch (ChromaHttpException retryException) {
+                if (retryException.getStatusCode() != 404) {
+                    throw retryException;
+                }
+                collectionIdCache.remove(targetCategory);
+            }
         }
-        deleteJson(collectionPath(collectionId));
-        collectionIdCache.remove(targetCategory);
     }
 
     @Override
@@ -316,12 +336,12 @@ public class ChromaV2VectorStore extends BaseVectorStore {
     }
 
     private <T> T withCollectionIdRetry(String category, CollectionOperation<T> operation) {
-        String collectionId = getCollectionId(resolveCategory(category), true);
         try {
+            String collectionId = getCollectionId(resolveCategory(category), true);
             return operation.call(collectionId);
         } catch (ChromaHttpException e) {
             if (e.getStatusCode() == 404) {
-                collectionIdCache.remove(resolveCategory(category));
+                resetTenantAndCollectionState();
                 String retryCollectionId = getCollectionId(resolveCategory(category), true);
                 return operation.call(retryCollectionId);
             }
@@ -345,6 +365,7 @@ public class ChromaV2VectorStore extends BaseVectorStore {
     }
 
     private String createOrGetCollection(String category) {
+        ensureTenantAndDatabase();
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("name", category);
         request.put("get_or_create", true);
@@ -356,6 +377,50 @@ public class ChromaV2VectorStore extends BaseVectorStore {
             return collectionId;
         }
         return findCollectionIdByName(category);
+    }
+
+    private void ensureTenantAndDatabase() {
+        if (tenantAndDatabaseReady && hasText(tenantUuid)) {
+            return;
+        }
+        synchronized (this) {
+            if (tenantAndDatabaseReady && hasText(tenantUuid)) {
+                return;
+            }
+            ensureTenant();
+            ensureDatabase();
+            tenantAndDatabaseReady = true;
+        }
+    }
+
+    private void ensureTenant() {
+        try {
+            tenantUuid = requireTenantUuid(getJson(configuredTenantPath()));
+        } catch (ChromaHttpException e) {
+            if (e.getStatusCode() != 404) {
+                throw e;
+            }
+            Map<String, Object> request = new LinkedHashMap<>();
+            request.put("name", tenantName());
+            String createdTenantUuid = parseTenantUuid(postJson(tenantsPath(), toJson(request)));
+            if (!hasText(createdTenantUuid)) {
+                createdTenantUuid = requireTenantUuid(getJson(configuredTenantPath()));
+            }
+            tenantUuid = createdTenantUuid;
+        }
+    }
+
+    private void ensureDatabase() {
+        try {
+            getJson(databasePath());
+        } catch (ChromaHttpException e) {
+            if (e.getStatusCode() != 404) {
+                throw e;
+            }
+            Map<String, Object> request = new LinkedHashMap<>();
+            request.put("name", databaseName());
+            postJson(databasesPath(), toJson(request));
+        }
     }
 
     private String findCollectionIdByName(String category) {
@@ -370,6 +435,7 @@ public class ChromaV2VectorStore extends BaseVectorStore {
     }
 
     private JsonNode listCollectionNodes() {
+        ensureTenantAndDatabase();
         String json = getJson(collectionsPath());
         JsonNode root = unwrapDataNode(readTree(json));
         if (root.isArray()) {
@@ -384,6 +450,28 @@ public class ChromaV2VectorStore extends BaseVectorStore {
             return data;
         }
         return OBJECT_MAPPER.createArrayNode();
+    }
+
+    private String requireTenantUuid(String json) {
+        String resolvedTenantUuid = parseTenantUuid(json);
+        if (!hasText(resolvedTenantUuid)) {
+            throw new RuntimeException("Chroma tenant response missing tenant UUID: " + clip(json == null ? "" : json));
+        }
+        return resolvedTenantUuid;
+    }
+
+    private String parseTenantUuid(String json) {
+        if (!hasText(json)) {
+            return null;
+        }
+        JsonNode root = unwrapDataNode(readTree(json));
+        return readText(root, "name", "id", "uuid", "tenant");
+    }
+
+    private void resetTenantAndCollectionState() {
+        tenantUuid = null;
+        tenantAndDatabaseReady = false;
+        collectionIdCache.clear();
     }
 
     private JsonNode unwrapDataNode(JsonNode root) {
@@ -611,11 +699,45 @@ public class ChromaV2VectorStore extends BaseVectorStore {
     }
 
     protected String buildBasePath() {
-        String tenant = hasText(this.config.getTenant()) ? this.config.getTenant() : "default_tenant";
-        String database = hasText(this.config.getDatabase()) ? this.config.getDatabase() : "default_database";
-        return trimTrailingSlash(this.config.getUrl())
-                + "/api/v2/tenants/" + encodePathSegment(tenant)
-                + "/databases/" + encodePathSegment(database);
+        return rootApiPath()
+                + "/tenants/" + encodePathSegment(tenantUuid())
+                + "/databases/" + encodePathSegment(databaseName());
+    }
+
+    private String rootApiPath() {
+        return trimTrailingSlash(this.config.getUrl()) + "/api/v2";
+    }
+
+    private String tenantsPath() {
+        return rootApiPath() + "/tenants";
+    }
+
+    private String tenantPath() {
+        return tenantsPath() + "/" + encodePathSegment(tenantUuid());
+    }
+
+    private String configuredTenantPath() {
+        return tenantsPath() + "/" + encodePathSegment(tenantName());
+    }
+
+    private String databasesPath() {
+        return tenantPath() + "/databases";
+    }
+
+    private String databasePath() {
+        return databasesPath() + "/" + encodePathSegment(databaseName());
+    }
+
+    private String tenantName() {
+        return hasText(this.config.getTenant()) ? this.config.getTenant() : "default_tenant";
+    }
+
+    private String tenantUuid() {
+        return hasText(this.tenantUuid) ? this.tenantUuid : tenantName();
+    }
+
+    private String databaseName() {
+        return hasText(this.config.getDatabase()) ? this.config.getDatabase() : "default_database";
     }
 
     private String trimTrailingSlash(String value) {
