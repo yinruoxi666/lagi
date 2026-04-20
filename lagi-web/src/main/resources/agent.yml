@@ -294,3 +294,9 @@ agents:
   # Agent for violation_content_recognition,automatically scan text to quickly retrieve illegal or infringing content
   - name: violation_content_recognition
     driver: TBD
+
+  - name: pek_icdh
+    driver: ai.agent.chat.lydaas.PekIcdhAgent
+    token:
+    userId:
+    appId:
