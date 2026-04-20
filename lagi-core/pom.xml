@@ -199,7 +199,7 @@
         <dependency>
             <groupId>io.github.amikos-tech</groupId>
             <artifactId>chromadb-java-client</artifactId>
-            <version>0.1.5</version>
+            <version>0.1.7</version>
         </dependency>
         <dependency>
             <groupId>cn.bigmodel.openapi</groupId>
