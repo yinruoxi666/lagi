@@ -18,6 +18,8 @@ public class VectorStoreConfig {
     private String url;
     private String metric = VectorStoreConstant.VECTOR_METRIC_COSINE;
     private String apiKey;
+    private String tenant;
+    private String database;
     private String indexName;
     private String environment;
     private String projectName;
@@ -38,6 +40,8 @@ public class VectorStoreConfig {
         similarityCutoff = 0.5;
         parentDepth = 0;
         childDepth = 0;
+        tenant = "default_tenant";
+        database = "default_database";
     }
 
 }
