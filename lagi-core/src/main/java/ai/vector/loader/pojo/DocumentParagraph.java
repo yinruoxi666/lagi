@@ -28,8 +28,13 @@ public class DocumentParagraph {
 
     private String txt;
 
-    private List<String> images;
+    private List<Image> images;
 
     private List<List<String>> table;
 
+    @Data
+    public static class Image {
+        private String path;
+        private Integer offset;
+    }
 }
