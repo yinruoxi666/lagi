@@ -59,7 +59,8 @@ public class LandingAdapter extends OpenAIStandardAdapter {
     }
 
     private boolean isFinalServer() {
-        return getApiAddress().startsWith(ConfigUtil.getBaseUrl());
+        boolean flag = getApiAddress().startsWith(ConfigUtil.getBaseUrl());
+        return flag;
     }
 
     @Override

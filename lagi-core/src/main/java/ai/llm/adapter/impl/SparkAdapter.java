@@ -8,6 +8,7 @@ import ai.llm.pojo.LlmApiResponse;
 import ai.llm.utils.OpenAiApiUtil;
 import ai.llm.utils.convert.SparkConvert;
 import ai.openai.pojo.*;
+import ai.utils.AiGlobal;
 import io.reactivex.Observable;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
@@ -18,7 +19,7 @@ import org.slf4j.LoggerFactory;
 public class SparkAdapter extends ModelService implements ILlmAdapter {
     private static final Logger logger = LoggerFactory.getLogger(SparkAdapter.class);
     private static final String COMPLETIONS_URL = "https://spark-api-open.xf-yun.com/v1/chat/completions";
-    private static final int HTTP_TIMEOUT = 15;
+    private static final int HTTP_TIMEOUT = AiGlobal.LLM_TIME_OUT_SECONDS;
 
     @Override
     public ChatCompletionResult completions(ChatCompletionRequest chatCompletionRequest) {

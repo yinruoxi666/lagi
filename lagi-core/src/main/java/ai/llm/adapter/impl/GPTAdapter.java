@@ -17,6 +17,7 @@ import ai.llm.adapter.ILlmAdapter;
 import ai.openai.pojo.ChatCompletionRequest;
 import ai.openai.pojo.ChatCompletionResult;
 import ai.openai.pojo.ChatMessage;
+import ai.utils.AiGlobal;
 import io.reactivex.Observable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,7 +31,7 @@ public class GPTAdapter extends ModelService implements ILlmAdapter {
     private static final Logger logger = LoggerFactory.getLogger(GPTAdapter.class);
     private static final String COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
     private static final String RESPONSES_URL = "https://api.openai.com/v1/responses";
-    private static final int HTTP_TIMEOUT = 15;
+    private static final int HTTP_TIMEOUT = AiGlobal.LLM_TIME_OUT_SECONDS;
     private static final ResponseSessionManager SESSION_MANAGER = ResponseSessionManager.getInstance();
 
     @Override

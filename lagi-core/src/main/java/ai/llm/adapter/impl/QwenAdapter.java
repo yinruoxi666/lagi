@@ -14,6 +14,7 @@ import ai.llm.responses.ResponseSessionContext;
 import ai.llm.responses.ResponseSessionManager;
 import ai.llm.utils.convert.QwenConvert;
 import ai.openai.pojo.*;
+import ai.utils.AiGlobal;
 import ai.utils.qa.ChatCompletionUtil;
 import cn.hutool.core.bean.BeanUtil;
 import com.alibaba.dashscope.aigc.generation.Generation;
@@ -44,7 +45,7 @@ import java.util.stream.Collectors;
 @LLM(modelNames = {"qwen-turbo","qwen-plus","qwen-max","qwen-max-1201","qwen-max-longcontext",
         "qwen-flash","qwen3.5-plus","qwen3.5-flash","qwen3-max","qwen3-coder-plus","qwen3-coder-flash"})
 public class QwenAdapter extends ModelService implements ILlmAdapter {
-    private static final int HTTP_TIMEOUT = 30;
+    private static final int HTTP_TIMEOUT = AiGlobal.LLM_TIME_OUT_SECONDS;
     private static final ResponseSessionManager SESSION_MANAGER = ResponseSessionManager.getInstance();
 
 

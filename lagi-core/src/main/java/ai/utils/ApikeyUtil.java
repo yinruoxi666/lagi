@@ -79,6 +79,10 @@ public class ApikeyUtil {
         if (apiKey == null || apiKey.trim().isEmpty()) {
             return false;
         }
+        if (landingKeyCache.containsKey(apiKey)) {
+            return true;
+        }
+        doValidateModelApiKey(apiKey);
         return landingKeyCache.containsKey(apiKey);
     }
 
@@ -86,6 +90,10 @@ public class ApikeyUtil {
         if (!enableAuth) {
             return true;
         }
+        return doValidateModelApiKey(apiKey);
+    }
+
+    private static boolean doValidateModelApiKey(String apiKey) {
         if (apiKey == null || apiKey.trim().isEmpty()) {
             return false;
         }

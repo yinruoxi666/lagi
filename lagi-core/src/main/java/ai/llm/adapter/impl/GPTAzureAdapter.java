@@ -15,6 +15,7 @@ import ai.llm.utils.convert.GptAzureConvert;
 import ai.openai.pojo.ChatCompletionRequest;
 import ai.openai.pojo.ChatCompletionResult;
 import ai.openai.pojo.ChatMessage;
+import ai.utils.AiGlobal;
 import cn.hutool.core.util.StrUtil;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -31,7 +32,7 @@ import java.util.concurrent.atomic.AtomicReference;
 @LLM(modelNames = {"gpt-3.5-turbo","gpt-4-1106-preview","gpt-4o-20240513"})
 public class GPTAzureAdapter extends ModelService implements ILlmAdapter {
     private static final Logger logger = LoggerFactory.getLogger(GPTAzureAdapter.class);
-    private static final int HTTP_TIMEOUT = 30;
+    private static final int HTTP_TIMEOUT = AiGlobal.LLM_TIME_OUT_SECONDS;
     private static final ResponseSessionManager SESSION_MANAGER = ResponseSessionManager.getInstance();
     private final ObjectMapper mapper;
 

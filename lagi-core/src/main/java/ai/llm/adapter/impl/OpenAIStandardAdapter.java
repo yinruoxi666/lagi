@@ -15,6 +15,7 @@ import ai.llm.utils.convert.GptConvert;
 import ai.openai.pojo.ChatCompletionRequest;
 import ai.openai.pojo.ChatCompletionResult;
 import ai.openai.pojo.ChatMessage;
+import ai.utils.AiGlobal;
 import cn.hutool.core.util.StrUtil;
 import io.reactivex.Observable;
 import org.slf4j.Logger;
@@ -28,7 +29,7 @@ import java.util.concurrent.atomic.AtomicReference;
 @LLM(modelNames = {"*"})
 public class OpenAIStandardAdapter extends ModelService implements ILlmAdapter {
     private static final Logger logger = LoggerFactory.getLogger(OpenAIStandardAdapter.class);
-    private static final int HTTP_TIMEOUT = 30;
+    private static final int HTTP_TIMEOUT = AiGlobal.LLM_TIME_OUT_SECONDS;
     private static final ResponseSessionManager SESSION_MANAGER = ResponseSessionManager.getInstance();
 
     @Override
