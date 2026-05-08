@@ -47,6 +47,21 @@ The host has already replaced the following placeholders with real data. Use the
 
 Note: When executing Python scripts, use `{{SKILL_DIR}}` to build the absolute script path so relative paths do not fail because of an uncertain `cwd`. When calling APIs, use `{{BASE_URL}}` as `--base-url`; the user does not need to specify it again.
 
+### Platform Detection (Required Before `exec`)
+
+Before issuing any command, detect the OS by inspecting `{{SKILL_DIR}}`:
+
+- If `{{SKILL_DIR}}` is a **Windows-style path** — i.e. it starts with a drive letter such as `C:\`, `D:\`, `E:\` (case-insensitive), or starts with `\\` (UNC path), or contains `\` as a separator — the host is Windows. **You MUST run Windows-native commands directly (cmd.exe or PowerShell) and MUST NOT route the command through WSL, `wsl.exe`, `bash`, or any POSIX-style wrapper.** Keep the path exactly as provided (do not rewrite `C:\...` to `/mnt/c/...`), use `\` as the path separator, and pick the cmd.exe or PowerShell example below.
+- Otherwise (path starts with `/`, e.g. `/home/...`, `/Users/...`, `/opt/...`), the host is Linux or macOS. Use the bash / zsh example below.
+
+Do not mix styles: never feed a Windows path into a bash command, and never feed a POSIX path into cmd.exe / PowerShell.
+
+### Execution Policy (Python Only, No Fallback)
+
+- This skill **only** invokes the bundled Python scripts via `python` (or `python3` / `py` if `python` is not available on Linux / macOS / Windows respectively). All HTTP calls go through those scripts.
+- **Do NOT use any other tool or method to call the API** — no `curl`, `wget`, `Invoke-WebRequest`, `Invoke-RestMethod`, `iwr`, `irm`, `requests` ad-hoc one-liners, `node`, `java`, custom HTTP clients, or rewriting requests in another language.
+- **If the Python command fails** (non-zero exit code, interpreter not found, network error, timeout, or any other failure), **stop immediately**. Do not retry with a different transport, do not switch to `curl` / PowerShell `Invoke-*`, do not write a temporary script in another language. Report the failure to the user, including the exit code or stderr if available, and end the skill.
+
 Field meanings for each element:
 - `channelId`: Numeric channel ID used for API calls.
 - `channelName`: Channel name used by the user in requests, in Chinese or English.
@@ -84,13 +99,33 @@ Request parameters (query string):
 - `limit`: Defaults to `20` when the user does not specify it.
 - `beforeId`: Optional. Use only when the user asks for earlier messages, the previous page, or similar pagination.
 
-Use the `exec` tool to call this skill's bundled Python script `scripts/list_messages.py` (standard library only, no `pip install` required). The script path is relative to this `SKILL.md` directory. Example command:
+Use the `exec` tool to call this skill's bundled Python script `scripts/list_messages.py` (standard library only, no `pip install` required). The script path is relative to this `SKILL.md` directory. Pick the example that matches the current OS.
+
+Linux / macOS (bash / zsh):
 
 ```bash
-python {{SKILL_DIR}}/scripts/list_messages.py \
+python "{{SKILL_DIR}}/scripts/list_messages.py" \
   --user-id "{{USER_ID}}" \
   --channel-id <CHANNEL_ID> \
   --limit 20 \
+  --base-url "{{BASE_URL}}"
+# For pagination, append: --before-id <BEFORE_ID>
+```
+
+Windows (cmd.exe, single line, use `^` for line continuation if you need to wrap):
+
+```bat
+python "{{SKILL_DIR}}\scripts\list_messages.py" --user-id "{{USER_ID}}" --channel-id <CHANNEL_ID> --limit 20 --base-url "{{BASE_URL}}"
+REM For pagination, append:  --before-id <BEFORE_ID>
+```
+
+Windows (PowerShell, use backtick `` ` `` for line continuation):
+
+```powershell
+python "{{SKILL_DIR}}\scripts\list_messages.py" `
+  --user-id "{{USER_ID}}" `
+  --channel-id <CHANNEL_ID> `
+  --limit 20 `
   --base-url "{{BASE_URL}}"
 # For pagination, append: --before-id <BEFORE_ID>
 ```
@@ -115,21 +150,45 @@ Request body JSON:
 }
 ```
 
-Use the `exec` tool to call this skill's bundled Python script `scripts/send_message.py` (standard library only). The script handles JSON encoding internally. The caller only needs to pass the message body as-is through `--content`:
+Use the `exec` tool to call this skill's bundled Python script `scripts/send_message.py` (standard library only). The script handles JSON encoding internally. The caller only needs to pass the message body as-is through `--content`. Pick the example that matches the current OS.
+
+Linux / macOS (bash / zsh):
 
 ```bash
-python {{SKILL_DIR}}/scripts/send_message.py \
+python "{{SKILL_DIR}}/scripts/send_message.py" \
   --user-id "{{USER_ID}}" \
   --channel-id <CHANNEL_ID> \
   --content "<MESSAGE_CONTENT>" \
   --base-url "{{BASE_URL}}"
 ```
 
+Windows (cmd.exe, single line):
+
+```bat
+python "{{SKILL_DIR}}\scripts\send_message.py" --user-id "{{USER_ID}}" --channel-id <CHANNEL_ID> --content "<MESSAGE_CONTENT>" --base-url "{{BASE_URL}}"
+```
+
+Windows (PowerShell, use backtick `` ` `` for line continuation):
+
+```powershell
+python "{{SKILL_DIR}}\scripts\send_message.py" `
+  --user-id "{{USER_ID}}" `
+  --channel-id <CHANNEL_ID> `
+  --content "<MESSAGE_CONTENT>" `
+  --base-url "{{BASE_URL}}"
+```
+
 Notes:
-- If `--content` contains double quotes, escape them according to the current shell's rules. For example, in bash, wrap the value in single quotes or escape inner `"` as `\"`. The script uses `json.dumps(..., ensure_ascii=False)` internally to handle JSON escaping automatically.
+- Always wrap each path and argument in double quotes so spaces in `{{SKILL_DIR}}` or `<MESSAGE_CONTENT>` do not break the command. This works on all platforms.
+- Quoting rules differ across shells:
+  - bash / zsh: prefer single quotes around `--content`, or escape inner `"` as `\"`.
+  - cmd.exe: escape an inner `"` inside a double-quoted value as `\"` (or use `""`).
+  - PowerShell: escape an inner `"` as `` `" `` inside a double-quoted value, or wrap the value in single quotes.
+  - The script uses `json.dumps(..., ensure_ascii=False)` internally to handle JSON escaping automatically.
+- Choose the path separator that matches the OS: `/` on Linux / macOS, `\` on Windows. Python itself accepts both, but other tools in the pipeline may not.
+- The Python interpreter can be `python3` or `python` on Linux / macOS, and is normally just `python` (or `py`) on Windows. Both scripts depend only on the standard library (`argparse`, `json`, `urllib`), so no extra installation is required on any platform.
 - If `status` == `success`, briefly confirm to the user: "Sent the message in <channel name>: <content>", and provide the `messageId`.
 - If `status` == `failed`, relay `msg` to the user.
-- The Python interpreter can be `python3` or `python`, depending on the current environment. Both scripts depend only on the standard library (`argparse`, `json`, `urllib`).
 
 ## Response Guidelines
 

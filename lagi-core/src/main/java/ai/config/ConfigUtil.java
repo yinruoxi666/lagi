@@ -10,6 +10,8 @@ public class ConfigUtil {
     public static String APP_HOST;
     public static int APP_PORT;
 
+    public static String APP_CONTAINER_URL;
+
     private ConfigUtil() {
     }
 
@@ -94,7 +96,7 @@ public class ConfigUtil {
 
     public static String getBaseUrl() {
         if (getAppHost() == null) {
-            return "http";
+            return APP_CONTAINER_URL;
         }
         return "http://" + getAppHost() + ":" + getAppPort();
     }

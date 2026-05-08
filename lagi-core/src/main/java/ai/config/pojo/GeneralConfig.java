@@ -13,4 +13,7 @@ public class GeneralConfig {
 
     @JsonProperty("menu_login_required")
     private Boolean menuLoginRequired = false;
+
+    @JsonProperty("container_url")
+    private String containerUrl;
 }

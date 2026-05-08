@@ -515,13 +515,11 @@ public class LlmApiServlet extends BaseServlet {
     }
 
     private String resolveModelNameForUsage(ChatCompletionRequest request, ChatCompletionResult result) {
-        if (result != null && StrUtil.isNotBlank(result.getModel())) {
-            return result.getModel().trim();
-        }
+        String requestModel = null;
         if (request != null && StrUtil.isNotBlank(request.getModel())) {
-            return request.getModel().trim();
+            requestModel = request.getModel().trim();
         }
-        return null;
+        return requestModel;
     }
 
     private void outputChunk(PrintWriter out, String msg) {

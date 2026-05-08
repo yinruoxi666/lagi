@@ -12,19 +12,24 @@ public class GetModelConfigUtil {
     private static final String URL = "https://saas.landingbj.com/saas/api/apikey/listModelInfo";
     private static final Gson GSON = new Gson();
 
+    private static final Set<String> OPEN_ROUTER_PROVIDERS = new HashSet<>(Arrays.asList("google", "openai", "anthropic"));
+
     public static void main(String[] args) {
         try {
             String response = OkHttpUtil.get(URL);
             List<LagiModelInfo> modelInfos = parseResponse(response);
             printGroupedByProvider(modelInfos);
             printLandingSummary(modelInfos);
+            printLandingOpenRouterSummary(modelInfos);
+            printOpenRouterSummary(modelInfos);
         } catch (IOException e) {
             System.err.println("Request failed: " + e.getMessage());
         }
     }
 
     private static List<LagiModelInfo> parseResponse(String response) {
-        Type listType = new TypeToken<List<LagiModelInfo>>() {}.getType();
+        Type listType = new TypeToken<List<LagiModelInfo>>() {
+        }.getType();
         List<LagiModelInfo> modelInfos = GSON.fromJson(response, listType);
         return modelInfos == null ? new ArrayList<LagiModelInfo>() : modelInfos;
     }
@@ -54,7 +59,8 @@ public class GetModelConfigUtil {
     private static void printLandingSummary(List<LagiModelInfo> modelInfos) {
         List<String> allModels = new ArrayList<String>();
         for (LagiModelInfo modelInfo : modelInfos) {
-            if (modelInfo == null || modelInfo.getProvider() == null || modelInfo.getModelName() == null) {
+            if (modelInfo == null || modelInfo.getProvider() == null || modelInfo.getModelName() == null
+                    || OPEN_ROUTER_PROVIDERS.contains(modelInfo.getProvider())) {
                 continue;
             }
             allModels.add(modelInfo.getProvider() + "/" + modelInfo.getModelName());
@@ -63,6 +69,39 @@ public class GetModelConfigUtil {
         System.out.println("type: Landing");
         System.out.println("enable: true");
         System.out.println("model: " + joinWithComma(allModels));
+        System.out.println();
+    }
+
+    private static void printLandingOpenRouterSummary(List<LagiModelInfo> modelInfos) {
+        List<String> allModels = new ArrayList<String>();
+        for (LagiModelInfo modelInfo : modelInfos) {
+            if (modelInfo == null || modelInfo.getProvider() == null || modelInfo.getModelName() == null
+                    || !OPEN_ROUTER_PROVIDERS.contains(modelInfo.getProvider())) {
+                continue;
+            }
+            allModels.add(modelInfo.getProvider() + "/" + modelInfo.getModelName());
+        }
+
+        System.out.println("type: Landing");
+        System.out.println("enable: true");
+        System.out.println("model: " + joinWithComma(allModels));
+        System.out.println();
+    }
+
+    private static void printOpenRouterSummary(List<LagiModelInfo> modelInfos) {
+        List<String> allModels = new ArrayList<String>();
+        for (LagiModelInfo modelInfo : modelInfos) {
+            if (modelInfo == null || modelInfo.getProvider() == null || modelInfo.getModelName() == null
+                    || !OPEN_ROUTER_PROVIDERS.contains(modelInfo.getProvider())) {
+                continue;
+            }
+            allModels.add(modelInfo.getModelName());
+        }
+
+        System.out.println("type: openrouter");
+        System.out.println("enable: true");
+        System.out.println("model: " + joinWithComma(allModels));
+        System.out.println();
     }
 
     private static String joinWithComma(List<String> values) {
