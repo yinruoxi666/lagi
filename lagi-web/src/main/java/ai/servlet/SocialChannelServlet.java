@@ -1,6 +1,8 @@
 package ai.servlet;
 
 import ai.config.ConfigUtil;
+import ai.config.ContextLoader;
+import ai.config.pojo.GeneralConfig;
 import ai.migrate.service.CascadeConfigService;
 import ai.sevice.SocialChannelService;
 import ai.utils.OkHttpUtil;
@@ -168,6 +170,22 @@ public class SocialChannelServlet extends BaseServlet {
         return params;
     }
 
+    private boolean isMenuLoginRequired() {
+        try {
+            if (ContextLoader.configuration == null) {
+                return false;
+            }
+            GeneralConfig general = ContextLoader.configuration.getGeneral();
+            if (general == null) {
+                return false;
+            }
+            Boolean flag = general.getMenuLoginRequired();
+            return flag != null && flag;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private void runningMode(HttpServletResponse resp) throws IOException {
         resp.setContentType("application/json;charset=utf-8");
         Map<String, Object> result = new HashMap<String, Object>();
@@ -176,6 +194,7 @@ public class SocialChannelServlet extends BaseServlet {
             result.put("status", "success");
             result.put("runningMode", runningMode);
             result.put("isMateMode", "mate".equals(runningMode));
+            result.put("menuLoginRequired", isMenuLoginRequired());
         } catch (Exception e) {
             log.error("runningMode: {}", e.getMessage(), e);
             result.put("status", "failed");

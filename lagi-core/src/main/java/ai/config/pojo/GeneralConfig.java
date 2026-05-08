@@ -10,4 +10,7 @@ public class GeneralConfig {
 
     @JsonProperty("cascade_api_address")
     private String cascadeApiAddress;
+
+    @JsonProperty("menu_login_required")
+    private Boolean menuLoginRequired = false;
 }
