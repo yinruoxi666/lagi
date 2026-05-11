@@ -265,6 +265,11 @@ public class SocialChannelService {
     }
 
     public List<SocialChannelMessage> listMessages(String userId, long channelId, int limit, Long beforeMessageId) throws IOException {
+        return listMessages(userId, channelId, limit, beforeMessageId, null, null);
+    }
+
+    public List<SocialChannelMessage> listMessages(String userId, long channelId, int limit, Long beforeMessageId,
+                                                   String startTime, String endTime) throws IOException {
         if (isBlank(userId)) {
             throw new IOException("userId is required");
         }
@@ -272,7 +277,7 @@ public class SocialChannelService {
             if (!socialChannelDao.isSubscribed(userId, channelId)) {
                 throw new IOException("not subscribed to this channel");
             }
-            return socialChannelDao.listMessages(channelId, limit, beforeMessageId);
+            return socialChannelDao.listMessages(channelId, limit, beforeMessageId, startTime, endTime);
         } catch (IOException e) {
             throw e;
         } catch (Exception e) {

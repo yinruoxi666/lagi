@@ -98,6 +98,8 @@ Request parameters (query string):
 - `channelId`: The channel ID parsed in the previous step.
 - `limit`: Defaults to `20` when the user does not specify it.
 - `beforeId`: Optional. Use only when the user asks for earlier messages, the previous page, or similar pagination.
+- `startTime`: Optional. Inclusive lower bound of message `created_at`, format `YYYY-MM-DD HH:MM:SS`. Use when the user asks for messages within a time range (e.g. "today", "yesterday afternoon", "since 9am", "from 2026-05-01").
+- `endTime`: Optional. Inclusive upper bound of message `created_at`, format `YYYY-MM-DD HH:MM:SS`. Use together with or instead of `startTime` to bound the upper end (e.g. "before noon", "until 2026-05-10 23:59:59").
 
 Use the `exec` tool to call this skill's bundled Python script `scripts/list_messages.py` (standard library only, no `pip install` required). The script path is relative to this `SKILL.md` directory. Pick the example that matches the current OS.
 
@@ -110,6 +112,7 @@ python "{{SKILL_DIR}}/scripts/list_messages.py" \
   --limit 20 \
   --base-url "{{BASE_URL}}"
 # For pagination, append: --before-id <BEFORE_ID>
+# For a time range, append: --start-time "2026-05-11 00:00:00" --end-time "2026-05-11 23:59:59"
 ```
 
 Windows (cmd.exe, single line, use `^` for line continuation if you need to wrap):
@@ -117,6 +120,7 @@ Windows (cmd.exe, single line, use `^` for line continuation if you need to wrap
 ```bat
 python "{{SKILL_DIR}}\scripts\list_messages.py" --user-id "{{USER_ID}}" --channel-id <CHANNEL_ID> --limit 20 --base-url "{{BASE_URL}}"
 REM For pagination, append:  --before-id <BEFORE_ID>
+REM For a time range, append:  --start-time "2026-05-11 00:00:00" --end-time "2026-05-11 23:59:59"
 ```
 
 Windows (PowerShell, use backtick `` ` `` for line continuation):
@@ -128,6 +132,7 @@ python "{{SKILL_DIR}}\scripts\list_messages.py" `
   --limit 20 `
   --base-url "{{BASE_URL}}"
 # For pagination, append: --before-id <BEFORE_ID>
+# For a time range, append: --start-time "2026-05-11 00:00:00" --end-time "2026-05-11 23:59:59"
 ```
 
 Successful response example:

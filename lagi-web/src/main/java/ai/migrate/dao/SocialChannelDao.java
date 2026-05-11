@@ -460,22 +460,51 @@ public class SocialChannelDao {
     // ---------- Messages ----------
 
     public List<SocialChannelMessage> listMessages(long channelId, int limit, Long beforeMessageId) throws SQLException {
+        return listMessages(channelId, limit, beforeMessageId, null, null);
+    }
+
+    /**
+     * Lists messages of a channel, optionally filtered by id cursor and a
+     * created_at time range. {@code startTime} and {@code endTime} are inclusive
+     * bounds in the same format used by the DB (e.g. "yyyy-MM-dd HH:mm:ss");
+     * either can be null to leave that side unbounded.
+     */
+    public List<SocialChannelMessage> listMessages(long channelId, int limit, Long beforeMessageId,
+                                                   String startTime, String endTime) throws SQLException {
         ensureTables();
         int lim = limit <= 0 ? 50 : Math.min(limit, 200);
-        String sql = "SELECT m.id,m.channel_id,c.name AS channel_name,m.user_id,u.username AS user_name,m.content,m.created_at " +
-                "FROM social_channel_messages m " +
-                "INNER JOIN social_channels c ON c.id = m.channel_id " +
-                "LEFT JOIN social_users u ON u.user_id = m.user_id " +
-                "WHERE m.channel_id = ? " +
-                (beforeMessageId != null && beforeMessageId > 0 ? "AND m.id < ? " : "") +
-                "ORDER BY m.id DESC LIMIT ?";
+        boolean hasBefore = beforeMessageId != null && beforeMessageId > 0;
+        boolean hasStart = startTime != null && !startTime.trim().isEmpty();
+        boolean hasEnd = endTime != null && !endTime.trim().isEmpty();
+        StringBuilder sql = new StringBuilder()
+                .append("SELECT m.id,m.channel_id,c.name AS channel_name,m.user_id,u.username AS user_name,m.content,m.created_at ")
+                .append("FROM social_channel_messages m ")
+                .append("INNER JOIN social_channels c ON c.id = m.channel_id ")
+                .append("LEFT JOIN social_users u ON u.user_id = m.user_id ")
+                .append("WHERE m.channel_id = ? ");
+        if (hasBefore) {
+            sql.append("AND m.id < ? ");
+        }
+        if (hasStart) {
+            sql.append("AND m.created_at >= ? ");
+        }
+        if (hasEnd) {
+            sql.append("AND m.created_at <= ? ");
+        }
+        sql.append("ORDER BY m.id DESC LIMIT ?");
         List<SocialChannelMessage> list = new ArrayList<SocialChannelMessage>();
         try (Connection conn = HikariDS.getConnection("saas");
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+             PreparedStatement ps = conn.prepareStatement(sql.toString())) {
             int idx = 1;
             ps.setLong(idx++, channelId);
-            if (beforeMessageId != null && beforeMessageId > 0) {
+            if (hasBefore) {
                 ps.setLong(idx++, beforeMessageId);
+            }
+            if (hasStart) {
+                ps.setString(idx++, startTime.trim());
+            }
+            if (hasEnd) {
+                ps.setString(idx++, endTime.trim());
             }
             ps.setInt(idx, lim);
             try (ResultSet rs = ps.executeQuery()) {

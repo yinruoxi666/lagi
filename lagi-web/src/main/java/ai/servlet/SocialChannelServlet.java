@@ -426,8 +426,11 @@ public class SocialChannelServlet extends BaseServlet {
             if (beforeStr != null && !beforeStr.trim().isEmpty()) {
                 beforeId = Long.parseLong(beforeStr.trim());
             }
+            // Optional inclusive time range filter (format: yyyy-MM-dd HH:mm:ss).
+            String startTime = req.getParameter("startTime");
+            String endTime = req.getParameter("endTime");
             result.put("status", "success");
-            result.put("data", socialChannelService.listMessages(userId, channelId, limit, beforeId));
+            result.put("data", socialChannelService.listMessages(userId, channelId, limit, beforeId, startTime, endTime));
         } catch (Exception e) {
             log.error("listMessages: {}", e.getMessage(), e);
             result.put("status", "failed");
