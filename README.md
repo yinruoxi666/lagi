@@ -202,9 +202,9 @@ Use built-in cache acceleration to shorten repeat response latency and improve r
 
 Route, rank, fail over, and orchestrate multiple models centrally through routers such as `best(...)` and `pass(...)` instead of hard-coding provider logic in each app.
 
-### 4. Security Guardrails
+### 4. Security & Safety
 
-Apply sensitive-word filtering, priority keywords, stopping keywords, continuation rules, and related runtime controls to keep output safer and conversations governable.
+Centralize guardrails, policy checks, data handling, access control, provider governance, and deployment responsibilities through the [Security & Safety document](docs/security_en.md).
 
 ### 5. Graph
 
