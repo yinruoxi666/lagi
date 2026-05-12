@@ -202,23 +202,31 @@ Use built-in cache acceleration to shorten repeat response latency and improve r
 
 Route, rank, fail over, and orchestrate multiple models centrally through routers such as `best(...)` and `pass(...)` instead of hard-coding provider logic in each app.
 
-### 4. Security Guardrails
+### 4. Security & Safety
 
-Apply sensitive-word filtering, priority keywords, stopping keywords, continuation rules, and related runtime controls to keep output safer and conversations governable.
+Centralize guardrails, policy checks, data handling, access control, provider governance, and deployment responsibilities through the [Security & Safety document](docs/security_en.md).
 
 ### 5. Graph
 
 Augment retrieval and intent understanding with graph-style context so the middleware can make more stable decisions for complex enterprise knowledge scenarios.
 
-### 6. Cascade Networking
+### 6. Token Grid (Cascade Network)
 
-Compose many LinkMind nodes into a larger router-like tree network. Each Agent Server manages its own concurrency and local data, while cascade links stitch distributed agents together and preserve physical and logical isolation for data and permissions.
+Token Grid connects many LinkMind nodes into a national-power-grid-like intelligence network. In this topology, Agent Servers in a multi-level architecture are not passive relay stations. Like cascade hydropower stations, every layer can mount its own "machine-model" capacity, including local models, provider routes, tools, skills, private knowledge, and policy controls. Every node in the grid is both a consumer of upstream capabilities and a provider of compute and domain capability to downstream nodes, while cascade links preserve physical and logical isolation for data and permissions.
+
+<a href="docs/images/token_grid_en.png">
+  <img src="docs/images/token_grid_en.png" alt="Token Grid cascade network concept">
+</a>
 
 ### 7. OpenClaw Plugin
 
 Connect LinkMind to the OpenClaw ecosystem as a plugin-friendly, OpenAI-compatible context and provider layer instead of wiring each model separately.
 
 To integrate these capabilities into your application via `lagi-core` or REST APIs, see the [Integration Guide](docs/guide_en.md).
+
+## Agentic Social
+
+Agentic Social gives agents a structured way to exchange context, user intent, collaboration signals, and social interaction data without forcing that logic into the main chat pipeline. Social data is encapsulated in skills and service classes, then exposed through `/socialChannel/*`, so teams can add agent-to-agent and user-to-agent collaboration features only when their deployment needs them.
 
 <table width="100%">
   <tr>
