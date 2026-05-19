@@ -1,153 +1,189 @@
-### **Extension Development Documentation**
+# Extension Guide
 
-You can refer to this documentation to freely extend LinkMind to suit your business needs.
+This guide explains how to extend model adapters, multimodal capabilities, vector stores, runtime integrations, and secondary-development interfaces. The safest path is to reuse an existing compatible adapter first, and only write Java code when you truly need a new protocol, modality, storage backend, or business-side extension point.
 
-### **Model Extension**
+## 1. Decide What Kind of Extension You Need
 
-If you wish to extend LinkMind to support other large models, you can refer to the following sections.
+Use configuration only when:
 
-#### **1. Add New Configuration**
+- your provider is OpenAI-compatible
+- your provider is Qwen-compatible
+- you only need to add a new model ID, endpoint, or credential set
 
-Add new configurations under the `models` and `functions` sections in the `lagi.yml` configuration file. Refer to the example below:
+Write a new adapter when:
+
+- the request or response shape is custom
+- the provider needs special signing logic
+- you are adding a new modality or storage backend
+
+## 2. Reuse Existing Compatibility Adapters First
+
+The current codebase already contains several general-purpose adapters:
+
+- `ai.llm.adapter.impl.OpenAIStandardAdapter`
+- `ai.llm.adapter.impl.OpenRouterAdapter`
+- `ai.llm.adapter.impl.QwenCompatibleAdapter`
+
+In many integrations, you only need to add a model row and then reference it from `functions.chat.backends`.
 
 ```yaml
 models:
-    - name: your-model-name
-      type: your-model-type
-      enable: true  # This flag determines whether the backend service is enabled. "true" means enabled.
-      drivers:  # Use "drivers" to extend the model when multiple models are required.
-        - model: model-version
-          driver: ai.llm.adapter.impl.Yonr-Adapter  # Corresponding implementation class.
-          oss: oos-name  # Corresponding OSS configuration name.
-      api_key: your-api-key 
-      secret_key: your-secret-key 
-      access_key_secret: your-access-key-secret
-      api_address: your-api-address  # Specify the API address for privatized deployed models.
+  - name: custom-openai
+    type: OpenAI-Compatible
+    enable: true
+    model: my-model
+    driver: ai.llm.adapter.impl.OpenAIStandardAdapter
+    api_address: https://your-endpoint.example.com/chat/completions
+    api_key: your-api-key
 
 functions:
-   chat:
-    - backend: your-model-name
-      model: model-version
-      enable: true
-      stream: true
-      priority: 0
+  chat:
+    route: pass(%)
+    backends:
+      - backend: custom-openai
+        model: my-model
+        enable: true
+        stream: true
+        protocol: completion
+        priority: 100
 ```
 
-#### **2. Interface Adaptation**
+## 3. Extend Model And Multimodal Adapters
 
-##### **Extend the Inference Interface for Large Language Models**
+## 3.1 Add Configuration First
 
-Create a new `YonrAdapter` class under the `ai>llm>adapter>impl` directory in the `lagi-core` module. Extend `ModelService` and implement the `ILlmAdapter` interface.
+The current config shape still centers on `models` and `functions`. A minimal custom provider example looks like this:
 
-Path reference: \lagi\lagi-core\src\main\java\ai\audio\adapter\impl
+```yaml
+models:
+  - name: your-model-name
+    type: your-model-type
+    enable: true
+    model: model-version
+    driver: ai.llm.adapter.impl.YourAdapter
+    api_key: your-api-key
+    secret_key: your-secret-key
+    api_address: your-api-address
+
+functions:
+  chat:
+    route: pass(%)
+    backends:
+      - backend: your-model-name
+        model: model-version
+        enable: true
+        stream: true
+        priority: 100
+```
+
+Use the multi-driver shape when one provider exposes multiple modalities under one logical backend:
+
+```yaml
+models:
+  - name: landing
+    type: Landing
+    enable: true
+    drivers:
+      - model: turing,qa,tree,proxy
+        driver: ai.llm.adapter.impl.LandingAdapter
+      - model: image
+        driver: ai.image.adapter.impl.LandingImageAdapter
+        oss: landing
+      - model: landing-tts,landing-asr
+        driver: ai.audio.adapter.impl.LandingAudioAdapter
+      - model: video
+        driver: ai.video.adapter.impl.LandingVideoAdapter
+    api_key: your-api-key
+```
+
+## 3.2 Extend Large Language Model Adapters
+
+LLM adapters implement `ai.llm.adapter.ILlmAdapter`:
 
 ```java
-@LLM(modelName = { "Yonr-version"})
-public class YonrAdapter extends ModelService implements ILlmAdapter {
-    /**
-     * API Call
-     * @param chatCompletionRequest
-     * @return
-     */
-    @Override
-    public ChatCompletionResult completions(ChatCompletionRequest chatCompletionRequest) {
-        return null;
-    }
-
-    /**
-     * Streaming Call
-     * @param chatCompletionRequest
-     * @return
-     */
-    @Override
-    public ChatCompletionResult streamCompletions(ChatCompletionRequest chatCompletionRequest) {
-        return null;
-    }
+public interface ILlmAdapter {
+    ChatCompletionResult completions(ChatCompletionRequest request);
+    Observable<ChatCompletionResult> streamCompletions(ChatCompletionRequest request);
 }
 ```
 
-Example implementation:
+Minimal shape:
 
 ```java
-@LLM(modelNames = {"your_model1,your_model2"})
-public class DoubaoAdapter extends ModelService implements ILlmAdapter {
+@LLM(modelNames = {"your-model"})
+public class YourAdapter extends ModelService implements ILlmAdapter {
     @Override
     public ChatCompletionResult completions(ChatCompletionRequest request) {
-        ArkService service = ArkService.builder().apiKey(apiKey).baseUrl("https://ark.cn-beijing.volces.com/api/v3/").build();
-        List<ChatMessage> messages = new ArrayList<>();
-        ChatMessage systemMessage = ChatMessage.builder().role(ChatMessageRole.SYSTEM).content("You are Doubao AI assistant").build();
-        ChatMessage userMessage = ChatMessage.builder().role(ChatMessageRole.USER).content(request.getMessages().get(0).getContent()).build();
-        messages.add(systemMessage);
-        messages.add(userMessage);
-
-        com.volcengine.ark.runtime.model.completion.chat.ChatCompletionRequest chatCompletionRequest = com.volcengine.ark.runtime.model.completion.chat.ChatCompletionRequest.builder()
-                .model(getModel())
-                .messages(messages)
-                .build();
-        com.volcengine.ark.runtime.model.completion.chat.ChatCompletionResult chatCompletion = service.createChatCompletion(chatCompletionRequest);
-
-        ChatCompletionResult result = new ChatCompletionResult();
-        BeanUtil.copyProperties(chatCompletion, result);
-        return result;
+        return null;
     }
 
     @Override
     public Observable<ChatCompletionResult> streamCompletions(ChatCompletionRequest request) {
-        ArkService service = ArkService.builder().apiKey(apiKey).baseUrl("https://ark.cn-beijing.volces.com/api/v3/").build();
-        List<ChatMessage> messages = new ArrayList<>();
-        ChatMessage systemMessage = ChatMessage.builder().role(ChatMessageRole.SYSTEM).content("You are Doubao AI assistant").build();
-        ChatMessage userMessage = ChatMessage.builder().role(ChatMessageRole.USER).content(request.getMessages().get(0).getContent()).build();
-        messages.add(systemMessage);
-        messages.add(userMessage);
-
-        com.volcengine.ark.runtime.model.completion.chat.ChatCompletionRequest streamChatCompletionRequest = com.volcengine.ark.runtime.model.completion.chat.ChatCompletionRequest.builder()
-                .model(getModel())
-                .messages(messages)
-                .build();
-
-        Flowable<ChatCompletionChunk> flowable = service.streamChatCompletion(streamChatCompletionRequest);
-        Observable<ChatCompletionResult> iterable = Observable.create(observableEmitter -> {
-            try {
-                flowable.blockingForEach(chatCompletionChunk -> {
-                    System.out.println(JSONUtil.toJsonStr(chatCompletionChunk));
-                    if (chatCompletionChunk.getChoices().size() > 0) {
-                        observableEmitter.onNext(convertResponse(chatCompletionChunk));
-                        if (chatCompletionChunk.getChoices().get(0).getMessage().getContent().equals("")) {
-                            service.shutdownExecutor();
-                        }
-                    }
-                });
-            } catch (Exception e) {
-                System.out.println(e);
-            }
-            observableEmitter.onComplete();
-        });
-        return iterable;
-    }
-}
-```
-
-### **Extend Speech-to-Text Interface**
-
-Create a new `YonrAdapter` class under the `ai>audio>adapter>impl` directory in the `lagi-core` module. Extend `ModelService` and implement the `IAudioAdapter` interface.
-
-```java
-@ASR(company = "your-company-name", modelNames = "Yonr-modelNames")
-public class YonrAdapter extends ModelService implements IAudioAdapter {
-    @Override
-    public String asr(String audioFilePath) {
         return null;
     }
 }
 ```
 
-Example implementation:
+Existing style example:
+
+```java
+@LLM(modelNames = {"your_model1", "your_model2"})
+public class DoubaoAdapter extends ModelService implements ILlmAdapter {
+    @Override
+    public ChatCompletionResult completions(ChatCompletionRequest request) {
+        ArkService service = ArkService.builder()
+                .apiKey(apiKey)
+                .baseUrl("https://ark.cn-beijing.volces.com/api/v3/")
+                .build();
+        // Build provider request, invoke remote API, then convert back.
+        return new ChatCompletionResult();
+    }
+
+    @Override
+    public Observable<ChatCompletionResult> streamCompletions(ChatCompletionRequest request) {
+        return Observable.create(emitter -> {
+            // Stream provider chunks and convert them into LinkMind chunks.
+            emitter.onComplete();
+        });
+    }
+}
+```
+
+## 3.3 Extend Speech-to-Text And Text-to-Speech
+
+Audio adapters implement `ai.audio.adapter.IAudioAdapter`:
+
+```java
+public interface IAudioAdapter {
+    AsrResult asr(File audio, AudioRequestParam param);
+    TTSResult tts(TTSRequestParam param);
+}
+```
+
+Speech-to-text skeleton:
+
+```java
+@ASR(company = "your-company-name", modelNames = "your-asr-model")
+public class YourAudioAdapter extends ModelService implements IAudioAdapter {
+    @Override
+    public AsrResult asr(File audio, AudioRequestParam param) {
+        return null;
+    }
+
+    @Override
+    public TTSResult tts(TTSRequestParam param) {
+        return null;
+    }
+}
+```
+
+ASR example fragment:
 
 ```java
 @ASR(company = "alibaba", modelNames = "asr")
-public class YonrAdapter extends ModelService implements IAudioAdapter {
+public class YourAudioAdapter extends ModelService implements IAudioAdapter {
     @Override
-    public String asr(String audioFilePath) {
+    public AsrResult asr(File audio, AudioRequestParam param) {
         AlibabaAsrService asrService = new AlibabaAsrService(
                 getAppKey(),
                 getAccessKeyId(),
@@ -155,74 +191,52 @@ public class YonrAdapter extends ModelService implements IAudioAdapter {
         );
         return gson.fromJson(asrService.asr(audio), AsrResult.class);
     }
-}
-```
 
-### **Extend Text-to-Speech Interface**
-
-Create a new `YonrAdapter` class under the `ai>audio>adapter>impl` directory in the `lagi-core` module. Extend `ModelService` and implement the `IAudioAdapter` interface.
-
-```java
-@TTS(company = "your-company-name", modelNames = "Yonr-modelNames")
-public class YonrAdapter extends ModelService implements IAudioAdapter {
     @Override
-    public String tts(String audioFilePath) {
+    public TTSResult tts(TTSRequestParam param) {
         return null;
     }
 }
 ```
 
-Example implementation:
+TTS example fragment:
 
 ```java
 @TTS(company = "alibaba", modelNames = "tts")
-public class YonrAdapter extends ModelService implements IAudioAdapter {
+public class YourAudioAdapter extends ModelService implements IAudioAdapter {
     @Override
-    public String tts(String audioFilePath) {
+    public AsrResult asr(File audio, AudioRequestParam param) {
+        return null;
+    }
+
+    @Override
+    public TTSResult tts(TTSRequestParam param) {
         AlibabaTtsService ttsService = new AlibabaTtsService(
                 getAppKey(),
                 getAccessKeyId(),
                 getAccessKeySecret()
         );
-        param.setSample_rate(16000);
-        param.setFormat("wav");
         Request request = ttsService.getRequest(param);
-        TTSResult result = new TTSResult();
-        try {
-            OkHttpClient client = new OkHttpClient();
-            okhttp3.Response response = client.newCall(request).execute();
-            String contentType = response.header("Content-Type");
-            if ("audio/mpeg".equals(contentType)) {
-                String tempDir = System.getProperty("java.io.tmpdir");
-                String tempFile = tempDir + FileUploadUtil.generateRandomFileName("wav");
-                File audio = new File(tempFile);
-                FileOutputStream fout = new FileOutputStream(audio);
-                fout.write(response.body().bytes());
-                fout.close();
-                String url = universalOSS.upload("tts/" + audio.getName(), audio);
-                audio.delete();
-                result.setStatus(LagiGlobal.TTS_STATUS_SUCCESS);
-                result.setResult(url);
-            } else {
-                String errorMessage = response.body().string();
-                result = gson.fromJson(errorMessage, TTSResult.class);
-            }
-            response.close();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-        return result;
+        return new TTSResult();
     }
 }
 ```
 
-### **Extend Text-to-Image Interface**
+## 3.4 Extend Text-to-Image
 
-Create a new `YonrAdapter` class under the `ai>image>adapter>impl` directory in the `lagi-core` module. Extend `ModelService` and implement the `IImageGenerationAdapter` interface.
+Image generation adapters implement `ai.image.adapter.IImageGenerationAdapter`:
 
 ```java
-@ImgGen(modelNames = "Yonr-modelNames")
-public class SparkImageAdapter extends ModelService implements IImageGenerationAdapter {
+public interface IImageGenerationAdapter {
+    ImageGenerationResult generations(ImageGenerationRequest request);
+}
+```
+
+Skeleton:
+
+```java
+@ImgGen(modelNames = "your-image-model")
+public class YourImageAdapter extends ModelService implements IImageGenerationAdapter {
     @Override
     public ImageGenerationResult generations(ImageGenerationRequest request) {
         return null;
@@ -230,118 +244,84 @@ public class SparkImageAdapter extends ModelService implements IImageGenerationA
 }
 ```
 
-Example implementation:
+Example fragment:
 
 ```java
 @ImgGen(modelNames = "tti")
 public class SparkImageAdapter extends ModelService implements IImageGenerationAdapter {
     @Override
     public ImageGenerationResult generations(ImageGenerationRequest request) {
-        try {
-            String authUrl = getAuthUrl(apiUrl, apiKey, secretKey);
-            SparkGenImgRequest sparkGenImgRequest = convert2SparkGenImageRequest(request);
-            String post = doPostJson(authUrl, null, JSONUtil.toJsonStr(sparkGenImgRequest));
-            SparkGenImgResponse bean = JSONUtil.toBean(post, SparkGenImgResponse.class);
-            return convert2ImageGenerationResult(bean);
-        } catch (Exception e) {
-            log.error(e.getMessage());
-        }
-        return null;
+        String authUrl = getAuthUrl(apiUrl, apiKey, secretKey);
+        SparkGenImgRequest sparkRequest = convert2SparkGenImageRequest(request);
+        String post = doPostJson(authUrl, null, JSONUtil.toJsonStr(sparkRequest));
+        SparkGenImgResponse bean = JSONUtil.toBean(post, SparkGenImgResponse.class);
+        return convert2ImageGenerationResult(bean);
     }
 }
 ```
 
-### **Extend Image-to-Text Interface**
+## 3.5 Extend Image-to-Text
 
-Create a new `YonrAdapter` class under the `ai>image>adapter>impl` directory in the `lagi-core` module. Extend `ModelService` and implement the `IImage2TextAdapter` interface.
+Image understanding adapters implement `ai.image.adapter.IImage2TextAdapter`:
 
 ```java
-@Img2Text(modelNames = "Yonr-modelNames")
-public class YonrAdapter extends ModelService implements IImage2TextAdapter {
-    @Override
-    public ImageToTextResponse toText(FileRequest param) {
-        return null;
-    }
+public interface IImage2TextAdapter {
+    ImageToTextResponse toText(FileRequest param);
 }
 ```
 
-Example implementation:
+Example fragment:
 
 ```java
 @Img2Text(modelNames = "Fuyu-8B")
-public class YonrAdapter extends ModelService implements IImage2TextAdapter {
+public class YourVisionAdapter extends ModelService implements IImage2TextAdapter {
     @Override
     public ImageToTextResponse toText(FileRequest param) {
-        try {
-            Image2TextRequest image2TextRequest = convertImage2TextRequest(param);
-            Image2TextResponse image2TextResponse = buildQianfan().image2Text(image2TextRequest);
-            return ImageToTextResponse.success(image2TextResponse.getResult());
-        } catch (Exception e) {
-            logger.error("error", e);
-        }
-        return ImageToTextResponse.error();
+        Image2TextRequest request = convertImage2TextRequest(param);
+        Image2TextResponse response = buildQianfan().image2Text(request);
+        return ImageToTextResponse.success(response.getResult());
     }
 }
 ```
 
-### **Extend Image Enhancement Interface**
+## 3.6 Extend Image Enhancement
 
-Create a new `YonrAdapter` class under the `ai>image>adapter>impl` directory in the `lagi-core` module. Extend `ModelService` and implement the `ImageEnhanceAdapter` interface.
+Image enhancement adapters implement `ai.image.adapter.ImageEnhanceAdapter`:
 
 ```java
-@ImgEnhance(modelNames = "Yonr-modelNames")
-public class YonrAdapter extends ModelService implements ImageEnhanceAdapter {
-    @Override
-    public ImageEnhanceResult enhance(ImageEnhanceRequest imageEnhanceRequest) {
-        return null;
-    }
+public interface ImageEnhanceAdapter {
+    ImageEnhanceResult enhance(ImageEnhanceRequest imageEnhanceRequest);
 }
 ```
 
-Example implementation:
+Example fragment:
 
 ```java
 @ImgEnhance(modelNames = "enhance")
-public class YonrAdapter extends ModelService implements ImageEnhanceAdapter {
+public class YourEnhanceAdapter extends ModelService implements ImageEnhanceAdapter {
     @Override
-    public ImageEnhanceResult enhance(ImageEnhanceRequest imageEnhanceRequest) {
-        String image = null;
+    public ImageEnhanceResult enhance(ImageEnhanceRequest request) {
         String url = "https://aip.baidubce.com/rest/2.0/image-process/v1/image_definition_enhance";
-        try {
-            byte[] imgData = ImageUtil.getFileStream(imageEnhanceRequest.getImageUrl());
-            String imgStr = Base64Util.encode(imgData);
-            String imgParam = URLEncoder.encode(imgStr, "UTF-8");
-            String param = "image=" + imgParam;
-            String accessToken = getAccessToken();
-            String result = BaiduHttpUtil.post(url, accessToken, param);
-            image = JSONUtil.parse(result).getByPath("image", String.class);
-        } catch (Exception e) {
-            log.error("error", e);
-        }
-        return ImageEnhanceResult.builder().type("base64").data(image).build();
+        return ImageEnhanceResult.builder().type("base64").data("...").build();
     }
 }
 ```
 
-### **Extend Text-to-Video Interface**
+## 3.7 Extend Text-to-Video
 
-Create a new `YonrAdapter` class under the `ai>video>adapter>impl` directory in the `lagi-core` module. Extend `ModelService` and implement the `Text2VideoAdapter` interface.
+Text-to-video adapters implement `ai.video.adapter.Text2VideoAdapter`:
 
 ```java
-@Text2Video(modelNames = "Yonr-modelNames")
-public class YonrAdapter extends ModelService implements Text2VideoAdapter {
-    @Override
-    public VideoJobResponse toVideo(ImageGenerationRequest request) {
-        return null;
-    }
+public interface Text2VideoAdapter {
+    VideoJobResponse toVideo(ImageGenerationRequest request);
 }
 ```
 
-Example implementation:
+Example fragment:
 
 ```java
 @Text2Video(modelNames = "video")
-public class YonrAdapter extends ModelService implements Text2VideoAdapter {
+public class YourVideoAdapter extends ModelService implements Text2VideoAdapter {
     @Override
     public VideoJobResponse toVideo(ImageGenerationRequest request) {
         ImageGenerationResult generations = generations(request);
@@ -354,134 +334,99 @@ public class YonrAdapter extends ModelService implements Text2VideoAdapter {
 }
 ```
 
-### **Extend Image-to-Video Interface**
+## 3.8 Extend Image-to-Video
 
-Create a new `YonrAdapter` class under the `ai>video>adapter>impl` directory in the `lagi-core` module. Extend `ModelService` and implement the `Image2VideoAdapter` interface.
+Image-to-video adapters implement `ai.video.adapter.Image2VideoAdapter`:
 
 ```java
-@Img2Video(modelNames = "Yonr-modelNames")
-public class YonrAdapter extends ModelService implements Image2VideoAdapter {
-    @Override
-    public VideoJobResponse image2Video(VideoGeneratorRequest videoGeneratorRequest) {
-        return null;
-    }
+public interface Image2VideoAdapter {
+    VideoJobResponse image2Video(VideoGeneratorRequest videoGeneratorRequest);
 }
 ```
 
-Example implementation:
+Example fragment:
 
 ```java
 @Img2Video(modelNames = "video")
-public class YonrAdapter extends ModelService implements Image2VideoAdapter {
+public class YourVideoAdapter extends ModelService implements Image2VideoAdapter {
     @Override
-    public VideoJobResponse image2Video(VideoGeneratorRequest videoGeneratorRequest) {
-        Client client = createClient();
-        GenerateVideoRequest generateVideoRequest = convert2GenerateVideoRequest(videoGeneratorRequest);
-        try {
-            GenerateVideoResponse generateVideoResponse = client.generateVideo(generateVideoRequest);
-            String requestId = generateVideoResponse.getBody().getRequestId();
-            if (requestId != null) {
-                return wait2Result(requestId);
-            }
-            return VideoJobResponse.builder().jobId(generateVideoResponse.getBody().getRequestId()).build();
-        } catch (TeaException error) {
-            log.error(error.getMessage());
-        } catch (Exception _error) {
-            TeaException error = new TeaException(_error.getMessage(), _error);
-            log.error(error.getMessage());
-        }
-        return null;
+    public VideoJobResponse image2Video(VideoGeneratorRequest request) {
+        GenerateVideoResponse response = client.generateVideo(convert2GenerateVideoRequest(request));
+        return VideoJobResponse.builder().jobId(response.getBody().getRequestId()).build();
     }
 }
 ```
 
-### **Extend Video Tracking Interface**
+## 3.9 Extend Video Tracking
 
-Create a new `YonrAdapter` class under the `ai>video>adapter>impl` directory in the `lagi-core` module. Extend `ModelService` and implement the `Video2trackAdapter` interface.
+Video tracking adapters implement `ai.video.adapter.Video2trackAdapter`:
 
 ```java
-@VideoTrack(modelNames = "Yonr-modelNames")
-public class YonrAdapter extends ModelService implements Video2trackAdapter {
-    @Override
-    public VideoJobResponse track(String videoUrl) {
-        return null;
-    }
+public interface Video2trackAdapter {
+    VideoJobResponse track(String videoUrl);
 }
 ```
 
-Example implementation:
+Example fragment:
 
 ```java
 @VideoTrack(modelNames = "video")
-public class YonrAdapter extends ModelService implements Video2trackAdapter {
+public class YourTrackingAdapter extends ModelService implements Video2trackAdapter {
     @Override
     public VideoJobResponse track(String videoUrl) {
-        File file = new File(videoUrl);
-        String url = universalOSS.upload("mmtracking/" + file.getName(), file);
-        MotInferenceRequest request = new MotInferenceRequest();
-        request.setVideoUrl(url);
-        Object[] params = { gson.toJson(request) };
-        String[] result = call.callWS(AiServiceInfo.WSVdoUrl, "motInference", params);
-        Response response = gson.fromJson(result[0], Response.class);
-        if (response != null) {
-            return VideoJobResponse.builder().data(response.getData()).build();
-        }
-        return null;
+        String url = universalOSS.upload("mmtracking/" + new File(videoUrl).getName(), new File(videoUrl));
+        return VideoJobResponse.builder().data(url).build();
     }
 }
 ```
 
-### **Extend Video Enhancement Interface**
+## 3.10 Extend Video Enhancement
 
-Create a new `YonrAdapter` class under the `ai>video>adapter>impl` directory in the `lagi-core` module. Extend `ModelService` and implement the `Video2EnhanceAdapter` interface.
+Video enhancement adapters implement `ai.video.adapter.Video2EnhanceAdapter`:
 
 ```java
-@VideoEnhance(modelNames = "Yonr-modelNames")
-public class YonrAdapter extends ModelService implements Video2EnhanceAdapter {
-    @Override
-    public VideoJobResponse enhance(VideoEnhanceRequest videoEnhanceRequest) {
-        return null;
-    }
+public interface Video2EnhanceAdapter {
+    VideoJobResponse enhance(VideoEnhanceRequest videoEnhanceRequest);
 }
 ```
 
-Example implementation:
+Example fragment:
 
 ```java
 @VideoEnhance(modelNames = "vision")
-public class YonrAdapter extends ModelService implements Video2EnhanceAdapter {
+public class YourVideoEnhanceAdapter extends ModelService implements Video2EnhanceAdapter {
     @Override
-    public VideoJobResponse enhance(VideoEnhanceRequest videoEnhanceRequest) {
-        Client client = createClient();
-        EnhanceVideoQualityRequest enhanceVideoQualityRequest = convert2EnhanceVideoQualityRequest(videoEnhanceRequest);
-        try {
-            EnhanceVideoQualityResponse enhanceVideoQualityResponse = client.enhanceVideoQuality(enhanceVideoQualityRequest);
-            return wait2Result(enhanceVideoQualityResponse.getBody().getRequestId());
-        } catch (TeaException error) {
-            log.error(error.getMessage());
-        } catch (Exception _error) {
-            TeaException error = new TeaException(_error.getMessage(), _error);
-            log.error(error.getMessage());
-        }
-        return null;
+    public VideoJobResponse enhance(VideoEnhanceRequest request) {
+        EnhanceVideoQualityResponse response = client.enhanceVideoQuality(
+                convert2EnhanceVideoQualityRequest(request)
+        );
+        return wait2Result(response.getBody().getRequestId());
     }
 }
 ```
 
-### **Vector Database Extension**
+## 3.11 Design OOP-Style Secondary-Development Interfaces
 
-If you want to extend LinkMind to support other vector databases, follow the steps below.
+When you extend LinkMind for business-specific workflows, keep the secondary-development boundary object-oriented and responsibility-driven:
 
-#### **1. Add New Configuration**
+- `Out-of-band request data`: keep non-standard business fields in typed request extensions such as `extra_body`, and centralize encode or decode logic in helper classes. Adapters should read typed objects, not parse scattered business strings.
+- `Skill-level interaction state`: keep social, announcement, or workflow state inside skills, scripts, and service helpers. This lets you reuse the current tool and chat pipeline without modifying the base completion path.
+- `Authentication, API-key, and billing`: keep account, credential-pool, and charging logic behind service or servlet boundaries such as `/user/*`, `/apiKey/*`, and `/credit/*`. Replace the backing implementation when integrating with enterprise SSO or billing, but preserve the HTTP contract.
 
-Add new configurations under the `stores` section in the `lagi.yml` configuration file. Refer to the example below:
+This layering keeps the current codebase zero-invasive for existing callers and makes each module opt-in. Teams that only need routing, RAG, or token optimization can leave social or billing extensions disabled without affecting the standard runtime.
+
+## 4. Extend Vector Stores
+
+Use `stores.vector` as the configuration key.
+
+Configuration example:
 
 ```yaml
 stores:
-  vectors:
+  vector:
     - name: chroma
       driver: ai.vector.impl.ChromaVectorStore
-      default_category: chaoyang
+      default_category: default
       similarity_top_k: 10
       similarity_cutoff: 0.5
       parent_depth: 1
@@ -490,48 +435,49 @@ stores:
 
   rag:
     vector: chroma
-    fulltext: elasticsearch
+    term: elastic
     graph: landing
     enable: true
     priority: 10
     default: "Please give prompt more precisely"
 ```
 
-#### **2. Interface Adaptation**
+Custom vector backends implement `ai.vector.VectorStore` or extend `ai.vector.impl.BaseVectorStore`.
 
-Create a new `YonrVectorStore` class under the `ai>vector>impl` directory in the `lagi-core` module. Extend the `BaseVectorStore` class and override the following methods of the `VectorStore` interface:
+The current interface includes:
 
 ```java
 void upsert(List<UpsertRecord> upsertRecords);
-
 void upsert(List<UpsertRecord> upsertRecords, String category);
-
 List<IndexRecord> query(QueryCondition queryCondition);
-
+List<List<IndexRecord>> query(MultiQueryCondition queryCondition);
 List<IndexRecord> query(QueryCondition queryCondition, String category);
-
 List<IndexRecord> fetch(List<String> ids);
-
 List<IndexRecord> fetch(List<String> ids, String category);
-
+List<IndexRecord> fetch(Map<String, String> where);
+List<IndexRecord> fetch(Map<String, String> where, String category);
 void delete(List<String> ids);
-
 void delete(List<String> ids, String category);
-
-void deleteWhere(List<Map<String, String>> where);
-
+void deleteWhere(List<Map<String, String>> whereList);
 void deleteWhere(List<Map<String, String>> whereList, String category);
-
 void deleteCollection(String category);
+List<VectorCollection> listCollections();
+List<IndexRecord> get(GetEmbedding getEmbedding);
+void add(AddEmbedding addEmbedding);
+void update(UpdateEmbedding updateEmbedding);
+void delete(DeleteEmbedding deleteEmbedding);
 ```
 
-##### **Insert or Update Data (`upsert`)**
+Reference implementations already exist in the repository:
+
+- `ai.vector.impl.ChromaVectorStore`
+- `ai.vector.impl.SqliteVectorStore`
+- `lagi-extension/src/main/java/ai/vector/impl/MilvusVectorStore.java`
+- `lagi-extension/src/main/java/ai/vector/impl/PineconeVectorStore.java`
+
+CRUD example fragments:
 
 ```java
-public void upsert(List<UpsertRecord> upsertRecords) {
-    upsert(upsertRecords, this.config.getDefaultCategory());
-}
-
 public void upsert(List<UpsertRecord> upsertRecords, String category) {
     List<String> documents = new ArrayList<>();
     List<Map<String, String>> metadatas = new ArrayList<>();
@@ -543,122 +489,98 @@ public void upsert(List<UpsertRecord> upsertRecords, String category) {
     }
     List<List<Float>> embeddings = this.embeddingFunction.createEmbedding(documents);
     Collection collection = getCollection(category);
-    try {
-        collection.upsert(embeddings, metadatas, documents, ids);
-    } catch (ApiException e) {
-        throw new RuntimeException(e);
-    }
+    collection.upsert(embeddings, metadatas, documents, ids);
 }
 ```
 
-##### **Query Data (`query`)**
-
 ```java
-public List<IndexRecord> query(QueryCondition queryCondition) {
-    return query(queryCondition, this.config.getDefaultCategory());
-}
-
 public List<IndexRecord> query(QueryCondition queryCondition, String category) {
     List<IndexRecord> result = new ArrayList<>();
     Collection collection = getCollection(category);
-    Collection.GetResult gr;
-    if (queryCondition.getText() == null) {
-        try {
-            gr = collection.get(null, queryCondition.getWhere(), null);
-        } catch (ApiException e) {
-            throw new RuntimeException(e);
-        }
-        return getIndexRecords(result, gr);
-    }
-    List<String> queryTexts = Collections.singletonList(queryCondition.getText());
-    Integer n = queryCondition.getN();
-    Map<String, String> where = queryCondition.getWhere();
-    Collection.QueryResponse qr = null;
-    try {
-        qr = collection.query(queryTexts, n, where, null, null);
-    } catch (ApiException e) {
-        e.printStackTrace();
-    }
-    for (int i = 0; i < qr.getDocuments().size(); i++) {
-        for (int j = 0; j < qr.getDocuments().get(i).size(); j++) {
-            IndexRecord indexRecord = IndexRecord.newBuilder()
-                    .withDocument(qr.getDocuments().get(i).get(j))
-                    .withId(qr.getIds().get(i).get(j))
-                    .withMetadata(qr.getMetadatas().get(i).get(j))
-                    .withDistance(qr.getDistances().get(i).get(j))
-                    .build();
-            result.add(indexRecord);
-        }
-    }
+    Collection.QueryResponse qr = collection.query(
+            Collections.singletonList(queryCondition.getText()),
+            queryCondition.getN(),
+            queryCondition.getWhere(),
+            null,
+            null
+    );
+    // Convert provider response into IndexRecord list.
     return result;
 }
 ```
 
-##### **Fetch Data (`fetch`)**
-
 ```java
-public List<IndexRecord> fetch(List<String> ids) {
-    return fetch(ids, this.config.getDefaultCategory());
-}
-
-public List<IndexRecord> fetch(List<String> ids, String category) {
-    List<IndexRecord> result = new ArrayList<>();
-    Collection.GetResult gr;
-    Collection collection = getCollection(category);
-    try {
-        gr = collection.get(ids, null, null);
-    } catch (ApiException e) {
-        throw new RuntimeException(e);
-    }
-    return getIndexRecords(result, gr);
-}
-```
-
-##### **Delete Data by ID (`delete`)**
-
-```java
-public void delete(List<String> ids) {
-    this.delete(ids, this.config.getDefaultCategory());
-}
-
-public void delete(List<String> ids, String category) {
-    Collection collection = getCollection(category);
-    try {
-        collection.deleteWithIds(ids);
-    } catch (ApiException e) {
-        throw new RuntimeException(e);
-    }
-}
-```
-
-##### **Delete Data by Conditions (`deleteWhere`)**
-
-```java
-public void deleteWhere(List<Map<String, String>> whereList) {
-    deleteWhere(whereList, this.config.getDefaultCategory());
-}
-
 public void deleteWhere(List<Map<String, String>> whereList, String category) {
     Collection collection = getCollection(category);
-    try {
-        for (Map<String, String> where : whereList) {
-            collection.deleteWhere(where);
-        }
-    } catch (ApiException e) {
-        throw new RuntimeException(e);
+    for (Map<String, String> where : whereList) {
+        collection.deleteWhere(where);
     }
 }
 ```
 
-##### **Delete a Collection (`deleteCollection`)**
+## 5. Extend Agents, Skills, Workers, And MCP
 
-```java
-public void deleteCollection(String category) {
-    try {
-        client.deleteCollection(category);
-    } catch (ApiException e) {
-        throw new RuntimeException(e);
-    }
-}
+### Agents
+
+Add a new agent in `agents.items` or `agent.yml`:
+
+```yaml
+agents:
+  enable: true
+  items:
+    - name: your-agent
+      driver: ai.agent.customer.YourAgent
+      token: your-token
 ```
 
+### MCP
+
+```yaml
+mcps:
+  enable: true
+  servers:
+    - name: your_mcp
+      url: https://your-mcp.example.com/sse
+```
+
+### Skills And Workers
+
+In the current default config, workers and pnps are nested under `skills`:
+
+```yaml
+skills:
+  enable: true
+  roots: ["classpath:skills"]
+  workspace: "skills"
+  workers:
+    - name: appointedWorker
+      route: pass(%)
+      worker: ai.worker.DefaultAppointWorker
+  pnps:
+    - name: qq
+      api_key: your-api-key
+      driver: ai.pnps.social.QQPnp
+```
+
+If your extension needs routing, define or reuse a router under `routers.items`, then call it from the worker definition.
+
+## 6. Runtime Ecosystem Integrations
+
+The current codebase also includes sync services for:
+
+- OpenClaw
+- Hermes Agent
+- DeerFlow
+
+These are runtime integration helpers, not replacements for your LinkMind YAML. Treat them as ecosystem bridges that can import or export configuration where needed.
+
+## 7. Practical Extension Order
+
+For most teams, the safest order is:
+
+1. Add config only with an existing compatible adapter.
+2. If that is not enough, add a new Java adapter for the modality you need.
+3. Only after the adapter works, expose it through `functions.*`.
+4. If retrieval is involved, add or swap the vector backend in `stores.vector`.
+
+Following this order usually keeps both the implementation and the documentation much simpler.

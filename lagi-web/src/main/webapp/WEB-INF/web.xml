@@ -6,7 +6,7 @@
 
     <context-param>
         <param-name>version</param-name>
-        <param-value>2604141544</param-value>
+        <param-value>2605061544</param-value>
     </context-param>
 
     <welcome-file-list>
@@ -415,6 +415,15 @@
     <servlet-mapping>
         <servlet-name>credit</servlet-name>
         <url-pattern>/credit/*</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
+        <servlet-name>socialChannel</servlet-name>
+        <servlet-class>ai.servlet.SocialChannelServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>socialChannel</servlet-name>
+        <url-pattern>/socialChannel/*</url-pattern>
     </servlet-mapping>
 
     <servlet>

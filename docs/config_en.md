@@ -1,410 +1,878 @@
-# Configuration Reference Guide
+# Configuration Guide
 
-System Homepage Display Name: This setting specifies the name displayed on the system homepage, which is "LinkMind".
+This document reflects the current configuration structure in `lagi-web/src/main/resources/lagi.yml` and the configuration classes that load it. When older screenshots, blogs, or copied snippets conflict with this page, treat the current code and YAML structure as the source of truth.
+
+## Start With The Smallest Working Setup
 
 ```yaml
 system_title: LinkMind
-```
 
-Model Configuration
-
-```yaml
-# This section defines the model configuration used by the middleware.
 models:
-  # Configuration for a single-driver model.
-  - name: chatgpt  # Name of the backend service.
-    type: OpenAI  # Associated company, e.g., OpenAI here.
-    enable: false # This flag determines whether the backend service is enabled. "true" means enabled.
-    model: gpt-3.5-turbo,gpt-4-turbo # List of models supported by the driver.
-    driver: ai.llm.adapter.impl.GPTAdapter # Model driver.
-    api_key: your-api-key # API key.
-  # Configuration for multi-driver models.
-  - name: landing
-    type: Landing
-    enable: false
-    drivers: # Multi-driver configuration.
-      - model: turing,qa,tree,proxy # Driver Model List
-        driver: ai.llm.adapter.impl.LandingAdapter # Driver address.
-      - model: image # List of features supported by the driver.
-        driver: ai.image.adapter.impl.LandingImageAdapter # Driver address.
-        oss: landing # Name of the object storage service used.
-      - model: landing-tts,landing-asr
-        driver: ai.audio.adapter.impl.LandingAudioAdapter 
-      - model: video
-        driver: ai.video.adapter.impl.LandingVideoAdapter 
-        api_key: your-api-key # API key specified for the driver.
-    api_key: your-api-key # Shared API key for the drivers.
-```
+  - name: qwen
+    type: Alibaba
+    enable: true
+    model: qwen-plus,asr,vision,ocr
+    driver: ai.wrapper.impl.AlibabaAdapter
+    api_key: your-api-key
+    access_key_id: your-access-key-id
+    access_key_secret: your-access-key-secret
 
-Storage Configuration
-
-```yaml
-# This section defines the storage device configuration used by the middleware.
 stores:
-  # Configuration for the vector database.
-  vectors: # List of vector database configurations.
-    - name: chroma # Name of the vector database.
-      driver: ai.vector.impl.ChromaVectorStore # Vector database driver.
-      default_category: default # Category for vector database storage.
-      similarity_top_k: 10 # Parameter used for vector database queries.
-      similarity_cutoff: 0.5 # Will cut off those results whose similarity to the query vector is less than 0.5.
+  vector:
+    - name: chroma
+      driver: ai.vector.impl.ChromaVectorStore
+      default_category: default
+      similarity_top_k: 10
+      similarity_cutoff: 0.5
       parent_depth: 1
       child_depth: 1
-      url: http://localhost:8000 # Storage configuration of the vector database.
-  # Configuration for object storage services.
-  oss:
-    - name: landing # Name of the object storage service.
-      driver: ai.oss.impl.LandingOSS  # Object storage service driver class.
-      bucket_name: lagi # Bucket name for object storage.
-      enable: true # Determines if the object storage service is enabled.
-
-    - name: alibaba
-      driver: ai.oss.impl.AlibabaOSS
-      access_key_id: your-access-key-id # Access key ID for third-party object storage services.
-      access_key_secret: your-access-key-secret # Access key secret for third-party object storage services.
-      bucket_name: ai-service-oss
-      enable: true
-
-  # Configuration for Elasticsearch.
-  text:
-    - name: elasticsearch # Name of the full-text search.
-      driver: ai.bigdata.impl.ElasticSearchAdapter
-      host: localhost # Address of Elasticsearch for full-text search.
-      port: 9200 # Port of Elasticsearch for full-text search.
-      enable: false # Determines if it is enabled.
-  database: # Relational database configuration.
-    name: mysql # Database name.
-    jdbcUrl: you-jdbc-url # Connection address.
-    driverClassName: com.mysql.cj.jdbc.Driver # Driver class.
-    username: your-username # Database username.
-    password: your-password # Database password.
-  # Configuration for Retrieval-Augmented Generation (RAG) service.
+      url: http://localhost:8000
   rag:
-      vector: chroma # Name of the vector database used by the service.
-      fulltext: elasticsearch # Full-text search (optional; if configured, this service is enabled. To disable, simply comment out this line).
-      graph: landing # Graph search (optional; if configured, this service is enabled. To disable, simply comment out this line).
-      enable: true # Determines if it is enabled.
-      priority: 10 # Priority; if this priority exceeds the model's, it will return the default prompt if no context is matched.
-      default: "Please give prompt more precisely" # Default prompt returned when no context is matched.
-      track: true # Enables document tracking.
-      
-  # This section contains the configuration for Medusa's accelerated inference service. 
-  # You can use the pre-trained `medusa.model` to prepopulate the cache. 
-  # Set `flush` to true for the initial run to initialize it; afterward, you can change it back to false for routine start/stop operations.
-  # Full download link for the `medusa.model` file: https://downloads.landingbj.com/lagi/medusa.model
+    vector: chroma
+    enable: false
+    priority: 10
+    track: true
+    html: true
+    default: "Please give prompt more precisely"
   medusa:
-      enable: true # Whether to enable
-      algorithm: hash,llm,tree # Algorithms to use
-      reason_model: deepseek-r1 # Inference model
-      aheads: 1 # Number of pre-inference requests
-      producer_thread_num: 1 # Number of producer threads
-      consumer_thread_num: 2 # Number of consumer threads
-      cache_persistent_path: medusa_cache # Cache persistence path
-      cache_persistent_batch_size: 2 # Cache persistence batch size
-      cache_hit_window: 16    # size of the sliding window for cache hits
-      cache_hit_ratio: 0.3    # minimum cache hit ratio
-      temperature_tolerance: 0.1  # tolerance for the temperature parameter on cache hits
-      flush: true # Whether to reload the cache on every startup
-```
+    enable: false
 
-Middleware Functionality Configuration
-
-```yaml
-# Functionality configuration for large models.
 functions:
-  # Embedding service configuration.
   embedding:
     - backend: qwen
       type: Qwen
       api_key: your-api-key
-  
-  # Configuration list for chat and text generation functions.
-  chat:
-    - backend: chatgpt # Name of the backend model configuration.
-      model: gpt-4-turbo # Model name.
-      enable: true # Determines if it is enabled.
-      stream: true # Determines if streaming is used.
-      priority: 200 # Priority.
 
-    - backend: chatglm
-      model: glm-3-turbo
+  chat:
+    route: pass(qwen)
+    filter: sensitive,priority,stopping,continue
+    backends:
+      - backend: qwen
+        model: qwen-plus
+        enable: true
+        stream: true
+        protocol: completion
+        priority: 100
+```
+
+## How Configuration Is Composed
+
+LinkMind uses one main file plus optional include files:
+
+| Key | Purpose |
+| --- | --- |
+| `lagi.yml` | Main runtime configuration |
+| `include_models: model.yml` | Extra model definitions |
+| `include_stores: store.yml` | Extra storage definitions |
+| `include_agents: agent.yml` | Extra agent definitions |
+| `include_mcps: mcp.yml` | Extra MCP servers |
+| `include_pnps: pnp.yml` | Extra automation connectors |
+
+If you start LinkMind with `-Dlinkmind.config=/path/to/lagi.yml`, the custom file becomes the main entry point.
+
+## Top-Level Sections
+
+| Section | What it controls |
+| --- | --- |
+| `system_title` | Product name shown in the UI |
+| `models` | Provider and adapter definitions |
+| `stores` | Vector store, object storage, term store, relational database, RAG, and Medusa |
+| `functions` | Chat and multimodal capability orchestration |
+| `agents` | Built-in or custom agents |
+| `mcps` | MCP server registry |
+| `skills` | Skill roots, workspace, workers, and pnps |
+| `routers` | Route expressions such as `best(...)` and `pass(...)` |
+| `filters` | Sensitive-word, priority, and session filters |
+
+One easy-to-miss detail: in the current default `lagi.yml`, `workers` and `pnps` are nested under `skills`, not declared as standalone top-level blocks.
+
+## Models
+
+### Single-Driver Example
+
+```yaml
+models:
+  - name: deepseek
+    type: DeepSeek
+    enable: true
+    model: deepseek-chat
+    driver: ai.llm.adapter.impl.DeepSeekAdapter
+    api_address: https://api.deepseek.com/chat/completions
+    api_key: your-api-key
+```
+
+### Multi-Driver Example
+
+```yaml
+models:
+  - name: landing
+    type: Landing
+    enable: true
+    drivers:
+      - model: turing,qa,tree,proxy
+        driver: ai.llm.adapter.impl.LandingAdapter
+      - model: image
+        driver: ai.image.adapter.impl.LandingImageAdapter
+        oss: landing
+      - model: landing-tts,landing-asr
+        driver: ai.audio.adapter.impl.LandingAudioAdapter
+      - model: video
+        driver: ai.video.adapter.impl.LandingVideoAdapter
+    api_key: your-api-key
+```
+
+### Common Fields
+
+| Field | Meaning |
+| --- | --- |
+| `name` | Backend name referenced later by `functions.*.backend` |
+| `type` | Provider label shown in config or UI |
+| `enable` | Whether the provider is enabled |
+| `model` | Comma-separated model IDs handled by the adapter |
+| `driver` | Java adapter class for a single-driver backend |
+| `drivers` | Optional multi-driver list when one backend exposes multiple modalities |
+| `api_address` | Provider endpoint, often for OpenAI-compatible or self-hosted services |
+| `endpoint` | Provider-specific base endpoint |
+| `api_key` | Primary API key |
+| `api_keys` | Multi-key pool |
+| `key_route` | Key-pool strategy: `polling` or `failover` |
+| `app_id` / `app_key` | Provider-specific app identity |
+| `secret_key` | Provider secret |
+| `access_key_id` / `access_key_secret` | Cloud credential pair used by some vendors |
+| `deployment` / `api_version` | Deployment-specific fields, especially for Azure-like providers |
+| `alias` | Optional model alias mapping |
+| `oss` | Object-storage profile used by the adapter |
+
+The default config already includes providers such as Qwen, DeepSeek, Landing, FastChat/Vicuna, OpenAI, Azure OpenAI, ERNIE, ChatGLM, Kimi, Baichuan, Spark, SenseChat, Gemini, Doubao, and Claude.
+
+### API Key Pool
+
+If you only have a single key, keep using `api_key`:
+
+```yaml
+api_key: sk-your-single-key
+```
+
+When you have multiple keys, use `api_keys` plus `key_route`:
+
+```yaml
+api_keys:
+  - sk-key1
+  - sk-key2
+  - sk-key3
+key_route: polling
+```
+
+You can also use comma-separated syntax:
+
+```yaml
+api_keys: sk-key1,sk-key2,sk-key3
+key_route: failover
+```
+
+When both `api_key` and `api_keys` exist, the key pool takes priority and the single key is merged into the pool if needed.
+
+### Compatibility Adapters Worth Reusing
+
+- `ai.llm.adapter.impl.OpenAIStandardAdapter`
+- `ai.llm.adapter.impl.OpenRouterAdapter`
+- `ai.llm.adapter.impl.QwenCompatibleAdapter`
+
+## Stores
+
+### Vector Store
+
+Current key: `stores.vector`
+
+```yaml
+stores:
+  vector:
+    - name: chroma
+      driver: ai.vector.impl.ChromaVectorStore
+      default_category: default
+      similarity_top_k: 10
+      similarity_cutoff: 0.5
+      parent_depth: 1
+      child_depth: 1
+      url: http://localhost:8000
+```
+
+Common fields:
+
+| Field | Meaning |
+| --- | --- |
+| `name` | Vector backend name |
+| `driver` | Java vector store implementation |
+| `type` | Optional vector vendor label |
+| `default_category` | Default collection or category name |
+| `url` | Remote vector endpoint |
+| `metric` | Similarity metric, usually cosine |
+| `similarity_top_k` | Number of nearest results |
+| `similarity_cutoff` | Minimum similarity threshold |
+| `parent_depth` / `child_depth` | Parent-child retrieval expansion depth |
+| `api_key` / `token` | Optional auth fields |
+| `index_name` / `environment` / `project_name` | Vendor-specific vector fields |
+| `concurrency` | Optional request concurrency |
+
+### Object Storage (OSS)
+
+```yaml
+stores:
+  oss:
+    - name: landing
+      driver: ai.oss.impl.LandingOSS
+      bucket_name: lagi
+      enable: true
+
+    - name: alibaba
+      driver: ai.oss.impl.AlibabaOSS
+      endpoint: oss-cn-hangzhou.aliyuncs.com
+      access_key_id: your-access-key-id
+      access_key_secret: your-access-key-secret
+      bucket_name: your-bucket
+      enable: true
+```
+
+Common fields:
+
+| Field | Meaning |
+| --- | --- |
+| `name` | Storage profile name |
+| `driver` | OSS implementation class |
+| `endpoint` | Object storage endpoint |
+| `access_key_id` / `access_key_secret` | Cloud credentials |
+| `bucket_name` | Bucket used by the adapter |
+| `enable` | Whether this OSS profile is enabled |
+
+### Full-Text / Term Store
+
+```yaml
+stores:
+  term:
+    - name: elastic
+      driver: ai.bigdata.impl.ElasticSearchAdapter
+      host: localhost
+      port: 9200
       enable: false
-      stream: false
-      priority: 10
-  
-  # Configuration list for translation functions.
+```
+
+Common fields:
+
+| Field | Meaning |
+| --- | --- |
+| `name` | Term-search backend name |
+| `driver` | Full-text adapter class |
+| `host` | Hostname |
+| `port` | Service port |
+| `username` / `password` | Optional auth |
+| `enable` | Whether the backend is active |
+
+### Relational Database
+
+```yaml
+stores:
+  database:
+    - name: mysql
+      jdbc_url: jdbc:mysql://127.0.0.1:3306/demo
+      driver: com.mysql.cj.jdbc.Driver
+      username: root
+      password: your-password
+      maximum_pool_size: 20
+      idle_timeout: 0
+      max_lifetime: 2877700
+```
+
+Common fields:
+
+| Field | Meaning |
+| --- | --- |
+| `name` | Database profile name |
+| `jdbc_url` | JDBC connection string |
+| `driver` | JDBC driver class |
+| `username` / `password` | Login credentials |
+| `maximum_pool_size` | Hikari max pool size |
+| `idle_timeout` | Connection idle timeout |
+| `max_lifetime` | Maximum connection lifetime |
+
+### RAG
+
+```yaml
+stores:
+  rag:
+    vector: chroma
+    term: elastic
+    graph: landing
+    enable: true
+    priority: 10
+    track: true
+    html: true
+    default: "Please give prompt more precisely"
+    cache_size: 1000
+    preload_cache: false
+    preload_cache_category: default
+    enable_excel_to_md: true
+```
+
+Common fields:
+
+| Field | Meaning |
+| --- | --- |
+| `vector` | Vector backend name to use |
+| `term` | Optional term-search backend |
+| `graph` | Optional graph-style backend |
+| `enable` | Whether RAG is enabled |
+| `priority` | Priority when RAG competes with direct model calls |
+| `track` | Whether to keep document trace information |
+| `html` | Whether HTML-style content handling is enabled |
+| `default` | Fallback reply when no context is found |
+| `cache_size` | Optional RAG cache size |
+| `preload_cache` | Whether to preload cache |
+| `preload_cache_category` | Category used during preload |
+| `enable_excel_to_md` | Whether spreadsheet content should be normalized into Markdown |
+
+### Medusa
+
+```yaml
+stores:
+  medusa:
+    enable: true
+    algorithm: hash,graph,llm
+    reason_model: deepseek-r1
+    aheads: 1
+    producer_thread_num: 1
+    consumer_thread_num: 2
+    cache_persistent_path: medusa_cache
+    cache_persistent_batch_size: 2
+    flush: false
+    cache_hit_window: 16
+    cache_hit_ratio: 0.3
+    temperature_tolerance: 0.1
+```
+
+Common fields:
+
+| Field | Meaning |
+| --- | --- |
+| `enable` | Whether Medusa cache acceleration is enabled |
+| `cache` / `memory` | Whether cache and in-memory acceleration are enabled |
+| `algorithm` | Cache and reasoning strategies |
+| `enableL2` / `enableReasonDiver` | Optional advanced cache and reasoning toggles |
+| `reason_model` | Optional reasoning model |
+| `aheads` | Number of ahead-of-time requests |
+| `producer_thread_num` / `consumer_thread_num` | Worker thread counts |
+| `consumeDelay` / `preDelay` | Optional queue timing controls |
+| `lcsRatioPromptInput` / `similarityCutoff` / `qa_similarity_cutoff` / `dynamicSimilarity` | Cache-match thresholds |
+| `cache_persistent_path` | Persistent cache directory |
+| `cache_persistent_batch_size` | Flush batch size |
+| `flush` | Rebuild cache state on startup |
+| `cache_hit_window` / `cache_hit_ratio` | Sliding window and hit-ratio thresholds |
+| `temperature_tolerance` | Temperature tolerance during cache match |
+| `inits` | Optional warm-up prompts |
+
+## Functions
+
+### Shared Backend Item Fields
+
+Most function arrays reuse the same backend item shape:
+
+| Field | Meaning |
+| --- | --- |
+| `backend` | Name of the model backend defined under `models` |
+| `model` | Model ID handled by that backend |
+| `enable` | Whether this function backend is active |
+| `priority` | Selection priority |
+| `stream` | Streaming flag where applicable |
+| `protocol` | Completion or response protocol for chat |
+| `others` | Extra provider-specific value, such as a speaker ID |
+| `filter` | Optional filter override |
+| `router` | Optional router override |
+| `concurrency` | Optional concurrency limit |
+
+Unless noted otherwise, the modules below use arrays of these backend items.
+
+### Embedding
+
+```yaml
+functions:
+  embedding:
+    - backend: qwen
+      type: Qwen
+      api_key: your-api-key
+      model_name: text-embedding
+      api_endpoint: https://your-endpoint.example.com
+      secret_key: your-secret-key
+      model_path: /path/to/local-embedding.model
+```
+
+Common fields:
+
+| Field | Meaning |
+| --- | --- |
+| `backend` | Provider name |
+| `type` | Provider label |
+| `api_key` | API key |
+| `model_name` | Embedding model name |
+| `api_endpoint` | Remote endpoint |
+| `secret_key` | Optional provider secret |
+| `model_path` | Local embedding model path |
+
+### Chat
+
+```yaml
+functions:
+  chat:
+    route: best((landing&qwen),(kimi|chatgpt))
+    filter: sensitive,priority,stopping,continue
+    handle: failover
+    grace_time: 20
+    maxgen: 3
+    context_length: 4096
+    token_charge: false
+    enable_auth: false
+    enable_policy: true
+    backends:
+      - backend: landing
+        model: cascade
+        enable: true
+        stream: true
+        protocol: completion
+        priority: 350
+```
+
+Common fields:
+
+| Field | Meaning |
+| --- | --- |
+| `route` | Router expression used to choose or combine backends |
+| `filter` | Comma-separated filter names from `filters.items` |
+| `backends` | Candidate chat backends |
+| `enable_queue_handle` | Whether queue handling is enabled |
+| `handle` | Overflow or fallback strategy |
+| `grace_time` | Grace period used by the handler |
+| `maxgen` | Maximum number of generated branches or retries |
+| `context_length` | Conversation context length used by orchestration |
+| `token_charge` | Whether token accounting is enabled |
+| `enable_auth` | Whether auth checks are enabled |
+| `enable_policy` | Whether built-in policy checks are enabled |
+
+Declare chat backends under `functions.chat.backends`.
+
+### Translate
+
+```yaml
+functions:
   translate:
-    - backend: ernie # Name of the backend model configuration.
-      model: translate # Model name.
-      enable: false # Determines if it is enabled.
-      priority: 10 # Priority.
-  
-  # Configuration list for speech-to-text functions.
+    - backend: ernie
+      model: translate
+      enable: true
+      priority: 10
+```
+
+### Speech To Text
+
+```yaml
+functions:
   speech2text:
-    - backend: qwen  # Name of the backend model configuration.
+    - backend: qwen
       model: asr
       enable: true
       priority: 10
-  
-  # Configuration list for text-to-speech functions.
+```
+
+### Text To Speech
+
+```yaml
+functions:
   text2speech:
-    - backend: landing # Name of the backend model configuration.
+    - backend: landing
       model: tts
       enable: true
       priority: 10
-  
-  # Configuration list for voice cloning functions.
+```
+
+### Speech Clone
+
+```yaml
+functions:
   speech2clone:
-    - backend: doubao # Name of the backend model configuration.
+    - backend: doubao
       model: openspeech
       enable: true
       priority: 10
-      others: your-speak-id
+      others: your-speaker-id
+```
 
-  # Configuration list for text-to-image functions.
+### Text To Image
+
+```yaml
+functions:
   text2image:
-    - backend: spark # Name of the backend model configuration.
+    - backend: spark
       model: tti
       enable: true
       priority: 10
-    - backend: ernie
-      model: Stable-Diffusion-XL
-      enable: true
-      priority: 5
-  # Configuration list for image-to-text functions.
+```
+
+### Image To Text
+
+```yaml
+functions:
   image2text:
-    - backend: ernie # Name of the backend model configuration.
+    - backend: ernie
       model: Fuyu-8B
       enable: true
       priority: 10
-  # Configuration list for image enhancement functions.
-  image2enhance:
-    - backend: ernie # Name of the backend model configuration.
-      model: enhance
-      enable: true
-      priority: 10
-  # Configuration list for text-to-video functions.
-  text2video:
-    - backend: landing # Name of the backend model configuration.
-      model: video
-      enable: true
-      priority: 10
-  # Configuration list for image-to-video functions.
-  image2video:
-    - backend: qwen # Name of the backend model configuration.
-      model: vision
-      enable: true
-      priority: 10
-  # Configuration list for image OCR functions.
+```
+
+### Image OCR
+
+```yaml
+functions:
   image2ocr:
     - backend: qwen
       model: ocr
       enable: true
       priority: 10
-  # Configuration list for video tracking functions.
-  video2track:
-    - backend: landing # Name of the backend model configuration.
+```
+
+### Image Enhancement
+
+```yaml
+functions:
+  image2enhance:
+    - backend: ernie
+      model: enhance
+      enable: true
+      priority: 10
+```
+
+### Text To Video
+
+```yaml
+functions:
+  text2video:
+    - backend: landing
       model: video
       enable: true
       priority: 10
-  # Configuration list for video enhancement functions.
-  video2enhance:
-    - backend: qwen # Name of the backend model configuration.
+```
+
+### Image To Video
+
+```yaml
+functions:
+  image2video:
+    - backend: qwen
       model: vision
       enable: true
       priority: 10
-  # Configuration list for document OCR functions.
-  doc2ocr:
-    - backend: qwen
-      model: ocr
+```
+
+### Video Tracking
+
+```yaml
+functions:
+  video2track:
+    - backend: landing
+      model: video
       enable: true
       priority: 10
-  # Configuration list for document instruction functions.
+```
+
+### Video Enhancement
+
+```yaml
+functions:
+  video2enhance:
+    - backend: qwen
+      model: vision
+      enable: true
+      priority: 10
+```
+
+### Document OCR
+
+```yaml
+functions:
+  doc2ocr:
+    - backend: qwen
+      model: qwen-vl-ocr
+      enable: true
+      priority: 15
+```
+
+### Document Instruction Extraction
+
+```yaml
+functions:
   doc2instruct:
     - backend: landing
       model: cascade
       enable: true
       priority: 10
-  # Configuration list for SQL instruction functions.
-  text2sql:
-    - backend: landing
-      model: qwen-turbo # Model name.
-      enable: true # Determines if it is enabled.
-      priority: 10
 ```
 
-Routing Policy Configuration
+### Text To SQL
 
 ```yaml
 functions:
-  policy:
-    # Handle configuration currently supports parallel, failover, and polling:
-    #  1. If no model is explicitly specified in the request or the specified model is invalid, the three strategies apply.
-    #  2. "parallel" executes configured models concurrently, returning the fastest and highest-priority result.
-    #  3. "failover" executes models sequentially by priority, stopping when a successful result is obtained.
-    #  4. "polling" distributes requests evenly among models using parameters such as IP and browser fingerprints.
-    #  5. If all models fail, the HTTP status code is set to 600–608, with the body containing detailed error information.
-    #     Error codes:
-    #       600 Invalid request parameters.
-    #       601 Authorization error.
-    #       602 Permission denied.
-    #       603 Resource not found.
-    #       604 Rate limit exceeded.
-    #       605 Model internal error.
-    #       606 Other errors.
-    #       607 Timeout.
-    #       608 No available model.
-    handle: failover #parallel #failover
-    grace_time: 20 # Retry interval after failure.
-    maxgen: 3 # Maximum retries after failure (default is Integer.MAX_VALUE).
+  text2sql:
+    - backend: landing
+      model: cascade
+      enable: true
+      priority: 10
 ```
 
-Agent Configuration
+### Document Content Extraction
 
 ```yaml
-# This section represents agent configurations supported by the models.
-agents:
-  - name: qq # Agent name.
-    api_key: your-api-key # API key used by the agent.
-    driver: ai.agent.social.QQAgent # Agent driver.
-
-  - name: wechat
-    api_key: your-api-key
-    driver: ai.agent.social.WechatAgent
-
-  - name: ding
-    api_key: your-api-key
-    driver: ai.agent.social.DingAgent
-    
-  - name: weather_agent
-    driver: ai.agent.customer.WeatherAgent
-    token: your-token
-    app_id: weather_agent
-
-  - name: oil_price_agent
-    driver: ai.agent.customer.OilPriceAgent
-    token: your-token
-    app_id: oil_price_agent
-
-  - name: bmi_agent
-    driver: ai.agent.customer.BmiAgent
-    token: your-token
-    app_id: bmi_agent
-
-  - name: food_calorie_agent
-    driver: ai.agent.customer.FoodCalorieAgent
-    token: your-token
-    app_id: food_calorie_agent
-
-  - name: dishonest_person_search_agent
-    driver: ai.agent.customer.DishonestPersonSearchAgent
-    token: your-token
-    app_id: dishonest_person_search_agent
-
-  - name: high_speed_ticket_agent
-    driver: ai.agent.customer.HighSpeedTicketAgent
-    app_id: high_speed_ticket_agent
-
-  - name: history_in_today_agent
-    driver: ai.agent.customer.HistoryInToDayAgent
-    app_id: history_in_today_agent
-
-  - name: youdao_agent
-    driver: ai.agent.customer.YouDaoAgent
-    app_id: your-app-id
-    token: your-token
-
-  - name: image_gen_agent
-    driver: ai.agent.customer.ImageGenAgent
-    app_id: your-app-id
-    endpoint: http://127.0.0.1:8080
-    token: image_gen_agent
-    
-# This section represents configurations for agent workers.
-workers:
-  - name: qq-robot # Worker name.
-    agent: qq # Name of the agent it works with.
-    worker: ai.worker.social.RobotWorker # Worker driver.
-
-  - name: wechat-robot
-    agent: wechat
-    worker: ai.worker.social.RobotWorker
-
-  - name: ding-robot
-    agent: ding
-    worker: ai.worker.social.RobotWorker
-
-# Routing configuration.
-routers:
-  - name: best
-    # Rule: (weather_agent&food_calorie_agent)
-    # A|B -> Polling, A or B indicates random polling between A and B.
-    # A,B -> Failover, starting with A; if A fails, then B.
-    # A&B -> Parallel execution, calling A and B simultaneously and selecting the most appropriate single result.
-    # This rule can combine into ((A&B&C),(E|F)), meaning first simultaneously call A, B, and C, and if they fail, randomly call E or F.
-    rule: (weather_agent&food_calorie_agent)
-
-    # % represents a wildcard.
-    # If specified, the call will use the given agent.
-    # If only "%" is given, the % will be determined by the parameters passed during the call.
-  - name: pass
-    rule: '%'
-
+functions:
+  doc2ext:
+    - backend: landing
+      model: cascade
+      enable: true
+      priority: 10
 ```
 
-MCP configuration
+### Document Structuring
+
+```yaml
+functions:
+  doc2struct:
+    - backend: landing
+      model: cascade
+      enable: true
+      priority: 10
+```
+
+### Text To QA
+
+`text2qa` is currently a single backend object rather than an array:
+
+```yaml
+functions:
+  text2qa:
+    enable: true
+    model: cascade
+```
+
+## Agents, MCP, Skills, Workers, Pnps, Routers, And Filters
+
+### Agents
+
+```yaml
+agents:
+  enable: true
+  items:
+    - name: weather
+      token: your-token
+      driver: ai.agent.customer.WeatherAgent
+```
+
+Common fields:
+
+| Field | Meaning |
+| --- | --- |
+| `enable` / `items[].enable` | Global agent switch or optional per-agent switch |
+| `name` | Agent name |
+| `driver` | Agent implementation class |
+| `token` / `api_key` | Provider token or API key |
+| `app_id` / `user_id` | Optional provider identity |
+| `wrong_case` | Fallback reply for unsupported or wrong requests |
+| `endpoint` | Optional custom endpoint |
+| `mcps` | Optional MCP dependency list |
+
+Large agent lists can be moved to `agent.yml` and loaded with `include_agents`.
+
+### MCP Servers
 
 ```yaml
 mcps:
+  enable: true
   servers:
-    - name: baidu_search_mcp  # MCP service name
-      url: http://appbuilder.baidu.com/v2/ai_search/mcp/sse?api_key=Bearer+your_api_key  # MCP service URL
+    - name: amap_mcp
+      url: https://mcp.amap.com/sse?key=your-key
+      priority: 10
+      enable: true
 ```
 
-Skills Configuration
+Common fields:
+
+| Field | Meaning |
+| --- | --- |
+| `enable` | Global MCP switch |
+| `name` | MCP server name |
+| `url` | SSE endpoint |
+| `key` | Optional auth key field |
+| `headers` | Optional custom request headers |
+| `priority` | Selection priority |
+| `servers[].enable` | Whether this server entry is active |
+| `driver` | MCP client implementation, defaulting to `ai.mcps.CommonSseMcpClient` |
+
+You can also split MCP definitions into `mcp.yml` and load them with `include_mcps`.
+
+### Skills
 
 ```yaml
-# Skills configuration
 skills:
-  # Skill root paths. Supports classpath or local directories.
+  enable: true
   roots: ["classpath:skills"]
-  # Skill workspace directory.
   workspace: "skills"
-  # Rule: server (server-first) / cli (client-first) / block (disabled)
   rule: cli
-  # Tell the server which skills are available.
   items:
     - name: extract_content_with_image
-      description: 将本地 PDF、TXT、Word、PPT 文件分割为文本和图片chunk。
-      rule: server
-    - name: pdf
-      description: Use this skill whenever the user wants to do anything with PDF files. This includes reading or extracting text/tables from PDFs, combining or merging multiple PDFs into one, splitting PDFs apart, rotating pages, adding watermarks, creating new PDFs, filling PDF forms, encrypting/decrypting PDFs, extracting images, and OCR on scanned PDFs to make them searchable. If the user mentions a .pdf file or asks to produce one, use this skill.
-    - name: docx
-      description: "Use this skill whenever the user wants to create, read, edit, or manipulate Word documents (.docx files). Triggers include: any mention of 'Word doc', 'word document', '.docx', or requests to produce professional documents with formatting like tables of contents, headings, page numbers, or letterheads. Also use when extracting or reorganizing content from .docx files, inserting or replacing images in documents, performing find-and-replace in Word files, working with tracked changes or comments, or converting content into a polished Word document. If the user asks for a 'report', 'memo', 'letter', 'template', or similar deliverable as a Word or .docx file, use this skill. Do NOT use for PDFs, spreadsheets, Google Docs, or general coding tasks unrelated to document generation."
-    - name: pptx
-      description: "Use this skill any time a .pptx file is involved in any way — as input, output, or both. This includes: creating slide decks, pitch decks, or presentations; reading, parsing, or extracting text from any .pptx file (even if the extracted content will be used elsewhere, like in an email or summary); editing, modifying, or updating existing presentations; combining or splitting slide files; working with templates, layouts, speaker notes, or comments. Trigger whenever the user mentions \"deck,\" \"slides,\" \"presentation,\" or references a .pptx filename, regardless of what they plan to do with the content afterward. If a .pptx file needs to be opened, created, or touched, use this skill."
-    - name: xlsx
-      description: "Use this skill any time a spreadsheet file is the primary input or output. This means any task where the user wants to: open, read, edit, or fix an existing .xlsx, .xlsm, .csv, or .tsv file (e.g., adding columns, computing formulas, formatting, charting, cleaning messy data); create a new spreadsheet from scratch or from other data sources; or convert between tabular file formats. Trigger especially when the user references a spreadsheet file by name or path — even casually (like \"the xlsx in my downloads\") — and wants something done to it or produced from it. Also trigger for cleaning or restructuring messy tabular data files (malformed rows, misplaced headers, junk data) into proper spreadsheets. The deliverable must be a spreadsheet file. Do NOT trigger when the primary deliverable is a Word document, HTML report, standalone Python script, database pipeline, or Google Sheets API integration, even if tabular data is involved."
-    - name: screenshot-1.0.1
-      description: "Capture, inspect, and compare screenshots of screens, windows, regions, web pages, simulators, and CI runs with the right tool, wait strategy, viewport, and output format. Use when (1) you need screenshots for debugging, QA, docs, bug reports, or visual review; (2) desktop, browser, simulator, or headless capture is involved; (3) stable screenshots require fixed viewport, settling, masking, or animation control."
-    - name: cn-web-search-2.2.0
-      description: 中文网页搜索 - 聚合 17 个免费搜索引擎，无需 API Key，纯网页抓取，支持公众号/财经/技术/学术/知识搜索。
-    - name: baidu-search-1.1.3
-      description: Search the web using Baidu AI Search Engine (BDSE). Use for live information, documentation, or research topics.
-    - name: google-maps-3.2.0
-      description: "Google Maps integration for OpenClaw with Routes API. Use for: (1) Distance/travel time calculations with traffic prediction, (2) Turn-by-turn directions, (3) Distance matrix between multiple points, (4) Geocoding addresses to coordinates and reverse, (5) Places search and details, (6) Transit planning with arrival times. Supports future departure times, traffic models (pessimistic/optimistic), avoid options (tolls/highways), and multiple travel modes (driving/walking/bicycling/transit)."
-    - name: feishu-1.0.5
-      description: 飞书深度集成技能。不是简单的消息桥接，而是你的数字指挥中枢。专为中国企业高压协作环境设计，理解“分寸”与“效率”两套并行规则，把消息、审批、会议、文档、多维表格、日程与邮箱，压缩成有优先级、可执行的行动链。
-    - name: imap-smtp-email-0.0.10
-      description: Read and send email via IMAP/SMTP. Check for new/unread messages, fetch content, search mailboxes, mark as read/unread, and send emails with attachments. Supports multiple accounts. Works with any IMAP/SMTP server including Gmail, Outlook, 163.com, vip.163.com, 126.com, vip.126.com, 188.com, and vip.188.com.
-    - name: docker-1.0.4
-      description: "Docker containers, images, Compose stacks, networking, volumes, debugging, production hardening, and the commands that keep real environments stable. Use when (1) the task touches Docker, Dockerfiles, images, containers, or Compose; (2) build reliability, runtime behavior, logs, ports, volumes, or security matter; (3) the agent needs Docker guidance and should apply it by default."
-    - name: typescript-skills-1.0.6
-      description: Provide best-practice coding conventions and generate standards-compliant TypeScript code.
-    - name: webapp-testing
-      description: Toolkit for interacting with and testing local web applications using Playwright. Supports verifying frontend functionality, debugging UI behavior, capturing browser screenshots, and viewing browser logs.
-    - name: ws-agent-browser-1.0.0
-      description: 浏览器智能控制。自动化操作、截图、填表、数据抓取。
-    - name: skill-finder-1.1.5
-      description: "Find, compare, and install agent skills across ClawHub and Skills.sh when the user needs new capabilities, better workflows, stronger tools, or safer alternatives. Use when (1) they ask how to do something, how to improve or automate it, or what to install; (2) a skill could extend the agent, replace a weak manual approach, or close a capability gap; (3) you need the best-fit option, not just a direct answer."
+      description: Split local files into text and image chunks
 ```
+
+Common fields:
+
+| Field | Meaning |
+| --- | --- |
+| `enable` | Global skills switch |
+| `roots` | Skill source roots |
+| `workspace` | Local working directory for skill execution |
+| `rule` | Skill execution preference such as `cli`, `server`, or `block` |
+| `items` | Skill catalog entries exposed to the runtime |
+
+### Workers
+
+```yaml
+skills:
+  workers:
+    - name: appointedWorker
+      route: pass(%)
+      worker: ai.worker.DefaultAppointWorker
+```
+
+Common fields:
+
+| Field | Meaning |
+| --- | --- |
+| `name` | Worker name |
+| `worker` | Worker implementation class |
+| `route` | Router expression |
+| `agent` / `agents` | Target agent or agent set |
+| `filter` | Optional filter override |
+
+### Pnps
+
+```yaml
+skills:
+  pnps:
+    - name: qq
+      api_key: your-api-key
+      driver: ai.pnps.social.QQPnp
+```
+
+Common fields:
+
+| Field | Meaning |
+| --- | --- |
+| `name` | Automation connector name |
+| `driver` | Pnp implementation class |
+| `api_key` | Connector credential |
+
+You can split additional Pnp definitions into `pnp.yml` and load them with `include_pnps`.
+
+### Routers
+
+```yaml
+routers:
+  enable: true
+  items:
+    - name: best
+      rule: (|,&)
+
+    - name: pass
+      rule: (%)
+```
+
+Common fields:
+
+| Field | Meaning |
+| --- | --- |
+| `enable` | Global router switch |
+| `items[].name` | Router name referenced from `functions.chat.route` or workers |
+| `items[].rule` | Route grammar supported by that router |
+
+Use:
+
+- `A|B` for polling
+- `A,B` for failover
+- `A&B` for parallel
+- `%` as a wildcard
+
+### Filters
+
+Sensitive-word example:
+
+```yaml
+filters:
+  enable: true
+  items:
+    - name: sensitive
+      groups:
+        - level: mask
+          rules: >-
+            openai,FLG
+        - level: erase
+          rules: >-
+            your context
+        - level: block
+          rules: >-
+            shit,CNM
+```
+
+Priority example:
+
+```yaml
+filters:
+  items:
+    - name: priority
+      rules: >-
+        car,weather,
+        social*security
+```
+
+Stopping example:
+
+```yaml
+filters:
+  items:
+    - name: stopping
+      rules: >-
+        bye,
+        start*
+```
+
+Continuation example:
+
+```yaml
+filters:
+  items:
+    - name: continue
+      rules: >-
+        about,next,then
+```
+
+Common fields:
+
+| Field | Meaning |
+| --- | --- |
+| `enable` | Global filter switch |
+| `items[].name` | Filter name referenced from `functions.chat.filter` |
+| `items[].groups[].level` | Action level for sensitive-word groups, such as `mask`, `erase`, or `block` |
+| `items[].groups[].rules` | Comma-separated or regex-style rules for grouped sensitive filters |
+| `items[].rules` | Keyword list for non-grouped filters such as priority, stopping, or continuation |
+
+`functions.chat.filter` should reference these filter names as a comma-separated list.
+
+## Runtime Sync Integrations
+
+The current codebase also contains configuration sync services for:
+
+- OpenClaw
+- Hermes Agent
+- DeerFlow
+
+These integrations help synchronize model and runtime settings during install or startup, but the core LinkMind runtime still reads from your local YAML configuration first.

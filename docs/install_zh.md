@@ -1,106 +1,297 @@
 # LinkMind 安装指南
 
-本文介绍如何在 Windows、macOS 与 Linux 上安装 JDK 并通过 JAR 运行 LinkMind。
+前置条件：LinkMind 需要 **JDK 8 或以上版本**。如果你的机器还没有安装 Java，请直接跳转到文末的[附录：安装 JDK 8+](#附录安装-jdk-8)。
 
----
+本文把 4 种安装方式视为并列选项，而不是顺序步骤。请选择最适合你的部署方式。
 
-## 一、安装 JDK
+## Option 1：官方安装脚本快速安装
 
-**JDK** 是运行 / 开发 LinkMind 的必备环境（含 JRE 运行时与编译器 javac）。可选：
+### 执行安装
 
-- **Oracle JDK**：商业授权，非商用免费
-- **Eclipse Temurin (Adoptium) OpenJDK**：开源免费，全场景可用（推荐）
+- Windows PowerShell
 
----
+  ```powershell
+  iwr -useb https://cdn.linkmind.top/install.ps1 | iex
+  ```
 
-### 1.1 Windows 系统
+- macOS / Linux
 
-#### 步骤 1：下载 JDK
+  ```bash
+  curl -fsSL https://cdn.linkmind.top/install.sh | bash
+  ```
 
-1. 打开浏览器访问：[Oracle Java 下载](https://www.oracle.com/java/technologies/downloads/#java8) 或 [Eclipse Temurin 下载](https://adoptium.net/temurin/releases/)
-2. 选择 **Windows**、**x64** 架构
-3. 选择 **JDK 8**
-4. 安装包格式：
-   - Oracle JDK：`.exe` 安装包（如 `jdk-8u391-windows-x64.exe`）
-   - Temurin JDK：`.msi` 安装包（可自动配置环境变量，推荐）
+### 选择运行模式
 
-#### 步骤 2：安装
+安装过程中，LinkMind 会提示你选择运行模式：
 
-1. 双击安装包，在「用户账户控制」中点击「是」
-2. Oracle JDK 需先勾选「接受许可协议」，再点击「下一步」
-3. 建议安装路径无中文、无空格、无特殊符号，例如：`C:\Development_tools\jdk1.8.0_391`
-4. 若向导提示「安装 JRE」，保持默认勾选
-5. 完成安装后点击「关闭」
+| 模式 | 适用场景 |
+| --- | --- |
+| `Agent Mate` | 本机已经在使用 OpenClaw、Hermes Agent 或 DeerFlow，希望 LinkMind 作为统一 AI 中间层接入 |
+| `Agent Server` | 先独立启动 LinkMind，直接体验控制台和 API，或做基础部署评估 |
 
-#### 步骤 3：环境变量（可选）
+如果你是第一次试用，建议先选 `Agent Server`。
 
-若安装时勾选了「Add to PATH」（Temurin 的 .msi 通常会自动勾选），可跳过本步，直接做「步骤 4」验证。
+### 安装器会自动做什么
 
-1. 右键「此电脑」→「属性」→「高级系统设置」→「环境变量」
-2. 新建 **系统变量**：
-   - 变量名：`JAVA_HOME`
-   - 变量值：JDK 安装根路径（如 `C:\Development_tools\jdk1.8.0_391`）
-3. 编辑 **系统变量** `Path`，新增：
-   - `%JAVA_HOME%\bin`
-   - `%JAVA_HOME%\jre\bin`
-4. 确定保存后，关闭已打开的所有命令行窗口
+当前安装器不只是下载一个 JAR，它还会顺带完成初始化工作：
 
-#### 步骤 4：验证
+1. 创建 LinkMind 主目录，通常是 Windows 下的 `%USERPROFILE%\\LinkMind`，或者 macOS / Linux 下的 `~/LinkMind`。
+2. 将 `LinkMind.jar` 下载到该目录。
+3. 询问你运行模式是 `Agent Mate` 还是 `Agent Server`。
+4. 如果选择 `Agent Mate`，继续询问要接入或同步哪个运行时：OpenClaw、DeerFlow、Hermes。若选择 DeerFlow，还会要求输入安装目录。
+5. 如果选择 `Agent Server`，会自动下载 popular skills 压缩包，并解压到 `skills/popular_skills`。
+6. 调用运行时初始化逻辑，把首启所需的模式、技能与同步设置写好。
 
-1. 按 `Win + R`，输入 `cmd`，回车
-2. 在命令行中执行：
+### 首次启动
+
+安装完成后，脚本可以直接帮你启动 LinkMind。正常成功流程通常是：
+
+1. 安装器输出 `LinkMind installed successfully!`
+2. 提示 `Would you like to start LinkMind now?`
+3. 输入 `yes`
+4. 等待服务日志启动完成
+5. 浏览器打开 `http://localhost:8080`
+
+第一次真正启动服务时，LinkMind 还会自动准备：
+
+- `config/`
+- `config/lagi.yml`
+- `data/`
+- 在使用默认路径时，把随包附带的本地数据文件复制到 `data/`
+
+### macOS 说明
+
+- 请从 Terminal 执行安装脚本，不要靠 Finder 双击文件启动。
+- 如果装完 JDK 后 `java -version` 仍然不可用，请打开一个新的 Terminal 窗口，或执行 `source ~/.zshrc`。
+- Apple Silicon 芯片的 Mac，请在文末附录中选择 `aarch64` 或 `arm64` 的 JDK 安装包。
+
+### 首次进入控制台建议做的事
+
+1. 打开 Web 控制台。
+2. 注册或登录。
+3. 进入 API Key / Provider 设置页。
+4. 至少填入一个真实可用的模型密钥。
+5. 回到聊天页发送第一条消息。
+
+如果你准备直接调用 REST API，且系统启用了鉴权，请先在控制台复制 LinkMind API Key，并在请求头中带上：
+
+```http
+Authorization: Bearer <你的-linkmind-api-key>
+```
+
+## Option 2：下载并运行 `LinkMind.jar`
+
+如果你希望直接使用现成封包，而不自己编译源码，可以选这个方式。
+
+### 预打包下载资源
+
+- 应用文件：`LinkMind.jar`，[点击这里下载](https://cdn.linkmind.top/installer/LinkMind.jar)
+- 核心库文件：`lagi-core-1.2.0-jar-with-dependencies.jar`，[点击这里下载](https://ai.linkmind.top/lagi/lib/lagi-core-1.2.0-jar-with-dependencies.jar)
+
+### 准备并启动
+
+- Windows
+
+  ```powershell
+  mkdir D:\LinkMind
+  cd D:\LinkMind
+  java -jar LinkMind.jar
+  ```
+
+- macOS
+
+  ```bash
+  mkdir -p ~/Documents/LinkMind
+  cd ~/Documents/LinkMind
+  java -jar LinkMind.jar
+  ```
+
+- Linux
+
+  ```bash
+  mkdir -p ~/LinkMind
+  cd ~/LinkMind
+  java -jar LinkMind.jar
+  ```
+
+### 首次启动会自动做什么
+
+当你不额外传入自定义目录参数时，LinkMind 会自动：
+
+- 创建 `config/`
+- 创建 `data/`
+- 生成 `config/lagi.yml`
+- 将随包附带的本地数据文件复制到 `data/`
+
+随后访问：
+
+- `http://localhost:8080`
+
+### 默认输出位置
+
+如果你的 JAR 放在 `D:\LinkMind`、`~/Documents/LinkMind` 或 `~/LinkMind` 下运行，默认生成的配置和数据目录也会落在该 JAR 同级位置。
+
+## Option 3：使用 Docker 镜像
+
+如果你想通过预构建容器快速启动，可以用这种方式。
+
+### 镜像名称
+
+- `landingbj/linkmind`
+
+### 拉取镜像
+
+```bash
+docker pull landingbj/linkmind
+```
+
+### 启动容器
+
+```bash
+docker run -d -p 8080:8080 landingbj/linkmind
+```
+
+启动后访问 `http://localhost:8080`。
+
+## Option 4：从源码编译
+
+如果你要跟随本地最新代码，或者同时需要可执行 JAR 和 WAR 包，请使用源码构建方式。
+
+### 打包命令
+
+```bash
+mvn clean package -pl lagi-web -am -DskipTests -U
+```
+
+### 当前构建产物
+
+当前 Maven 打包会生成：
+
+- `lagi-web/target/LinkMind.jar`
+- `lagi-web/target/ROOT.war`
+
+### 运行打包后的 JAR
+
+```bash
+java -jar lagi-web/target/LinkMind.jar
+```
+
+### 部署 WAR
+
+如果你更偏向传统 Servlet 容器，也可以部署：
+
+- `lagi-web/target/ROOT.war`
+
+但对于本地体验和日常运行，仍然更推荐直接使用内嵌式 JAR。
+
+## JAR 启动时常用运行参数
+
+下面这些参数适用于直接启动 `LinkMind.jar`，也适用于源码打包后的 JAR。
+
+### 修改端口
+
+```bash
+java -jar LinkMind.jar --port=8090
+```
+
+然后访问 `http://localhost:8090`。
+
+### 绑定监听地址
+
+```bash
+java -jar LinkMind.jar --host=0.0.0.0
+```
+
+### 自定义配置与数据目录
+
+- Windows
+
+  ```powershell
+  java -jar LinkMind.jar --config=D:\LinkMindConfig --data-dir=D:\LinkMindData
+  ```
+
+- macOS / Linux
+
+  ```bash
+  java -jar LinkMind.jar --config=/opt/linkmind/config --data-dir=/var/lib/linkmind/data
+  ```
+
+### 预设运行模式
+
+```bash
+java -jar LinkMind.jar --runtime-choice=server
+```
+
+可选值为 `mate` 和 `server`。
+
+### 指定 DeerFlow 同步目录
+
+```bash
+java -jar LinkMind.jar --deer-flow-path=/path/to/deer-flow
+```
+
+## 启动后下一步看什么
+
+建议按下面顺序继续：
+
+1. [配置参考](config_zh.md)
+2. [API 参考](API_zh.md)
+3. [教学演示](tutor_zh.md)
+4. [开发集成指南](guide_zh.md)
+
+如果你准备开启 RAG、本地向量库或文档处理，也请继续阅读 [附件](annex_zh.md)。
+
+## 附录：安装 JDK 8+
+
+JDK 是运行和开发 LinkMind 的前置条件。若你还没有 Java 环境，最推荐直接安装 Temurin OpenJDK。
+
+### Windows
+
+1. 从 [Eclipse Temurin](https://adoptium.net/temurin/releases/) 或 [Oracle Java](https://www.oracle.com/java/technologies/downloads/#java8) 下载 JDK 8。
+2. 选择 Windows x64 安装包。
+3. 按安装向导完成安装。Temurin 的 `.msi` 一般可以顺带配置 `PATH`。
+4. 如有需要，手动配置：
+
+   - `JAVA_HOME=C:\Development_tools\jdk1.8.0_xxx`
+   - 在 `Path` 中加入 `%JAVA_HOME%\bin`
+
+5. 验证：
+
    ```powershell
    java -version
+   javac -version
    ```
-3. 若看到类似以下输出即表示安装成功：
-   ```
-   java version "1.8.0_221"
-   Java(TM) SE Runtime Environment (build 1.8.0_221-b11)
-   Java HotSpot(TM) 64-Bit Server VM (build 25.221-b11, mixed mode)
-   ```
-4. 若提示「'java' 不是内部或外部命令」，请重启电脑后再试
 
----
+### macOS
 
-### 1.2 macOS 系统
+#### Temurin OpenJDK
 
-#### 方法一：Temurin OpenJDK（推荐，无需注册）
+1. 打开 [Eclipse Temurin Releases](https://adoptium.net/temurin/releases/)。
+2. 选择 macOS 的 JDK 8。
+3. Apple Silicon 选择 `aarch64`，Intel 机器选择 `x64`。
+4. 安装 `.pkg`。
 
-1. **下载**  
-   进入 [Eclipse Temurin 下载页](https://adoptium.net/temurin/releases/)，选择：
-   - 版本：8
-   - 操作系统：macOS
-   - 架构：Apple Silicon 选 **aarch64**，Intel 选 **x64**
-   - 格式：**PKG Installer**
+如果 `JAVA_HOME` 没有自动配置，可以手动追加：
 
-2. **安装**  
-   双击 `.pkg`，按向导默认安装。默认路径：`/Library/Java/JavaVirtualMachines/temurin-8.jdk`
+```bash
+# 现代 macOS 默认使用 zsh
+nano ~/.zshrc
+```
 
-3. **环境变量**（手动安装通常未自动配置）  
-   - 打开终端（启动台 → 其他 → 终端）  
-   - 编辑 Shell 配置（macOS 10.15+ 默认 Zsh）：
-     ```bash
-     # Zsh
-     nano ~/.zshrc
-     # 若使用 Bash
-     nano ~/.bash_profile
-     ```
-   - 在文件末尾添加（路径按实际安装版本调整）：
-     ```bash
-     export JAVA_HOME=/Library/Java/JavaVirtualMachines/temurin-8.jdk/Contents/Home
-     export PATH=$JAVA_HOME/bin:$PATH
-     ```
-   - 保存退出后执行：`source ~/.zshrc` 或 `source ~/.bash_profile`
+然后加入：
 
-#### 方法二：Oracle JDK
+```bash
+export JAVA_HOME=/Library/Java/JavaVirtualMachines/temurin-8.jdk/Contents/Home
+export PATH=$JAVA_HOME/bin:$PATH
+```
 
-1. 进入 [Oracle JDK 下载页](https://www.oracle.com/java/technologies/downloads/#java8)，选择 macOS 对应架构的 `.dmg`
-2. 双击 `.dmg`，将图标拖入「应用程序」完成安装
-3. 环境变量同方法一，默认路径示例：`/Library/Java/JavaVirtualMachines/jdk1.8.0_391.jdk/Contents/Home`
+重新加载：
 
-#### 验证
+```bash
+source ~/.zshrc
+```
 
-在终端执行：
+验证：
 
 ```bash
 java -version
@@ -108,191 +299,53 @@ javac -version
 echo $JAVA_HOME
 ```
 
-示例输出：
+#### Oracle JDK
 
-```
-openjdk version "1.8.0_392"
-OpenJDK Runtime Environment (Temurin)(build 1.8.0_392-b08)
-OpenJDK 64-Bit Server VM (Temurin)(build 25.392-b08, mixed mode)
-javac 1.8.0_392
-/Library/Java/JavaVirtualMachines/temurin-8.jdk/Contents/Home
-```
+你也可以安装 Oracle JDK 8，安装完成后按同样方式设置 `JAVA_HOME`。
 
----
+### Linux
 
-### 1.3 Linux 系统
+#### 包管理器安装
 
-#### 方法一：包管理器（推荐）
+- Ubuntu / Debian
 
-**Ubuntu / Debian：**
+  ```bash
+  sudo apt update
+  sudo apt install openjdk-8-jdk
+  sudo update-alternatives --config java
+  ```
 
-```bash
-# 更新包列表
-sudo apt update
+- CentOS / RHEL / Fedora
 
-# 安装 OpenJDK 8
-sudo apt install openjdk-8-jdk
+  ```bash
+  sudo yum install java-1.8.0-openjdk-devel
+  # 或者在较新的 Fedora 上
+  sudo dnf install java-1.8.0-openjdk-devel
+  ```
 
-# 若有多个 JDK，可切换默认版本
-sudo update-alternatives --config java
-```
+- Arch Linux
 
-**CentOS / RHEL / Fedora：**
+  ```bash
+  sudo pacman -S jdk8-openjdk
+  ```
 
-```bash
-# CentOS/RHEL 7/8、Fedora
-sudo yum install java-1.8.0-openjdk-devel
+#### 手动安装 Temurin
 
-# Fedora 新版本可用 dnf
-sudo dnf install java-1.8.0-openjdk-devel
-```
+1. 从 Temurin 下载 Linux 的 JDK 8 `.tar.gz`。
+2. 解压到例如 `/opt/java`。
+3. 在 `~/.bashrc`、`~/.profile` 或 `~/.zshrc` 中配置 `JAVA_HOME` 和 `PATH`。
 
-**Arch Linux：**
+示例：
 
 ```bash
-sudo pacman -S jdk8-openjdk
+export JAVA_HOME=/opt/java/jdk8u-xxx
+export PATH=$JAVA_HOME/bin:$PATH
 ```
 
-#### 方法二：Temurin 手动安装
-
-1. 打开 [Eclipse Temurin 下载页](https://adoptium.net/temurin/releases/)
-2. 选择 **Linux**、对应架构（x64 / aarch64）、**JDK 8**，下载 `.tar.gz`
-3. 解压并放到统一目录，例如：
-   ```bash
-   sudo mkdir -p /opt/java
-   sudo tar -xzf OpenJDK8U-jdk_*.tar.gz -C /opt/java
-   ```
-4. 配置环境变量，编辑 `~/.bashrc` 或 `~/.profile`（若用 Zsh 则 `~/.zshrc`）：
-   ```bash
-   export JAVA_HOME=/opt/java/jdk8u-xxx  # 替换为实际解压目录名
-   export PATH=$JAVA_HOME/bin:$PATH
-   ```
-5. 使配置生效：`source ~/.bashrc` 或 `source ~/.zshrc`
-
-#### 验证
+重新加载 shell 后验证：
 
 ```bash
 java -version
 javac -version
 echo $JAVA_HOME
-```
-
----
-
-## 二、JAR 方式安装与运行
-
-这是**最简单、推荐**的方式，适用于所有平台。
-
----
-
-### 2.1 Windows
-
-#### 步骤 1：准备目录
-
-1. 在任意盘符（如 D 盘）新建文件夹 `LinkMind`
-2. 将 `LinkMind.jar` 复制到该文件夹
-
-#### 步骤 2：启动
-
-1. 按 `Win + X`，选择 **「Windows PowerShell」** 或 **「终端(管理员)」**
-2. 进入目录并启动（路径按实际修改）：
-   ```powershell
-   cd D:\LinkMind
-   java -jar LinkMind.jar
-   ```
-3. **首次启动**会自动：
-   - 在当前目录下创建 `config`（配置文件）和 `data`（数据与 SQLite 等）
-   - 生成默认配置 `lagi.yml`
-4. **启动成功**：控制台出现 `Tomcat started on port(s): 8080 (http)`，且无红色报错
-
-#### 步骤 3：访问
-
-浏览器打开：**http://localhost:8080**
-
----
-
-### 2.2 macOS
-
-#### 步骤 1：准备目录
-
-1. 在「访达」中进入「文稿」(Documents)，新建文件夹 `LinkMind`
-2. 将 `LinkMind.jar` 放入该文件夹
-
-#### 步骤 2：启动
-
-1. 打开「启动台」→「其他」→「终端」
-2. 执行：
-   ```bash
-   cd ~/Documents/LinkMind
-   java -jar LinkMind.jar
-   ```
-3. 首次启动会自动创建 `config` 和 `data`
-
-#### 步骤 3：访问
-
-浏览器打开：**http://localhost:8080**
-
----
-
-### 2.3 Linux
-
-#### 步骤 1：准备目录
-
-```bash
-mkdir -p ~/LinkMind
-# 将 LinkMind.jar 复制到 ~/LinkMind/LinkMind.jar
-cp /path/to/LinkMind.jar ~/LinkMind 
-```
-
-#### 步骤 2：启动
-
-```bash
-cd ~/LinkMind
-java -jar LinkMind.jar
-```
-
-如需后台运行（关闭终端后仍运行）：
-
-```bash
-nohup java -jar LinkMind.jar > linkmind.log 2>&1 &
-```
-
-首次启动同样会自动创建 `config` 和 `data`。
-
-#### 步骤 3：访问
-
-浏览器打开：**http://localhost:8080**
-
----
-
-## 三、修改端口与数据目录
-
-### 3.1 修改端口
-
-若 8080 被占用，可指定其他端口：
-
-```powershell
-# Windows PowerShell
-java -jar LinkMind.jar --port=8090
-```
-
-```bash
-# macOS / Linux
-java -jar LinkMind.jar --port=8090
-```
-
-然后访问：**http://localhost:8090**
-
-### 3.2 指定配置与数据目录
-
-**Windows：**
-
-```powershell
-java -jar LinkMind.jar --config=D:\LinkMindConfig --data-dir=D:\LinkMindData
-```
-
-**macOS / Linux：**
-
-```bash
-java -jar LinkMind.jar --config=/path/to/config --data-dir=/path/to/data
 ```

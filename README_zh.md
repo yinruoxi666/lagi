@@ -1,389 +1,242 @@
-简体中文| [English](README.md)
+简体中文 | [English](README.md)
 
-## **项目简介**
+# <img src="docs/images/logo/LinkMind%20logo%281%29.png" alt="LinkMind logo" width="42"> LinkMind
 
-LinkMind（联智）是由北京联动北方科技有限公司精心打造的一款，旨在解决开源大模型技术飞速发展与企业实际应用之间存在显著差距的解决方案。它是一款企业级的复合多模态大模型中间件，旨在桥接这一鸿沟，通过提供一个既安全又专业的平台，使得企业能够以低成本、高效率的方式定制并部署大模型。
+LinkMind 是面向企业场景的多模态 AI 中间件，用来把业务系统、私有知识、模型厂商和 Agent 运行时统一接到一层可治理、可扩展、可上线的能力层里。它优先解决的是企业真正落地时最常见的几个问题：上手慢、接入碎、成本高、稳定性差。
 
-支持但不限于以下大模型：
+## 项目简介
 
-<div style="display: flex; flex-wrap: wrap; justify-content: flex-start; align-items: center;">
-    <div style="display: flex; align-items: center; margin: 10px;">
-        <img src="docs/images/logo/model/img_1.png" width="20" style="margin: 10px;" height="20">
-        <span style="font-size: 12px;width: 70px; text-align: left;">Landing&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
-        <img src="docs/images/logo/model/img_2.jpeg" width="20" style="margin: 10px;" height="20">
-        <span style="font-size: 12px;width: 70px; text-align: left;">Vicuna&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
-        <img src="docs/images/logo/model/img_4.jpeg" width="20" style="margin: 10px;" height="20">
-        <span style="font-size: 12px;width: 70px; text-align: left;">ChatGPT&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
-        <img src="docs/images/logo/model/img_3.jpeg" width="20" style="margin: 10px;" height="20">
-        <span style="font-size: 12px;width: 70px; text-align: left;">GPTAzure&nbsp;&nbsp;&nbsp;&nbsp;</span>
-        <img src="docs/images/logo/model/img_12.webp" width="20" style="margin: 10px;" height="20">
-        <span style="font-size: 12px;width: 70px; text-align: left;">Gemini&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
-        <img src="docs/images/logo/model/img_5.png" width="20" style="margin: 10px;" height="20">
-        <span style="font-size: 12px;width: 70px; text-align: left;">Qwen&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
-    </div>
-	</br>
- <div style="display: flex; align-items: center; margin: 10px;">
-        <img src="docs/images/logo/model/img_6.png" width="20" style="margin: 10px;" height="20">
-        <span style="font-size: 12px;width: 70px; text-align: left;">Baidu&nbsp;Ernie &nbsp;&nbsp; </span>
-        <img src="docs/images/logo/model/img_7.jpg" width="20" style="margin: 10px;" height="20">
-        <span style="font-size: 12px;width: 70px; text-align: left;">ChatGLM&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
-        <img src="docs/images/logo/model/img_8.png" width="20" style="margin: 10px;" height="20">
-        <span style="font-size: 12px;width: 70px; text-align: left;">Moonshot&nbsp;AI&nbsp;</span>
-        <img src="docs/images/logo/model/img_9.jpeg" width="20" style="margin: 10px;" height="20">
-        <span style="font-size: 12px;width: 70px; text-align:   left;">Baichuan&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
-        <img src="docs/images/logo/model/img_10.jpeg"width="20" style="margin: 10px;" height="20">
-        <span style="font-size: 12px;width: 70px; text-align: left;">IFLYTEK&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
-        <img src="docs/images/logo/model/img_11.png" width="20" style="margin: 10px;" height="20">
-        <span style="font-size: 12px;width: 70px; text-align: left;">SenseChat&nbsp;&nbsp;&nbsp;</span>
-    </div>
-		</br>
-    <div style="display: flex; align-items: center; margin: 10px;">
-        <img src="docs/images/logo/model/img_13.png" width="20" style="margin: 10px;" height="20">
-        <span style="font-size: 12px;width: 70px; text-align: left;">Doubao&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp</span>
-        <img src="docs/images/logo/model/img_14.jpeg" width="20" style="margin: 10px;" height="20">
-        <span style="font-size: 12px;width: 70px; text-align: left;">DeepSeek&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
-        <img src="docs/images/logo/model/img_15.webp" width="20" style="margin: 10px;" height="20">
-        <span style="font-size: 12px;width: 70px; text-align: left;">Claude&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
-        <img src="docs/images/logo/model/img_16.jpg" width="20" style="margin: 10px;" height="20">
-        <span style="font-size: 12px;width: 70px; text-align: left;">MiniMax&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
-    </div>
-	</br>
-</div>
+当前代码已经覆盖统一聊天入口、RAG、OCR、ASR/TTS、图片与视频能力、文档处理、Text-to-SQL、Embedding、Rerank、MCP、Skills、Worker 编排，以及 OpenAI 兼容接口。同时，项目还内置了 OpenClaw、Hermes Agent、DeerFlow 的配置同步能力，便于接入现有 Agent 工作流。
 
+### 模型与运行时生态
 
-支持但不限于以下智能体平台：
+**模型与提供方**
 
-<div style="display: flex; flex-wrap: wrap; justify-content: flex-start;">
-    <div style="display: flex; align-items: center; margin: 10px;">
-        <img src="docs/images/logo/img_4.jpeg" width="20" style="margin: 10px;" height="20">
-        <span style="font-size: 12px;" >混元智能体平台&nbsp;&nbsp;&nbsp;</span>
-        <img src="docs/images/logo/img_1.png" width="20" style="margin: 10px;" height="20">
-        <span style="font-size: 12px;">扣子智能体平台&nbsp;&nbsp;&nbsp;</span>
-        <img src="docs/images/logo/img_2.png" width="20" style="margin: 10px;" height="20">
-        <span style="font-size: 12px;">文心智能体平台&nbsp;&nbsp;&nbsp;</span>
-        <img src="docs/images/logo/img_3.png" width="20" style="margin: 10px;" height="20">
-        <span style="font-size: 12px;">智谱智能体平台&nbsp;&nbsp;&nbsp;</span>
-    </div>
-</div>
+<table>
+  <tr>
+    <td><img src="docs/images/logo/model/img_3.jpeg" width="18" alt="Azure OpenAI"> Azure OpenAI</td>
+    <td><img src="docs/images/logo/model/img_9.jpeg" width="18" alt="Baichuan"> Baichuan</td>
+    <td><img src="docs/images/logo/model/img_7.jpg" width="18" alt="ChatGLM"> ChatGLM</td>
+    <td><img src="docs/images/logo/model/img_15.webp" width="18" alt="Claude"> Claude</td>
+  </tr>
+  <tr>
+    <td><img src="docs/images/logo/model/img_14.jpeg" width="18" alt="DeepSeek"> DeepSeek</td>
+    <td><img src="docs/images/logo/model/img_13.png" width="18" alt="Doubao"> Doubao</td>
+    <td><img src="docs/images/logo/model/img_6.png" width="18" alt="ERNIE"> ERNIE</td>
+    <td><img src="docs/images/logo/model/img_2.jpeg" width="18" alt="FastChat / Vicuna"> FastChat / Vicuna</td>
+  </tr>
+  <tr>
+    <td><img src="docs/images/logo/model/img_12.webp" width="18" alt="Gemini"> Gemini</td>
+    <td><img src="docs/images/logo/model/img_17.png" width="18" alt="Grok"> Grok</td>
+    <td><img src="docs/images/logo/img_4.jpeg" width="18" alt="Hunyuan"> Hunyuan</td>
+    <td><img src="docs/images/logo/model/img_10.jpeg" width="18" alt="iFLYTEK Spark"> iFLYTEK Spark</td>
+  </tr>
+  <tr>
+    <td><img src="docs/images/logo/model/img_16.jpg" width="18" alt="MiniMax"> MiniMax</td>
+    <td><img src="docs/images/logo/model/img_8.png" width="18" alt="Moonshot / Kimi"> Moonshot / Kimi</td>
+    <td><img src="docs/images/logo/model/img_4.jpeg" width="18" alt="OpenAI"> OpenAI</td>
+    <td><img src="docs/images/logo/model/img_18.webp" width="18" alt="OpenRouter"> OpenRouter</td>
+  </tr>
+  <tr>
+    <td><img src="docs/images/logo/model/img_5.png" width="18" alt="Qwen"> Qwen</td>
+    <td><img src="docs/images/logo/model/img_11.png" width="18" alt="SenseChat"> SenseChat</td>
+    <td><img src="docs/images/logo/model/img_19.png" width="18" alt="StepFun"> StepFun</td>
+    <td><img src="docs/images/logo/model/img_20.png" width="18" alt="Xiaomi"> Xiaomi</td>
+  </tr>
+</table>
 
-  </br>
-支持但不限于以下数据库类型：
-  </br>
-<div style="display: flex; flex-wrap: wrap; justify-content: flex-start;">
-    <div style="display: flex; align-items: center; margin: 10px;">
-        <img src="docs/images/logo/img_4.png" width="20" style="margin: 10px;" height="20">
-        <span style="font-size: 12px;">Chroma&nbsp;&nbsp;&nbsp;</span>
-        <img src="docs/images/logo/img_5.png" width="20" style="margin: 10px;" height="20">
-        <span style="font-size: 12px;">elastic&nbsp;&nbsp;&nbsp;</span>
-        <img src="docs/images/logo/img_6.png" width="20" style="margin: 10px;" height="20">
-        <span style="font-size: 12px;">mysql&nbsp;&nbsp;&nbsp;</span>
-    </div>
-</div>
+**本地 Agent 框架**
 
-## 安装运行
+<table>
+  <tr>
+    <td><img src="docs/images/logo/img_23.jpg" width="18" alt="DeerFlow"> DeerFlow</td>
+    <td><img src="docs/images/logo/img_22.png" width="18" alt="Hermes Agent"> Hermes Agent</td>
+    <td><img src="docs/images/logo/img_21.jpg" width="18" alt="OpenClaw"> OpenClaw</td>
+  </tr>
+</table>
 
-前置要求：本机已安装 **JDK 8**。若未安装或需各平台详细步骤，请参阅 [安装指南（JDK 安装与详细配置）](docs/install_zh.md)。
+**云端 Agent 平台**
 
-**使用官方安装脚本**
+<table>
+  <tr>
+    <td><img src="docs/images/logo/img_1.png" width="18" alt="Coze"> Coze</td>
+    <td><img src="docs/images/logo/img_4.jpeg" width="18" alt="Hunyuan Agents"> Hunyuan Agents（混元智能体）</td>
+    <td><img src="docs/images/logo/img_2.png" width="18" alt="Wenxin Agents"> Wenxin Agents（文心智能体）</td>
+    <td><img src="docs/images/logo/img_3.png" width="18" alt="Zhipu Agents"> Zhipu Agents（智谱智能体）</td>
+  </tr>
+</table>
 
-在终端中执行对应命令即可下载并完成安装：
+**Data & Retrieval（数据与检索）**
 
-- **Windows（PowerShell）：**
+<table>
+  <tr>
+    <td><img src="docs/images/logo/img_4.png" width="18" alt="Chroma"> Chroma</td>
+    <td><img src="docs/images/logo/img_5.png" width="18" alt="Elasticsearch"> Elasticsearch</td>
+    <td><img src="docs/images/logo/img_26.png" width="18" alt="Milvus"> Milvus</td>
+  </tr>
+  <tr>
+    <td><img src="docs/images/logo/img_6.png" width="18" alt="MySQL"> MySQL</td>
+    <td><img src="docs/images/logo/img_27.png" width="18" alt="Pinecone"> Pinecone</td>
+    <td><img src="docs/images/logo/img_28.png" width="18" alt="SQLite"> SQLite</td>
+  </tr>
+</table>
+
+以上条目按类型分组，并按英文名称字母顺序排列。新增模型、向量库、适配器或二次开发接口的方式见[扩展开发文档](docs/extend_zh.md)。Chroma 的具体安装与补充说明见[附件](docs/annex_zh.md)。
+
+## 为什么选 LinkMind
+
+- 一层中间件同时覆盖聊天、OCR、ASR/TTS、图片生成、图像与视频理解、Text-to-SQL、Embedding、Rerank、文档处理等能力。
+- 多模型路由、故障切换和编排统一配置在 `lagi.yml` 中，业务系统不用为不同厂商重复改接口。
+- RAG 可以直接接到 Chroma、Elasticsearch、Milvus、MySQL、Pinecone、SQLite 等检索组件，也能继续扩展图谱类增强能力。
+- Medusa 缓存加速、Token 统计、过滤器和运行时治理，都是面向真实生产场景的稳定性与成本问题设计的。
+- OpenClaw、Hermes Agent、DeerFlow 的接入钩子已经内置，适合在现有 Agent 工作流里逐步落地。
+
+  <a href="docs/images/img_24.png">
+    <img src="docs/images/img_24.png" alt="LinkMind 运行时集成示意图">
+  </a>
+
+## 几分钟上手
+
+下面 4 种方式是并列选项，任选其一即可。
+
+### 选项1：官方安装脚本快速安装
+
+前置要求：先安装 **JDK 8 或以上版本**。如果还没装 Java，可直接跳到[安装指南](docs/install_zh.md#附录安装-jdk-8)中的附录。
+
+- Windows PowerShell
+
   ```powershell
-  iwr -useb https://downloads.landingbj.com/install.ps1 | iex
+  iwr -useb https://cdn.linkmind.top/install.ps1 | iex
   ```
-- **macOS / Linux：**
+
+- macOS / Linux
+
   ```bash
-  curl -fsSL https://downloads.landingbj.com/install.sh | bash
+  curl -fsSL https://cdn.linkmind.top/install.sh | bash
   ```
 
-**推荐方式：使用 JAR 运行**
+安装器支持两种运行模式：
 
-1. 将 `LinkMind.jar` 放到任意目录（如 `D:\LinkMind` 或 `~/LinkMind`）。
-2. 在该目录下执行：
-   - **Windows（PowerShell 或 cmd）：**
-     ```powershell
-     java -jar LinkMind.jar
-     ```
-   - **macOS / Linux：**
-     ```bash
-     java -jar LinkMind.jar
-     ```
-3. 首次运行会自动生成 `config`、`data` 及默认配置 `lagi.yml`。
-4. 浏览器访问 **http://localhost:8080** 即可使用。
+| 模式 | 适用场景 |
+| --- | --- |
+| `Agent Mate` | 本机已经在使用 OpenClaw、Hermes Agent、DeerFlow，希望 LinkMind 作为统一中间层接入 |
+| `Agent Server` | 先单独启动 LinkMind，直接体验控制台和 API，或做独立部署评估 |
 
-修改端口、指定配置/数据目录等说明见 [安装指南](docs/install_zh.md)。
+### 选项2：下载并运行 JAR 包
 
-## 产品特性
-本产品通过一系列先进技术和优化设计，提供高效、稳定且易用的功能，以满足多样化的用户需求。以下为主要特性：
+预打包资源：
 
-**更精准的检索增强（RAG）**
+- 应用文件：`LinkMind.jar`，[点击这里下载](https://cdn.linkmind.top/installer/LinkMind.jar)
+- 核心库文件：`lagi-core-1.2.0-jar-with-dependencies.jar`，[点击这里下载](https://ai.linkmind.top/lagi/lib/lagi-core-1.2.0-jar-with-dependencies.jar)
 
-通过精细化的数据管理和优化算法，确保模型输出具有高准确性。
-支持模型持续学习，逐步提升整体性能和响应精度。
-
-**更快速的预读缓存（Medusa）**
-
-引入 Medusa 技术，通过预读缓存机制有效减少用户等待时间。
-优化数据处理流程，进一步提升模型运行效率。
-
-**更高效的模型性能提升**
-
-采用先进的性能优化策略，显著提高模型的计算效率和响应速度。
-在多种应用场景中保持高性能表现，满足复杂任务需求。
-
-**更稳定的自动切换大模型**
-
-支持多链路备份机制，确保系统在故障发生时能够无缝切换至备用模型。
-提供稳定的运行环境，降低因技术故障导致的服务中断风险。
-
-**更强大的意图探查（Graph）**
-
-利用知识图谱技术，精准识别用户意图并提供针对性的响应。
-快速分析用户输入，确保响应准确、稳定且易于使用。
-
-
-**更便捷的一次编写多模型通用**
-
-支持一次编写即可适配多个模型，显著减少开发中的重复工作。
-降低开发和维护难度，提升整体开发效率。
-
-
-## 在线Demo
-
-为了让用户能够直观感受到LinkMind(联智) 的强大功能和便捷性，我们提供了一个在线Demo。您可以通过以下链接访问并体验：[https://lagi.landingbj.com](https://lagi.landingbj.com/)。
-
-## 快速开始
-
-对于开发者而言，我们提供了简便的方法来编译和运行LinkMind(联智) 应用。您可以选择使用maven工具进行封包，或者通过IntelliJ IDEA等主流的集成开发环境（IDE）运行。请确保您使用的 JDK 版本为 8 或以上。
-
-### 方法一：使用maven
-
-首先，您需要克隆LinkMind(联智) 项目的仓库，并切换到项目目录：
-
-```shell
-git clone https://github.com/landingbj/lagi.git
-cd lagi
+```powershell
+java -jar LinkMind.jar
 ```
 
-接下来，修改[`src/main/resources/lagi.yml`](lagi-web/src/main/resources/lagi.yml)配置文件，将其中的大语言模型API_KEY或SECRET_KEY替换为您自己的密钥，并根据需要将启用的模型的`enable`字段设置为`true`。详细的配置方法可参见[配置文档](docs/config_zh.md)。
+首次启动会自动生成 `config/`、`data/` 和默认的 `lagi.yml`，随后访问 `http://localhost:8080` 即可。
 
-```yaml
-- name: gpt-test
-  type: GPT
-  enable: true
-  priority: 1
-  model: gpt-3.5-turbo-1106
-  api_key: your-apikey
+### 选项3：使用 Docker 镜像
+
+镜像名称：`landingbj/linkmind`
+
+```bash
+docker pull landingbj/linkmind
+docker run -d -p 8080:8080 landingbj/linkmind
 ```
 
-然后，使用maven命令进行项目封包，封包完成后的jar文件和war文件将会在`target`目录下生成：
+启动后访问 `http://localhost:8080`。
 
-```shell
+### 选项4：从源码编译
+
+```bash
 mvn clean package -pl lagi-web -am -DskipTests -U
 ```
 
-最后，可以将生成的war包部署到Tomcat服务器中，或者直接运行已经嵌入Tomcat的jar包。启动后，通过浏览器访问对应的端口，即可查看LinkMind(联智) 的具体页面。
+当前打包结果为：
 
-### 方法二：使用IDE
+- `lagi-web/target/LinkMind.jar`
+- `lagi-web/target/ROOT.war`
 
-如果您更习惯使用IDE进行开发，可以直接使用IntelliJ IDEA等主流IDE打开LinkMind(联智) 项目。将项目作为web工程发布到Tomcat服务器中后，就可以通过浏览器访问相应的端口，查看LinkMind(联智) 的界面。
+更完整的安装说明见 [安装指南](docs/install_zh.md)。如需跟着示例一步步跑通，请参考[教学演示](docs/tutor_zh.md)。
 
-### 方法三：Docker 
+启动 LinkMind 后，可继续查看 [配置指南](docs/config_zh.md)，启用 `lagi.yml` 中的模型、路由、过滤器、RAG 等运行配置。
 
-- 镜像名称：`landingbj/lagi`
+## 接口风格
 
-- 拉取命令：
+LinkMind 当前同时暴露两套路由风格：
 
-  ```bash
-  docker pull landingbj/lagi
-  ```
+- LinkMind 原生路由，例如 `/chat/completions`、`/audio/speech2text`、`/audio/text2speech`、`/image/text2image`、`/sql/text2sql`、`/instruction/generate`、`/doc/doc2ext`、`/ocr/doc2ocr`
+- OpenAI 兼容路由，例如 `/v1/chat/completions`、`/v1/models`、`/v1/embeddings`、`/v1/images/generations`、`/v1/rerank`
 
-- 启动容器：
+当前有一个仍按代码映射保留在 `/v1` 命名空间下的例外：向量管理接口 `/v1/vector/*`。完整的接口文档见 [API 参考](docs/API_zh.md)。
 
-  ```bash
-  docker run -d --name lagi-web -p 8080:8080 landingbj/linkmind
-  ```
+## 二次开发接口
 
-## 教学演示
+LinkMind 将二次开发能力放在清晰的面向对象边界之后，便于在不改动主流程的前提下扩展业务能力。
 
-为了帮助您高效地熟悉并运用 LinkMind(联智) ，我们准备了一套全面的[教学演示](docs/tutor_zh.md)。通过该教程，无论您是初学者还是有经验的开发者，都能快速上手。该教程还涵盖了 LinkMind(联智) 基础环境向量数据库的搭建，手把手地引导您从 LinkMind(联智) 的下载、安装、配置到实际运行，让您轻松入门，快速掌握 LinkMind(联智) 的操作技巧。
+- `通讯层与带外数据`：OpenAI 兼容请求支持 `extra_body`，运行时通过专门的工具类完成编码、解码和当前用户注入，不把业务解析逻辑塞进 Adapter 主链路，因此不会影响既有补全、流式输出和级联调用。
+- `Skill 层社交数据`：社交交互数据封装在 Skill 与 Service 内部，并通过 `/socialChannel/*` 对外暴露。如果不启用社交 Skill，原有聊天流程和 Token 路径保持不变。
+- `认证、API Key 与计费`：`/user/*`、`/apiKey/*`、`/credit/*` 构成稳定的对外接口层，用于账号绑定、Key 池管理和计费流程接入，业务方可以替换后端实现而不改变接口协议。
 
-## API接口
+这种分层方式让二开具备两个直接优势：对现有代码零侵入，以及按需启用。你可以只接入自己需要的接口，而不必重写整套运行时。
 
-LinkMind(联智) 项目还提供了多个RESTful API接口，方便用户将AI服务集成到自己的应用中。我们为开发者准备了详尽的[API接口文档](docs/API_zh.md)，您可以参考文档了解如何使用这些API来丰富您的应用功能。
+## Agent 运行时集成
 
-## 开发集成
+- **OpenClaw**：可以把 LinkMind 注入为 OpenAI 兼容 Provider，也可以把 OpenClaw 的模型选择反向同步回 `lagi.yml`
+- **Hermes Agent**：可以通过 `~/.hermes/config.yaml` 和 `.env` 导入导出模型配置
+- **DeerFlow**：可以通过 DeerFlow 的 `config.yaml` 和 `.env` 导入导出模型配置
 
-为了帮助您更好地了解和使用 LinkMind(联智) ，我们为您提供了详尽的[指南](docs/guide_zh.md)，您可以参考该文档了解项目的结构和内容，以便您能够快速调用相关功能，并高效地开发大模型应用。帮助您理解并使用项目中提供的各种 AI 功能。通过这份指南，您可以轻松地将文本对话、语音识别、文字转语音、图片生成等 AI 功能集成到您的应用程序中，实现更智能、更人性化的交互体验。
+如果你只是首次评估，建议先用 `Agent Server` 跑通控制台与 API；确认稳定后，再切到 `Agent Mate` 接入现有 Agent 运行时。
 
-如果您希望将LinkMind(联智) 集成到您的项目中，您可以参考我们的[集成文档](docs/guide_zh.md#快速集成进您的项目)。该文档将助您轻松实现LinkMind(联智) 的快速集成。此外，我们还提供了常见问题解答和最佳实践，帮助您在集成过程中避免常见陷阱，确保项目顺利进行。它涵盖了从环境搭建到功能实现的全方位指导。无论您是初学者还是有经验的开发者，都能快速将LinkMind(联智) 集成进您的项目中。
+## 核心功能
 
-## OpenClaw 插件
+### 1. RAG + Embedding
 
-### 从已发布包安装
+把私有文档、问答对和结构化知识转成可检索上下文，通过向量库、Embedding、OCR 与文档处理流水线支撑真实知识库问答。
 
-包发布后，用户可通过以下命令安装：
+### 2. Medusa
 
-```bash
-openclaw plugins install linkmind-context@latest
-```
+通过内置缓存加速层缩短重复请求的响应时间，让模型运行在真实业务流量下更稳、更快。
 
-OpenClaw 会优先查询 ClawHub，若不可用则自动回退到 npm。
+### 3. Airank（路由与编排）
 
-### OpenClaw 配置
+利用 `best(...)`、`pass(...)` 等路由规则统一完成多模型选择、排序、故障切换与编排，而不是把厂商逻辑散落在各个业务系统里。
 
-在 OpenClaw 配置文件中配置该插件，并将其选为当前使用的上下文引擎：
+### 4. 安全与合规
 
-```json
-{
-  "plugins": {
-    "slots": {
-      "contextEngine": "linkmind-context"
-    },
-    "entries": {
-      "linkmind-context": {
-        "enabled": true,
-        "config": {
-          "apiUrl": "http://localhost:8080/v1",
-          "logLevel": "info"
-        }
-      }
-    }
-  }
-}
-```
+通过[安全与合规文档](docs/security_zh.md)集中说明安全围栏、策略检查、数据处理、访问控制、模型提供方治理与部署责任边界。
 
-### 配置说明
+### 5. Graph
 
-| 字段 | 类型 | 默认值 | 说明 |
-| --- | --- | --- | --- |
-| `apiUrl` | `string` | `http://localhost:8080/v1` | LinkMind 服务的基础 URL |
-| `logLevel` | `string` | `info` | 日志级别 |
+在向量检索之外补充图谱类上下文增强和意图理解能力，适合更复杂的企业知识与推理场景。
 
-## 自由扩展 
+### 6. Token Grid（级联网络）
 
-如您对LinkMind(联智) 已适配的大模型不满意，您还可以参考我们的[扩展文档](docs/extend_zh.md)，来对LinkMind(联智) 进行扩展，适配您喜欢的大模型。该文档不仅涵盖了功能模型的适配扩展和向量数据库的扩展方法，还提供了扩展示列，帮助您快速掌握LinkMind(联智) 扩展的方法，以满足您的特定需求。
+Token Grid 把多个 LinkMind 节点连接成类似“国家电网”的智能网络。在这套网络里，多级架构中的各级 Agent Server 并非仅仅是中转站。它更像梯级水电站，每一层都可以挂载自己的“机模”，包括本地模型、厂商路由、工具、技能、私有知识库和策略控制。全网所有节点既是上游能力的消费者，也是向下游输出算力与领域能力的提供者，同时通过级联链路保障数据和权限的物理与逻辑隔离。
 
-若您在使用LinkMind(联智) 时，对其已适配的向量数据库感到不够满意，您也可以参考我们的[扩展文档](docs/extend_cn.md#数据库扩展)，来对LinkMind(联智) 进行扩展，适配您喜欢的向量数据库。从而满足您多样化的业务需求，提升系统的整体性能和可靠性，为您带来更加丰富和高效的数据管理体验。
+<a href="docs/images/token_grid_zh.png">
+  <img src="docs/images/token_grid_zh.png" alt="Token Grid 级联网络概念图">
+</a>
 
-## 安全过滤
+### 7. OpenClaw 插件
 
-LinkMind（联智）支持自定义安全过滤规则，管控模型内容、引导对话走向，支持两种配置方式：[`src/main/resources/lagi.yml`](lagi-web/src/main/resources/lagi.yml)（集中配置，推荐）；②指定JSON文件（分文件配置）。
+把 LinkMind 作为 OpenClaw 生态里可插拔、兼容 OpenAI 的上下文层与 Provider 层来接入，而不是逐个模型分散配置。
 
-### 1. 敏感词过滤
-管控模型输入/输出敏感内容，支持3种策略：`mask`（遮罩替换）、`erase`（内容擦除）、`block`（整句拦截）。
-#### 方式1：[`src/main/resources/lagi.yml`](lagi-web/src/main/resources/lagi.yml)配置
-```yaml
-filters:
-  - name: sensitive # 输出过滤
-    groups:
-      - level: mask # 遮罩替换
-        rules: 'openai,FLG,...' # 正则逗号替换为\\,
-      - level: erase # 内容擦除
-        rules: 'your context,...'
-      - level: block # 整句拦截
-        rules: 'shit,CNM,...'
-  - name: sensitive_input # 输入过滤，格式同上
-    groups:
-      - level: mask # 遮罩替换
-        rules: 'openai,FLG,...' # 正则逗号替换为\\,
-      - level: erase # 内容擦除
-        rules: 'your context,...'
-      - level: block # 整句拦截
-        rules: 'shit,CNM,...'
-```
+如需将这些能力通过 `lagi-core` 或 REST API 接入到业务系统，请继续阅读[开发集成指南](docs/guide_zh.md)。
 
-#### 方式2：JSON文件配置
-- 输入过滤：[sensitive_input.json](lagi-web/src/main/resources/sensitive_input.json)
-- 输出过滤：[sensitive_word.json](lagi-web/src/main/resources/sensitive_word.json)
-```json
-{
-  "mask": "...", // 默认遮罩符
-  "level": 3, // 1=block/2=mask/3=erase（默认）
-  "rules": [
-        {"rule":"OPENAI"}, {"rule":"hello","level":2,"mask":"***"}
-        {"rule":"(?<!\\d)1[3-9]\\d{9}(?!\\d)", "level": 2, "mask": "*", "type": "phone"},
-        {"rule":"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}", "level": 2, "mask": "*", "type": "email"},
-        {"rule":"(?<!\\d)\\d{17}[\\dxX](?!\\d)", "level": 2, "mask": "*", "type": "idcard"},
-        {"rule":"(?<!\\d)1[3-9]\\d{9}(?!\\d)", "level": 2, "mask": "*", "type": "bankcard"},
-        {"rule":"(密码|password|passwd|pwd|secret|token|api_key|apikey)\\s*[=:：]\\s*[\"']?[^\\s\"']+[\"']?", "level": 2, "mask": "*", "type": "password"},
-        {"rule":"sk-[\\da-z]{10,100}", "level": 2, "mask": "*", "type": "api-key"}
-    ]
-```
+## Agentic Social（智能体社交）
 
-### 2. 优先级关键词
-提升RAG检索匹配权重：
-```yaml
-filters:
-  - name: priority
-    rules: 'car,weather,
-            社*保'
-```
-- JSON：[priority_word.json](lagi-web/src/main/resources/priority_word.json)，格式`["car","社*保"]`
+Agentic Social 为智能体提供结构化的上下文交换、用户意图传递、协作信号和社交交互数据通道，而不是把这些逻辑硬塞进主聊天链路。社交数据封装在 Skill 与 Service 内部，并通过 `/socialChannel/*` 对外暴露，团队可以按需启用智能体之间、用户与智能体之间的协作能力。
 
-### 3. 会话停止关键词
-#### 停止关键词
-匹配后分割终对话消息：
-- yml：
-```yaml
-filters:
-  - name: stopping
-    rules: 'bye,
-            开始*'
-```
-- JSON：[stopping_word.json](lagi-web/src/main/resources/stopping_word.json)，格式`["bye","开始*"]`
-
-#### 续聊关键词
-标记对话延续（仅yml配置）：
-```yaml
-filters:
-  - name: continue
-    rules: 'about,next,资料'
-```
-- JSON：[continue_word.json](lagi-web/src/main/resources/continue_word.json)，格式`["bye","开始*"]`
-
-## Rerank与Embedding模型
-
-下载[ai数据库](https://downloads.landingbj.com/lagi/ai-sqlite.zip)和[Embedding模型](https://downloads.landingbj.com/lagi/embedding_2048.model)，然后分别在配置文件内设置ai库和embedding模型的配置。
-
-ai数据库下载完成后，解压到任意目录，参考以下内容进行数据源配置。
-
-```yaml
-  database:
-    - name: ai
-      jdbc_url: jdbc:sqlite:{ai_sqlite_path}
-      driver: org.sqlite.JDBC
-      username: root
-      password: 123456
-      maximum_pool_size: 160
-      idle_timeout: 0
-      max_lifetime: 2877700
-```
-
-embedding模型下载完成后，添加如下配置启用LinkMind的Embedding模型。
-
-```yaml
-  embedding:
-    - backend: landing
-      type: Landing
-      model_path: {embedding_model_path}
-```
-
-Rerank功能只需要ai数据库文件，Embedding模型两者都需要。
-
-两者的API接口参考[API接口文档](docs/API_zh.md)。
-
-## 下载资源
-
-我们为用户提供了预打包的应用程序，方便直接下载和使用：
-
-- **核心库文件**：LinkMind(联智)的核心依赖库。
-  - 文件名：`lagi-core-jar-with-dependencies.jar`
-  - 下载链接：[点击这里下载](https://downloads.landingbj.com/lagi/lib/lagi-core-1.2.0-jar-with-dependencies.jar)
-- **应用文件**：LinkMind(联智)的完整封包，安装 JDK 后可直接运行。
-  - 文件名：`LinkMind.jar`
-  - 下载链接：[点击这里下载](https://downloads.landingbj.com/lagi/installer/LinkMind.jar)
-
-
-感谢您对 LinkMind(联智) 的关注与支持！如有任何问题或建议，请随时与我们联系。
+<table width="100%">
+  <tr>
+    <td valign="top" width="50%">
+      <h2>License</h2>
+      <p>本项目遵循 <a href="LICENSE">LICENSE</a>。</p>
+    </td>
+    <td valign="top" width="50%">
+      <h2>演示参看</h2>
+      <p>演示地址：<a href="https://linkmind.landingbj.com/">https://linkmind.landingbj.com/</a></p>
+    </td>
+  </tr>
+</table>

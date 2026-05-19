@@ -1,407 +1,878 @@
-# 配置参考指南
+# 配置指南
 
-系统首页展示名称，这个设置指定了将在系统首页显示的名称，这里是“ LinkMind”。
+本文档以当前代码中的 `lagi-web/src/main/resources/lagi.yml` 以及实际加载这些配置的 Java 类为准。如果你看到旧截图、旧博客或历史示例与本文不一致，请以当前代码和 YAML 结构为准。
+
+## 先从最小可用配置开始
 
 ```yaml
 system_title: LinkMind
-```
 
-模型配置
-
-```yaml
-# 这部分定义了中间件使用的模型配置。
 models:
-  # 单驱动模型情况下模型的配置。
-  - name: chatgpt  # 后端服务的名称。
-    type: OpenAI  # 所属公司，例如这里是OpenAI
-    enable: false # 这个标志决定了后端服务是否启用。“true”表示已启用。
-    model: gpt-3.5-turbo,gpt-4-turbo # 驱动支持的模型列表
-    driver: ai.llm.adapter.impl.GPTAdapter # 模型驱动
-    api_key: your-api-key # API密钥
-  # 模型支持多驱动的配置
-  - name: landing
-    type: Landing
-    enable: false
-    drivers: # 多驱动配置.
-      - model: turing,qa,tree,proxy # 驱动模型列表
-        driver: ai.llm.adapter.impl.LandingAdapter # 驱动地址
-      - model: image # 驱动支持功能列表
-        driver: ai.image.adapter.impl.LandingImageAdapter # 驱动地址
-        oss: landing # 用到的存储对象服务的名称
-      - model: landing-tts,landing-asr
-        driver: ai.audio.adapter.impl.LandingAudioAdapter 
-      - model: video
-        driver: ai.video.adapter.impl.LandingVideoAdapter 
-        api_key: your-api-key # 驱动指定api_key
-    api_key:  your-api-key # 驱动公用的api_key
+  - name: qwen
+    type: Alibaba
+    enable: true
+    model: qwen-plus,asr,vision,ocr
+    driver: ai.wrapper.impl.AlibabaAdapter
+    api_key: your-api-key
+    access_key_id: your-access-key-id
+    access_key_secret: your-access-key-secret
 
-```
-
-存储功能配置
-
-```yaml
-# 这部分定义了中间件用到的存储设备配置。
 stores:
-  # 这部分是向量数据库的配置
-  vectors: # 向量数据库配置列表
-    - name: chroma # 向量数据库名称
-      driver: ai.vector.impl.ChromaVectorStore # 向量数据库驱动
-      default_category: default # 向量数据库存储的分类
-      similarity_top_k: 10 # 向量数据库查询时使用的参数
-      similarity_cutoff: 0.5 # 会切掉那些与查询向量相似度 低于 0.5 的结果。
+  vector:
+    - name: chroma
+      driver: ai.vector.impl.ChromaVectorStore
+      default_category: default
+      similarity_top_k: 10
+      similarity_cutoff: 0.5
       parent_depth: 1
       child_depth: 1
-      url: http://localhost:8000 # 向量数据库的存储配置
-  # 这部分是对象存储服务的配置
-  oss:
-    - name: landing # 存储对象服务的名称
-      driver: ai.oss.impl.LandingOSS  # 存储对象服务的驱动类
-      bucket_name: lagi # 存储对象的 bucket_name
-      enable: true # 是否开启该存储对象服务
-
-    - name: alibaba
-      driver: ai.oss.impl.AlibabaOSS
-      access_key_id: your-access-key-id # 第三方存储对象的服务用到的 access key id
-      access_key_secret: your-access-key-secret # 第三方存储对象的服务用到的 access key secret 
-      bucket_name: ai-service-oss
-      enable: true
-
-  # 这部分是elasticsearch的配置
-  text:
-    - name: elasticsearch # 全文检索名称
-      driver: ai.bigdata.impl.ElasticSearchAdapter
-      host: localhost # 全文检索的elasticsearch地址
-      port: 9200 # 全文检索的elasticsearch的端口号
-      enable: false # 是否开启
-  database: # 关系型数据库配置
-    name: mysql # 数据库名称
-    jdbcUrl: you-jdbc-url # 连接地址
-    driverClassName: com.mysql.cj.jdbc.Driver # 驱动类
-    username: your-username # 数据库用户名
-    password: your-password # 数据库密码
-  # 这部分是检索增强生成服务的配置
+      url: http://localhost:8000
   rag:
-      vector: chroma # 服务用到的向量数据库的名称
-      fulltext: elasticsearch # 全文检索（可选填，如填写该配置，则开启该配置，不开启，直接注释即可）
-      graph: landing # 图检索（可选填，如填写该配置，则开启该配置，不开启，直接注释即可）
-      enable: true # 是否开启
-      priority: 10 # 优先级，当该优先级大于模型时,则匹配不到上下文就只返回default中提示语
-      default: "Please give prompt more precisely" # 如未匹配到上下文，则返回该提示语
-      track: true # 开启文档跟踪
-  # 这部分是美杜莎的加速推理服务的配置，可以通过预训练的medusa.model来预准备缓存，第一次flush置成true来初始化，后续可以改回false用做日常启停。
-  # 完整的medusa.model文件下载地址：https://downloads.landingbj.com/lagi/medusa.model
+    vector: chroma
+    enable: false
+    priority: 10
+    track: true
+    html: true
+    default: "Please give prompt more precisely"
   medusa:
-    enable: true # 是否开启
-    algorithm: hash,llm,tree # 使用的算法
-    reason_model: deepseek-r1 # 推理模型
-    aheads: 1 # 预推理的请求数
-    producer_thread_num: 1 # 生产者线程数
-    consumer_thread_num: 2 # 消费者线程数
-    cache_persistent_path: medusa_cache # 缓存持久化路径
-    cache_persistent_batch_size: 2 # 缓存持久化批次大小
-    cache_hit_window: 16 # cache命中的滑动窗口大小
-    cache_hit_ratio: 0.3 # cache命中的最低比例
-    temperature_tolerance: 0.1  # cache命中时温度参数的容忍度
-    flush: true # 缓存是否每次启动时都重新加载
-```
+    enable: false
 
-中间件功能配置
-
-```yaml
-# 大模型使用的功能配置
 functions:
-  # embedding 服务配置
   embedding:
     - backend: qwen
       type: Qwen
       api_key: your-api-key
-  
-  # 聊天对话、文本生成功能的配置列表
-  chat:
-    - backend: chatgpt # 后端使用的模型配置的名称
-      model: gpt-4-turbo # 模型名
-      enable: true # 是否开启
-      stream: true # 是否使用流
-      priority: 200 # 优先级
 
-    - backend: chatglm
-      model: glm-3-turbo
+  chat:
+    route: pass(qwen)
+    filter: sensitive,priority,stopping,continue
+    backends:
+      - backend: qwen
+        model: qwen-plus
+        enable: true
+        stream: true
+        protocol: completion
+        priority: 100
+```
+
+## 配置是怎么拼起来的
+
+LinkMind 采用“主配置 + 按需拆分”的方式：
+
+| 配置项 | 作用 |
+| --- | --- |
+| `lagi.yml` | 主运行配置 |
+| `include_models: model.yml` | 补充模型定义 |
+| `include_stores: store.yml` | 补充存储配置 |
+| `include_agents: agent.yml` | 补充 Agent 定义 |
+| `include_mcps: mcp.yml` | 补充 MCP 服务 |
+| `include_pnps: pnp.yml` | 补充自动化连接器 |
+
+如果你通过 `-Dlinkmind.config=/path/to/lagi.yml` 启动 LinkMind，这个自定义文件会成为真正的主入口配置。
+
+## 顶层结构总览
+
+| 区块 | 控制内容 |
+| --- | --- |
+| `system_title` | 前端展示的系统标题 |
+| `models` | 模型提供方与适配器定义 |
+| `stores` | 向量库、对象存储、词项检索、关系型数据库、RAG 与 Medusa |
+| `functions` | 对话与多模态能力编排 |
+| `agents` | 内置或自定义 Agent |
+| `mcps` | MCP 服务注册 |
+| `skills` | 技能根目录、工作区、workers 与 pnps |
+| `routers` | 路由表达式，如 `best(...)`、`pass(...)` |
+| `filters` | 敏感词、优先级、会话控制等过滤器 |
+
+有一个很容易忽略的点：当前默认 `lagi.yml` 里，`workers` 和 `pnps` 是挂在 `skills` 下面的，不是单独的顶层块。
+
+## 模型配置
+
+### 单适配器示例
+
+```yaml
+models:
+  - name: deepseek
+    type: DeepSeek
+    enable: true
+    model: deepseek-chat
+    driver: ai.llm.adapter.impl.DeepSeekAdapter
+    api_address: https://api.deepseek.com/chat/completions
+    api_key: your-api-key
+```
+
+### 多适配器示例
+
+```yaml
+models:
+  - name: landing
+    type: Landing
+    enable: true
+    drivers:
+      - model: turing,qa,tree,proxy
+        driver: ai.llm.adapter.impl.LandingAdapter
+      - model: image
+        driver: ai.image.adapter.impl.LandingImageAdapter
+        oss: landing
+      - model: landing-tts,landing-asr
+        driver: ai.audio.adapter.impl.LandingAudioAdapter
+      - model: video
+        driver: ai.video.adapter.impl.LandingVideoAdapter
+    api_key: your-api-key
+```
+
+### 常见字段
+
+| 字段 | 说明 |
+| --- | --- |
+| `name` | 后续在 `functions.*.backend` 中引用的后端名 |
+| `type` | 配置中展示的提供方标签 |
+| `enable` | 是否启用该提供方 |
+| `model` | 当前适配器负责的模型 ID 列表，通常为逗号分隔 |
+| `driver` | 单适配器模式下的 Java 适配器类 |
+| `drivers` | 一个后端暴露多种模态时使用的适配器列表 |
+| `api_address` | 提供方接口地址，常见于 OpenAI 兼容或自建服务 |
+| `endpoint` | 提供方专用基础地址 |
+| `api_key` | 主 API Key |
+| `api_keys` | 多 Key 池 |
+| `key_route` | Key 池策略，支持 `polling` 或 `failover` |
+| `app_id` / `app_key` | 提供方应用标识 |
+| `secret_key` | 提供方密钥 |
+| `access_key_id` / `access_key_secret` | 部分云厂商使用的密钥对 |
+| `deployment` / `api_version` | 部署名与版本字段，常见于 Azure 类服务 |
+| `alias` | 可选的模型别名映射 |
+| `oss` | 当前适配器绑定的对象存储配置名 |
+
+默认配置和代码已经覆盖 Qwen、DeepSeek、Landing、FastChat/Vicuna、OpenAI、Azure OpenAI、ERNIE、ChatGLM、Kimi、Baichuan、Spark、SenseChat、Gemini、Doubao、Claude 等提供方。
+
+### API Key 池
+
+如果你只有一个 Key，继续使用 `api_key` 即可：
+
+```yaml
+api_key: sk-your-single-key
+```
+
+如果你有多个 Key，可以用 `api_keys` + `key_route`：
+
+```yaml
+api_keys:
+  - sk-key1
+  - sk-key2
+  - sk-key3
+key_route: polling
+```
+
+也可以直接写成逗号分隔：
+
+```yaml
+api_keys: sk-key1,sk-key2,sk-key3
+key_route: failover
+```
+
+当 `api_key` 和 `api_keys` 同时存在时，Key 池优先生效；单个 Key 也会按需并入 Key 池。
+
+### 值得复用的兼容适配器
+
+- `ai.llm.adapter.impl.OpenAIStandardAdapter`
+- `ai.llm.adapter.impl.OpenRouterAdapter`
+- `ai.llm.adapter.impl.QwenCompatibleAdapter`
+
+## 存储配置
+
+### 向量库
+
+配置字段使用 `stores.vector`。
+
+```yaml
+stores:
+  vector:
+    - name: chroma
+      driver: ai.vector.impl.ChromaVectorStore
+      default_category: default
+      similarity_top_k: 10
+      similarity_cutoff: 0.5
+      parent_depth: 1
+      child_depth: 1
+      url: http://localhost:8000
+```
+
+常见字段：
+
+| 字段 | 说明 |
+| --- | --- |
+| `name` | 向量后端名称 |
+| `driver` | Java 向量库实现类 |
+| `type` | 可选的向量服务类型标签 |
+| `default_category` | 默认集合或分类名 |
+| `url` | 远程向量服务地址 |
+| `metric` | 相似度度量方式，通常为 cosine |
+| `similarity_top_k` | 返回的近邻数量 |
+| `similarity_cutoff` | 最低相似度阈值 |
+| `parent_depth` / `child_depth` | 父子分块扩展检索深度 |
+| `api_key` / `token` | 可选鉴权字段 |
+| `index_name` / `environment` / `project_name` | 厂商相关扩展字段 |
+| `concurrency` | 可选并发数限制 |
+
+### 对象存储（OSS）
+
+```yaml
+stores:
+  oss:
+    - name: landing
+      driver: ai.oss.impl.LandingOSS
+      bucket_name: lagi
+      enable: true
+
+    - name: alibaba
+      driver: ai.oss.impl.AlibabaOSS
+      endpoint: oss-cn-hangzhou.aliyuncs.com
+      access_key_id: your-access-key-id
+      access_key_secret: your-access-key-secret
+      bucket_name: your-bucket
+      enable: true
+```
+
+常见字段：
+
+| 字段 | 说明 |
+| --- | --- |
+| `name` | 存储配置名 |
+| `driver` | OSS 实现类 |
+| `endpoint` | 对象存储服务地址 |
+| `access_key_id` / `access_key_secret` | 云存储密钥对 |
+| `bucket_name` | 当前使用的桶名 |
+| `enable` | 是否启用该 OSS 配置 |
+
+### 全文 / 词项检索
+
+```yaml
+stores:
+  term:
+    - name: elastic
+      driver: ai.bigdata.impl.ElasticSearchAdapter
+      host: localhost
+      port: 9200
       enable: false
-      stream: false
-      priority: 10
-  
-  # 翻译功能的配置列表
+```
+
+常见字段：
+
+| 字段 | 说明 |
+| --- | --- |
+| `name` | 词项检索后端名 |
+| `driver` | 全文检索适配器类 |
+| `host` | 主机地址 |
+| `port` | 服务端口 |
+| `username` / `password` | 可选认证信息 |
+| `enable` | 是否启用该后端 |
+
+### 关系型数据库
+
+```yaml
+stores:
+  database:
+    - name: mysql
+      jdbc_url: jdbc:mysql://127.0.0.1:3306/demo
+      driver: com.mysql.cj.jdbc.Driver
+      username: root
+      password: your-password
+      maximum_pool_size: 20
+      idle_timeout: 0
+      max_lifetime: 2877700
+```
+
+常见字段：
+
+| 字段 | 说明 |
+| --- | --- |
+| `name` | 数据库配置名 |
+| `jdbc_url` | JDBC 连接串 |
+| `driver` | JDBC 驱动类 |
+| `username` / `password` | 登录账号密码 |
+| `maximum_pool_size` | Hikari 连接池最大连接数 |
+| `idle_timeout` | 空闲连接超时时间 |
+| `max_lifetime` | 连接最大生命周期 |
+
+### RAG
+
+```yaml
+stores:
+  rag:
+    vector: chroma
+    term: elastic
+    graph: landing
+    enable: true
+    priority: 10
+    track: true
+    html: true
+    default: "Please give prompt more precisely"
+    cache_size: 1000
+    preload_cache: false
+    preload_cache_category: default
+    enable_excel_to_md: true
+```
+
+常见字段：
+
+| 字段 | 说明 |
+| --- | --- |
+| `vector` | 使用哪个向量后端 |
+| `term` | 可选的词项检索后端 |
+| `graph` | 可选的图式检索后端 |
+| `enable` | 是否启用 RAG |
+| `priority` | 当 RAG 与直接模型调用竞争时的优先级 |
+| `track` | 是否保留文档追踪信息 |
+| `html` | 是否启用 HTML 内容处理 |
+| `default` | 没检索到上下文时的兜底回复 |
+| `cache_size` | 可选的 RAG 缓存大小 |
+| `preload_cache` | 是否预加载缓存 |
+| `preload_cache_category` | 预加载时使用的分类 |
+| `enable_excel_to_md` | 是否把表格内容归一化为 Markdown |
+
+### Medusa
+
+```yaml
+stores:
+  medusa:
+    enable: true
+    algorithm: hash,graph,llm
+    reason_model: deepseek-r1
+    aheads: 1
+    producer_thread_num: 1
+    consumer_thread_num: 2
+    cache_persistent_path: medusa_cache
+    cache_persistent_batch_size: 2
+    flush: false
+    cache_hit_window: 16
+    cache_hit_ratio: 0.3
+    temperature_tolerance: 0.1
+```
+
+常见字段：
+
+| 字段 | 说明 |
+| --- | --- |
+| `enable` | 是否启用 Medusa 缓存加速 |
+| `cache` / `memory` | 是否启用缓存与内存加速 |
+| `algorithm` | 缓存与推理策略组合 |
+| `enableL2` / `enableReasonDiver` | 高级缓存与推理开关 |
+| `reason_model` | 可选的推理模型 |
+| `aheads` | 预请求数量 |
+| `producer_thread_num` / `consumer_thread_num` | 生产者与消费者线程数 |
+| `consumeDelay` / `preDelay` | 队列时序控制参数 |
+| `lcsRatioPromptInput` / `similarityCutoff` / `qa_similarity_cutoff` / `dynamicSimilarity` | 缓存命中阈值相关参数 |
+| `cache_persistent_path` | 持久化缓存目录 |
+| `cache_persistent_batch_size` | 批量刷盘大小 |
+| `flush` | 启动时是否重建缓存 |
+| `cache_hit_window` / `cache_hit_ratio` | 滑动窗口与命中率阈值 |
+| `temperature_tolerance` | 缓存匹配时的温度容忍度 |
+| `inits` | 可选的预热提示词 |
+
+## 功能配置
+
+### 公共后端字段
+
+绝大多数功能块都会复用同一类后端项结构：
+
+| 字段 | 说明 |
+| --- | --- |
+| `backend` | 在 `models` 里定义的后端名称 |
+| `model` | 该后端负责的模型 ID |
+| `enable` | 是否启用这一条能力配置 |
+| `priority` | 选择优先级 |
+| `stream` | 是否流式输出 |
+| `protocol` | 对话协议，常见为 `completion` 或 `response` |
+| `others` | 提供方专用补充值，例如 speaker ID |
+| `filter` | 可选的过滤器覆盖 |
+| `router` | 可选的路由覆盖 |
+| `concurrency` | 可选并发限制 |
+
+除非特别说明，下方这些功能块都使用这一类后端数组结构。
+
+### Embedding
+
+```yaml
+functions:
+  embedding:
+    - backend: qwen
+      type: Qwen
+      api_key: your-api-key
+      model_name: text-embedding
+      api_endpoint: https://your-endpoint.example.com
+      secret_key: your-secret-key
+      model_path: /path/to/local-embedding.model
+```
+
+常见字段：
+
+| 字段 | 说明 |
+| --- | --- |
+| `backend` | 提供方名称 |
+| `type` | 提供方标签 |
+| `api_key` | API Key |
+| `model_name` | Embedding 模型名 |
+| `api_endpoint` | 远程接口地址 |
+| `secret_key` | 可选密钥 |
+| `model_path` | 本地 Embedding 模型路径 |
+
+### 对话编排
+
+```yaml
+functions:
+  chat:
+    route: best((landing&qwen),(kimi|chatgpt))
+    filter: sensitive,priority,stopping,continue
+    handle: failover
+    grace_time: 20
+    maxgen: 3
+    context_length: 4096
+    token_charge: false
+    enable_auth: false
+    enable_policy: true
+    backends:
+      - backend: landing
+        model: cascade
+        enable: true
+        stream: true
+        protocol: completion
+        priority: 350
+```
+
+常见字段：
+
+| 字段 | 说明 |
+| --- | --- |
+| `route` | 选择或组合后端的路由表达式 |
+| `filter` | 引用 `filters.items` 中定义的过滤器名称，逗号分隔 |
+| `backends` | 候选对话后端列表 |
+| `enable_queue_handle` | 是否启用排队处理 |
+| `handle` | 超载或失败时的处理策略 |
+| `grace_time` | 处理器使用的宽限时间 |
+| `maxgen` | 最大生成分支数或重试数 |
+| `context_length` | 编排时使用的上下文长度 |
+| `token_charge` | 是否启用 token 计费统计 |
+| `enable_auth` | 是否启用鉴权检查 |
+| `enable_policy` | 是否启用内置策略检查 |
+
+对话后端定义在 `functions.chat.backends` 中。
+
+### 翻译
+
+```yaml
+functions:
   translate:
-    - backend: ernie # 后端使用的模型配置的名称
-      model: translate # 模型名
-      enable: false # 是否开启
-      priority: 10 # 优先级
-  
-  # 语音转文字功能配置列表
+    - backend: ernie
+      model: translate
+      enable: true
+      priority: 10
+```
+
+### 语音转文本
+
+```yaml
+functions:
   speech2text:
-    - backend: qwen  # 后端使用的模型配置的名称
+    - backend: qwen
       model: asr
       enable: true
       priority: 10
-  
-  # 文字转语音功能配置列表
+```
+
+### 文本转语音
+
+```yaml
+functions:
   text2speech:
-    - backend: landing # 后端使用的模型配置的名称
+    - backend: landing
       model: tts
       enable: true
       priority: 10
-  
-  # 声音克隆功能配置列表
+```
+
+### 语音克隆
+
+```yaml
+functions:
   speech2clone:
-    - backend: doubao # 后端使用的模型配置的名称
+    - backend: doubao
       model: openspeech
       enable: true
       priority: 10
-      others: your-speak-id
+      others: your-speaker-id
+```
 
-  # 文字生成图片功能配置列表
+### 文本生成图片
+
+```yaml
+functions:
   text2image:
-    - backend: spark # 后端使用的模型配置的名称
+    - backend: spark
       model: tti
       enable: true
       priority: 10
-    - backend: ernie
-      model: Stable-Diffusion-XL
-      enable: true
-      priority: 5
-  # 图片生成文字功能配置列表
+```
+
+### 图片转文本
+
+```yaml
+functions:
   image2text:
-    - backend: ernie # 后端使用的模型配置的名称
+    - backend: ernie
       model: Fuyu-8B
       enable: true
       priority: 10
-  # 图片增强功能配置列表
-  image2enhance:
-    - backend: ernie # 后端使用的模型配置的名称
-      model: enhance
-      enable: true
-      priority: 10
-  # 文本生成视频功能配置列表
-  text2video:
-    - backend: landing # 后端使用的模型配置的名称
-      model: video
-      enable: true
-      priority: 10
-  # 图片生成视频功能配置列表
-  image2video:
-    - backend: qwen # 后端使用的模型配置的名称
-      model: vision
-      enable: true
-      priority: 10
-  # 图片OCR配置列表 OCR（Optical Character Recognition，光学字符识别）是将图片中的文字内容识别并提取为可编辑文本的技术
+```
+
+### 图片 OCR
+
+```yaml
+functions:
   image2ocr:
     - backend: qwen
       model: ocr
       enable: true
       priority: 10
-  # 视频追踪功能配置列表
-  video2track:
-    - backend: landing # 后端使用的模型配置的名称
+```
+
+### 图片增强
+
+```yaml
+functions:
+  image2enhance:
+    - backend: ernie
+      model: enhance
+      enable: true
+      priority: 10
+```
+
+### 文本生成视频
+
+```yaml
+functions:
+  text2video:
+    - backend: landing
       model: video
       enable: true
       priority: 10
-  # 视屏增强功能配置列表
-  video2enhance:
-    - backend: qwen # 后端使用的模型配置的名称
+```
+
+### 图片生成视频
+
+```yaml
+functions:
+  image2video:
+    - backend: qwen
       model: vision
       enable: true
       priority: 10
-  # 文档OCR配置列表 OCR（Optical Character Recognition，光学字符识别）是将图片中的文字内容识别并提取为可编辑文本的技术
-  doc2ocr:
-    - backend: qwen
-      model: ocr
+```
+
+### 视频跟踪
+
+```yaml
+functions:
+  video2track:
+    - backend: landing
+      model: video
       enable: true
       priority: 10
-  # 文件指令配置列表
+```
+
+### 视频增强
+
+```yaml
+functions:
+  video2enhance:
+    - backend: qwen
+      model: vision
+      enable: true
+      priority: 10
+```
+
+### 文档 OCR
+
+```yaml
+functions:
+  doc2ocr:
+    - backend: qwen
+      model: qwen-vl-ocr
+      enable: true
+      priority: 15
+```
+
+### 文档指令提取
+
+```yaml
+functions:
   doc2instruct:
     - backend: landing
       model: cascade
       enable: true
       priority: 10
-  # sql指令配置表
-  text2sql:
-    - backend: landing
-      model: qwen-turbo # 模型名称
-      enable: true # 是否启用
-      priority: 10
 ```
 
-路由政策配置
+### Text-to-SQL
 
 ```yaml
 functions:
-  policy:
-    #  handle配置 目前有parallel、failover、failover 3种值， parallel表示并行调用，failover表示故障转移, polling表示负载轮询调用, 场景解释：
-    #  1. 当请求中未强制指定模型, 或指定的模型无效时 ，parallel、failover、failover 3种策略生效
-    #  2. 当指定handle为 parallel 配置的模型并行执行， 返回响应最快且优先级最高的模型调用结果
-    #  3. 当指定handle为 failover 配置的模型串行执行， 模型按优先级串行执行， 串行执行过程中任意模型返回成功， 后面的模型不再执行。
-    #  4. 当指定handle为 failover 配置的模型轮询执行， 请求会根据请求的ip、浏览器指纹 等额外信息， 均衡分配请求给对应的模型执行。
-    #  5. 当所有的模型都返回失败时, 会设置 http 请求的状态码为 600-608。 body里为具体的错误信息。 (错误码错误信息实际为最后一个模型调用失败的信息)
-    #  错误码： 
-    #     600 请求参数不合法
-    #     601 授权错误
-    #     602 权限被拒绝
-    #     603 资源不存在
-    #     604 访问频率限制
-    #     605 模型内部错误
-    #     606 其他错误
-    #     607 超时
-    #     608 没有可用的模型
-    handle: failover #parallel #failover
-    grace_time: 20 # 故障后重试间隔时间
-    maxgen: 3 # 故障后最大重试次数 默认为 Integer.MAX_VALUE
+  text2sql:
+    - backend: landing
+      model: cascade
+      enable: true
+      priority: 10
 ```
 
-智能体配置
+### 文档内容抽取
 
 ```yaml
-# 这部分表示模型支持的智能体配置
-agents:
-  - name: qq # 智能体的名称
-    api_key: your-api-key # 智能体用到的 api key
-    driver: ai.agent.social.QQAgent # 智能体驱动
-
-  - name: wechat
-    api_key: your-api-key
-    driver: ai.agent.social.WechatAgent
-
-  - name: ding
-    api_key: your-api-key
-    driver: ai.agent.social.DingAgent
-    
-  - name: weather_agent
-    driver: ai.agent.customer.WeatherAgent
-    token: your-token
-    app_id: weather_agent
-
-  - name: oil_price_agent
-    driver: ai.agent.customer.OilPriceAgent
-    token: your-token
-    app_id: oil_price_agent
-
-  - name: bmi_agent
-    driver: ai.agent.customer.BmiAgent
-    token: your-token
-    app_id: bmi_agent
-
-  - name: food_calorie_agent
-    driver: ai.agent.customer.FoodCalorieAgent
-    token: your-token
-    app_id: food_calorie_agent
-
-  - name: dishonest_person_search_agent
-    driver: ai.agent.customer.DishonestPersonSearchAgent
-    token: your-token
-    app_id: dishonest_person_search_agent
-
-  - name: high_speed_ticket_agent
-    driver: ai.agent.customer.HighSpeedTicketAgent
-    app_id: high_speed_ticket_agent
-
-  - name: history_in_today_agent
-    driver: ai.agent.customer.HistoryInToDayAgent
-    app_id: history_in_today_agent
-
-  - name: youdao_agent
-    driver: ai.agent.customer.YouDaoAgent
-    app_id: your-app-id
-    token: your-token
-
-  - name: image_gen_agent
-    driver: ai.agent.customer.ImageGenAgent
-    app_id: your-app-id
-    endpoint: http://127.0.0.1:8080
-    token: image_gen_agent
-    
-# 这部分表示智能体实际作业的配置
-workers:
-  - name: qq-robot # 作业名称
-    agent: qq # 工作的智能体名称
-    worker: ai.worker.social.RobotWorker # 作业驱动
-
-  - name: wechat-robot
-    agent: wechat
-    worker: ai.worker.social.RobotWorker
-
-  - name: ding-robot
-    agent: ding
-    worker: ai.worker.social.RobotWorker
-
-# 路由配置
-routers:
-  - name: best
-    # rule: (weather_agent&food_calorie_agent)  # A|B ->轮询，A或B，表示在A和B之间随机轮询；
-    # A,B ->故障转移，首先A，如果A失败，然后B；
-    # A&B ->并行，同时调用A和B，选择合适的结果只有一个
-    # 该规则可以组合为((A&B&C),(E|F))，这意味着首先同时调用ABC，如果失败，则随机调用E或F
-    rule: (weather_agent&food_calorie_agent)  # A|B ->轮询，A或B，表示在A和B内随机轮询；
-
-    # %是表示的通配符。
-    # 如果指定，则调用该代理
-    # 如果只给出%，则%将由调用时的参数决定。
-  - name: pass
-    rule: '%'
+functions:
+  doc2ext:
+    - backend: landing
+      model: cascade
+      enable: true
+      priority: 10
 ```
 
-MCP配置
+### 文档结构化
+
+```yaml
+functions:
+  doc2struct:
+    - backend: landing
+      model: cascade
+      enable: true
+      priority: 10
+```
+
+### 文本生成问答
+
+`text2qa` 当前不是数组，而是单个后端对象：
+
+```yaml
+functions:
+  text2qa:
+    enable: true
+    model: cascade
+```
+
+## Agents、MCP、Skills、Workers、Pnps、Routers 与 Filters
+
+### Agents
+
+```yaml
+agents:
+  enable: true
+  items:
+    - name: weather
+      token: your-token
+      driver: ai.agent.customer.WeatherAgent
+```
+
+常见字段：
+
+| 字段 | 说明 |
+| --- | --- |
+| `enable` / `items[].enable` | 全局 Agent 开关，或单个 Agent 的可选启用开关 |
+| `name` | Agent 名称 |
+| `driver` | Agent 实现类 |
+| `token` / `api_key` | 提供方 token 或 API Key |
+| `app_id` / `user_id` | 可选的提供方身份字段 |
+| `wrong_case` | 请求不匹配时的兜底回复 |
+| `endpoint` | 可选的自定义地址 |
+| `mcps` | 可选的 MCP 依赖列表 |
+
+如果 Agent 很多，可以拆到 `agent.yml`，再通过 `include_agents` 引入。
+
+### MCP 服务
 
 ```yaml
 mcps:
+  enable: true
   servers:
-    - name: baidu_search_mcp # mcp服务名称
-      url: http://appbuilder.baidu.com/v2/ai_search/mcp/sse?api_key=Bearer+your_api_key # mcp服务地址
+    - name: amap_mcp
+      url: https://mcp.amap.com/sse?key=your-key
+      priority: 10
+      enable: true
 ```
 
-技能配置（Skills）
+常见字段：
+
+| 字段 | 说明 |
+| --- | --- |
+| `enable` | 全局 MCP 开关 |
+| `name` | MCP 服务名 |
+| `url` | SSE 接口地址 |
+| `key` | 可选鉴权 Key 字段 |
+| `headers` | 自定义请求头 |
+| `priority` | 优先级 |
+| `servers[].enable` | 当前服务项是否启用 |
+| `driver` | MCP 客户端实现，默认是 `ai.mcps.CommonSseMcpClient` |
+
+如果需要，也可以拆到 `mcp.yml`，再通过 `include_mcps` 引入。
+
+### Skills
 
 ```yaml
-# 技能配置
 skills:
-  # 技能根路径，支持 classpath 或本地目录
+  enable: true
   roots: ["classpath:skills"]
-  # 技能工作目录
   workspace: "skills"
-  # 规则：server（服务端优先）/ cli（客户端优先）/ block（不启用）
   rule: cli
-  # 告诉服务端当前可用的技能列表
   items:
     - name: extract_content_with_image
-      description: 将本地 PDF、TXT、Word、PPT 文件分割为文本和图片chunk。
-      rule: server
-    - name: pdf
-      description: Use this skill whenever the user wants to do anything with PDF files. This includes reading or extracting text/tables from PDFs, combining or merging multiple PDFs into one, splitting PDFs apart, rotating pages, adding watermarks, creating new PDFs, filling PDF forms, encrypting/decrypting PDFs, extracting images, and OCR on scanned PDFs to make them searchable. If the user mentions a .pdf file or asks to produce one, use this skill.
-    - name: docx
-      description: "Use this skill whenever the user wants to create, read, edit, or manipulate Word documents (.docx files). Triggers include: any mention of 'Word doc', 'word document', '.docx', or requests to produce professional documents with formatting like tables of contents, headings, page numbers, or letterheads. Also use when extracting or reorganizing content from .docx files, inserting or replacing images in documents, performing find-and-replace in Word files, working with tracked changes or comments, or converting content into a polished Word document. If the user asks for a 'report', 'memo', 'letter', 'template', or similar deliverable as a Word or .docx file, use this skill. Do NOT use for PDFs, spreadsheets, Google Docs, or general coding tasks unrelated to document generation."
-    - name: pptx
-      description: "Use this skill any time a .pptx file is involved in any way — as input, output, or both. This includes: creating slide decks, pitch decks, or presentations; reading, parsing, or extracting text from any .pptx file (even if the extracted content will be used elsewhere, like in an email or summary); editing, modifying, or updating existing presentations; combining or splitting slide files; working with templates, layouts, speaker notes, or comments. Trigger whenever the user mentions \"deck,\" \"slides,\" \"presentation,\" or references a .pptx filename, regardless of what they plan to do with the content afterward. If a .pptx file needs to be opened, created, or touched, use this skill."
-    - name: xlsx
-      description: "Use this skill any time a spreadsheet file is the primary input or output. This means any task where the user wants to: open, read, edit, or fix an existing .xlsx, .xlsm, .csv, or .tsv file (e.g., adding columns, computing formulas, formatting, charting, cleaning messy data); create a new spreadsheet from scratch or from other data sources; or convert between tabular file formats. Trigger especially when the user references a spreadsheet file by name or path — even casually (like \"the xlsx in my downloads\") — and wants something done to it or produced from it. Also trigger for cleaning or restructuring messy tabular data files (malformed rows, misplaced headers, junk data) into proper spreadsheets. The deliverable must be a spreadsheet file. Do NOT trigger when the primary deliverable is a Word document, HTML report, standalone Python script, database pipeline, or Google Sheets API integration, even if tabular data is involved."
-    - name: screenshot-1.0.1
-      description: "Capture, inspect, and compare screenshots of screens, windows, regions, web pages, simulators, and CI runs with the right tool, wait strategy, viewport, and output format. Use when (1) you need screenshots for debugging, QA, docs, bug reports, or visual review; (2) desktop, browser, simulator, or headless capture is involved; (3) stable screenshots require fixed viewport, settling, masking, or animation control."
-    - name: cn-web-search-2.2.0
-      description: 中文网页搜索 - 聚合 17 个免费搜索引擎，无需 API Key，纯网页抓取，支持公众号/财经/技术/学术/知识搜索。
-    - name: baidu-search-1.1.3
-      description: Search the web using Baidu AI Search Engine (BDSE). Use for live information, documentation, or research topics.
-    - name: google-maps-3.2.0
-      description: "Google Maps integration for OpenClaw with Routes API. Use for: (1) Distance/travel time calculations with traffic prediction, (2) Turn-by-turn directions, (3) Distance matrix between multiple points, (4) Geocoding addresses to coordinates and reverse, (5) Places search and details, (6) Transit planning with arrival times. Supports future departure times, traffic models (pessimistic/optimistic), avoid options (tolls/highways), and multiple travel modes (driving/walking/bicycling/transit)."
-    - name: feishu-1.0.5
-      description: 飞书深度集成技能。不是简单的消息桥接，而是你的数字指挥中枢。专为中国企业高压协作环境设计，理解“分寸”与“效率”两套并行规则，把消息、审批、会议、文档、多维表格、日程与邮箱，压缩成有优先级、可执行的行动链。
-    - name: imap-smtp-email-0.0.10
-      description: Read and send email via IMAP/SMTP. Check for new/unread messages, fetch content, search mailboxes, mark as read/unread, and send emails with attachments. Supports multiple accounts. Works with any IMAP/SMTP server including Gmail, Outlook, 163.com, vip.163.com, 126.com, vip.126.com, 188.com, and vip.188.com.
-    - name: docker-1.0.4
-      description: "Docker containers, images, Compose stacks, networking, volumes, debugging, production hardening, and the commands that keep real environments stable. Use when (1) the task touches Docker, Dockerfiles, images, containers, or Compose; (2) build reliability, runtime behavior, logs, ports, volumes, or security matter; (3) the agent needs Docker guidance and should apply it by default."
-    - name: typescript-skills-1.0.6
-      description: Provide best-practice coding conventions and generate standards-compliant TypeScript code.
-    - name: webapp-testing
-      description: Toolkit for interacting with and testing local web applications using Playwright. Supports verifying frontend functionality, debugging UI behavior, capturing browser screenshots, and viewing browser logs.
-    - name: ws-agent-browser-1.0.0
-      description: 浏览器智能控制。自动化操作、截图、填表、数据抓取。
-    - name: skill-finder-1.1.5
-      description: "Find, compare, and install agent skills across ClawHub and Skills.sh when the user needs new capabilities, better workflows, stronger tools, or safer alternatives. Use when (1) they ask how to do something, how to improve or automate it, or what to install; (2) a skill could extend the agent, replace a weak manual approach, or close a capability gap; (3) you need the best-fit option, not just a direct answer."
+      description: 将本地文件拆分为文本与图片块
 ```
 
+常见字段：
+
+| 字段 | 说明 |
+| --- | --- |
+| `enable` | 全局技能开关 |
+| `roots` | 技能来源根目录 |
+| `workspace` | 技能运行使用的本地工作区 |
+| `rule` | 技能执行优先策略，如 `cli`、`server`、`block` |
+| `items` | 暴露给运行时的技能清单 |
+
+### Workers
+
+```yaml
+skills:
+  workers:
+    - name: appointedWorker
+      route: pass(%)
+      worker: ai.worker.DefaultAppointWorker
+```
+
+常见字段：
+
+| 字段 | 说明 |
+| --- | --- |
+| `name` | Worker 名称 |
+| `worker` | Worker 实现类 |
+| `route` | 路由表达式 |
+| `agent` / `agents` | 目标 Agent 或 Agent 集合 |
+| `filter` | 可选过滤器覆盖 |
+
+### Pnps
+
+```yaml
+skills:
+  pnps:
+    - name: qq
+      api_key: your-api-key
+      driver: ai.pnps.social.QQPnp
+```
+
+常见字段：
+
+| 字段 | 说明 |
+| --- | --- |
+| `name` | 自动化连接器名称 |
+| `driver` | Pnp 实现类 |
+| `api_key` | 连接器凭证 |
+
+更多 Pnp 可以拆到 `pnp.yml`，再通过 `include_pnps` 引入。
+
+### 路由器
+
+```yaml
+routers:
+  enable: true
+  items:
+    - name: best
+      rule: (|,&)
+
+    - name: pass
+      rule: (%)
+```
+
+常见字段：
+
+| 字段 | 说明 |
+| --- | --- |
+| `enable` | 全局路由器开关 |
+| `items[].name` | 在 `functions.chat.route` 或 worker 中引用的路由器名 |
+| `items[].rule` | 该路由器支持的路由语法 |
+
+常见用法：
+
+- `A|B` 表示轮询
+- `A,B` 表示故障转移
+- `A&B` 表示并行
+- `%` 表示通配符
+
+### 过滤器
+
+敏感词过滤示例：
+
+```yaml
+filters:
+  enable: true
+  items:
+    - name: sensitive
+      groups:
+        - level: mask
+          rules: >-
+            openai,FLG
+        - level: erase
+          rules: >-
+            your context
+        - level: block
+          rules: >-
+            shit,CNM
+```
+
+优先级过滤示例：
+
+```yaml
+filters:
+  items:
+    - name: priority
+      rules: >-
+        car,weather,
+        social*security
+```
+
+停止词过滤示例：
+
+```yaml
+filters:
+  items:
+    - name: stopping
+      rules: >-
+        bye,
+        start*
+```
+
+续聊过滤示例：
+
+```yaml
+filters:
+  items:
+    - name: continue
+      rules: >-
+        about,next,then
+```
+
+常见字段：
+
+| 字段 | 说明 |
+| --- | --- |
+| `enable` | 全局过滤器开关 |
+| `items[].name` | 在 `functions.chat.filter` 中引用的过滤器名 |
+| `items[].groups[].level` | 敏感词分组动作级别，如 `mask`、`erase`、`block` |
+| `items[].groups[].rules` | 分组敏感词规则，可写逗号分隔关键词或正则风格规则 |
+| `items[].rules` | 非分组过滤器的关键词列表，如优先级、停止词、续聊词 |
+
+`functions.chat.filter` 里填写的应该就是这些过滤器名称，多个值用逗号分隔。
+
+## 运行时同步集成
+
+当前代码里还内置了以下配置同步服务：
+
+- OpenClaw
+- Hermes Agent
+- DeerFlow
+
+这些同步逻辑主要用于安装或启动阶段对齐外部运行时配置，但 LinkMind 真正运行时仍然优先读取本地 YAML 配置。

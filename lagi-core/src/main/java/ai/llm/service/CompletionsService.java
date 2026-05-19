@@ -34,6 +34,7 @@ import ai.openai.pojo.ChatMessage;
 import ai.router.Route;
 import ai.router.Routers;
 import ai.router.pojo.RouteCompletionResult;
+import ai.utils.ApikeyUtil;
 import ai.utils.LagiGlobal;
 import ai.utils.SensitiveWordUtil;
 import ai.utils.qa.ChatCompletionUtil;
@@ -75,6 +76,7 @@ public class CompletionsService implements ChatCompletion {
     }
 
     public ChatCompletionResult completions(ChatCompletionRequest chatCompletionRequest, List<IndexSearchData> indexSearchDataList) {
+        String apiKey = chatCompletionRequest.getApiKey();
         // The execution model is specified
         RRException r = new RRException(LLMErrorConstants.OTHER_ERROR, "{\"error\":\"backend is not enabled.\"}");
         if (chatCompletionRequest.getModel() != null) {
@@ -88,6 +90,7 @@ public class CompletionsService implements ChatCompletion {
                     unfreezeAdapter(appointAdapter);
                     return result;
                 } catch (RRException e) {
+                    ApikeyUtil.saveInvalidApiKey(apiKey);
                     Policy policy = getPolicy();
                     if (LLMErrorConstants.isContentSafetyBlocked(e.getCode()) || !policy.getEnablePolicy()) {
                         throw e;
@@ -123,6 +126,7 @@ public class CompletionsService implements ChatCompletion {
     }
 
     public Observable<ChatCompletionResult> streamCompletions(ChatCompletionRequest chatCompletionRequest, List<IndexSearchData> indexSearchDataList) {
+        String apiKey = chatCompletionRequest.getApiKey();
         RRException r = new RRException(LLMErrorConstants.NO_AVAILABLE_MODEL, "{\"error\":\"Stream backend is not enabled.\"}");
         String failedModel = null;
         if (chatCompletionRequest.getModel() != null) {
@@ -136,6 +140,7 @@ public class CompletionsService implements ChatCompletion {
                     unfreezeAdapter(adapter);
                     return result;
                 } catch (RRException e) {
+                    ApikeyUtil.saveInvalidApiKey(apiKey);
                     Policy policy = getPolicy();
                     if (LLMErrorConstants.isContentSafetyBlocked(e.getCode()) || !policy.getEnablePolicy()) {
                         throw e;
@@ -171,6 +176,7 @@ public class CompletionsService implements ChatCompletion {
                         unfreezeAdapter(adapter);
                         return result;
                     } catch (RRException e) {
+                        ApikeyUtil.saveInvalidApiKey(apiKey);
                         if (LLMErrorConstants.isContentSafetyBlocked(e.getCode())) {
                             throw e;
                         }
@@ -187,6 +193,7 @@ public class CompletionsService implements ChatCompletion {
     }
 
     private Observable<ChatCompletionResult> pollingGetStreamChatCompletionResult(ChatCompletionRequest chatCompletionRequest, List<ILlmAdapter> ragAdapters) {
+        String apiKey = chatCompletionRequest.getApiKey();
         RRException r = new RRException(LLMErrorConstants.NO_AVAILABLE_MODEL, "{\"error\":\"failover -> backend is not enabled.\"}");
 
         if (chatCompletionRequest instanceof EnhanceChatCompletionRequest) {
@@ -203,6 +210,7 @@ public class CompletionsService implements ChatCompletion {
                         unfreezeAdapter(adapter);
                         return chatCompletionResultObservable;
                     } catch (RRException e) {
+                        ApikeyUtil.saveInvalidApiKey(apiKey);
                         if (LLMErrorConstants.isContentSafetyBlocked(e.getCode())) {
                             throw e;
                         }

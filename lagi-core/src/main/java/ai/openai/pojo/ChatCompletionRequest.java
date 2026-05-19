@@ -10,8 +10,10 @@ import java.util.Map;
 public class ChatCompletionRequest {
     @JsonAlias({"session_id"})
     private String sessionId;
+    @JsonAlias({"extra_body"})
+    private ExtraBody extraBody;
     private String model;
-    private double temperature;
+    private double temperature = 1;
     private Integer max_tokens;
     private Integer max_completion_tokens;
     private String category;
@@ -30,4 +32,6 @@ public class ChatCompletionRequest {
     private transient Boolean enableAfter = true;
     private Boolean store;
     private String apiKey;
+    @JsonAlias({"chat_template_kwargs"})
+    private Map<String, Object> chat_template_kwargs;
 }

@@ -22,6 +22,65 @@ const AGENT_NAV_ID = 11;
 const ORCHESTRATION_NAV_ID = 12;
 const FEATURE_NAV_ID = 14;
 const MINE_NAV_ID = 15;
+const INTERACTION_NAV_ID = 17;
+const INTERACTION_SUBSCRIBE_NAV_ID = 1701;
+const INTERACTION_PUBLISH_NAV_ID = 1702;
+const INTERACTION_CASCADE_NAV_ID = 1703;
+
+const ALWAYS_LOGIN_REQUIRED_NAV_KEYS = [
+    'interactionSubscribe',
+    'interactionPublish',
+    'filterConfig',
+    'credits',
+    'apiKeys'
+];
+
+function isUserLoggedIn() {
+    if (typeof getCookie !== 'function') {
+        return false;
+    }
+    return !!getCookie('lagi-auth');
+}
+
+function promptLoginIfNotAuthenticated(event) {
+    if (isUserLoggedIn()) {
+        return true;
+    }
+    if (typeof openModal === 'function') {
+        openModal(event);
+    }
+    return false;
+}
+
+function isNavLoginRequired(navKey) {
+    if (navKey && ALWAYS_LOGIN_REQUIRED_NAV_KEYS.indexOf(navKey) !== -1) {
+        return true;
+    }
+    return window.menuLoginRequired === true;
+}
+
+function ensureNavLoginAllowed(navKey, event) {
+    if (!isNavLoginRequired(navKey)) {
+        return true;
+    }
+    return promptLoginIfNotAuthenticated(event);
+}
+
+function dispatchNavClick(funcName, navId, subNavId, navKey, event) {
+    if (!ensureNavLoginAllowed(navKey, event)) {
+        return;
+    }
+    const fn = window[funcName];
+    if (typeof fn !== 'function') {
+        return;
+    }
+    return fn(navId, subNavId, event);
+}
+
+window.isUserLoggedIn = isUserLoggedIn;
+window.promptLoginIfNotAuthenticated = promptLoginIfNotAuthenticated;
+window.ensureNavLoginAllowed = ensureNavLoginAllowed;
+window.dispatchNavClick = dispatchNavClick;
 
 let MODEL_NAV = null;
 let AGENT_NAV = null;
@@ -398,6 +457,47 @@ promptNavs = [
         ]
     },
     {
+        id: INTERACTION_NAV_ID,
+        key: 'interaction',
+        icon1: '<svg t="1774947800000" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="18881" width="16" height="16"><path d="M512 128c-211.744 0-384 135.232-384 301.952 0 96.768 57.856 182.912 147.968 238.08V896l190.336-105.472c15.104 1.344 30.336 2.048 45.696 2.048 211.744 0 384-135.168 384-301.888C896 263.104 723.744 128 512 128z m0 597.248c-17.024 0-34.048-0.96-50.624-2.88l-15.872-1.856-101.376 56.192v-115.84l-16.448-8.768C252.416 612.224 192 525.184 192 429.952 192 298.496 335.488 192 512 192s320 106.496 320 237.952c0 131.456-143.488 237.344-320 237.344z" fill="#444444" p-id="18882"></path><path d="M352 384m-48 0a48 48 0 1 0 96 0 48 48 0 1 0-96 0Z" fill="#444444" p-id="18883"></path><path d="M512 384m-48 0a48 48 0 1 0 96 0 48 48 0 1 0-96 0Z" fill="#444444" p-id="18884"></path><path d="M672 384m-48 0a48 48 0 1 0 96 0 48 48 0 1 0-96 0Z" fill="#444444" p-id="18885"></path></svg>',
+        icon2: '<svg t="1774947800000" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="18881" width="16" height="16"><path d="M512 128c-211.744 0-384 135.232-384 301.952 0 96.768 57.856 182.912 147.968 238.08V896l190.336-105.472c15.104 1.344 30.336 2.048 45.696 2.048 211.744 0 384-135.168 384-301.888C896 263.104 723.744 128 512 128z m0 597.248c-17.024 0-34.048-0.96-50.624-2.88l-15.872-1.856-101.376 56.192v-115.84l-16.448-8.768C252.416 612.224 192 525.184 192 429.952 192 298.496 335.488 192 512 192s320 106.496 320 237.952c0 131.456-143.488 237.344-320 237.344z" fill="#1296db" p-id="18882"></path><path d="M352 384m-48 0a48 48 0 1 0 96 0 48 48 0 1 0-96 0Z" fill="#1296db" p-id="18883"></path><path d="M512 384m-48 0a48 48 0 1 0 96 0 48 48 0 1 0-96 0Z" fill="#1296db" p-id="18884"></path><path d="M672 384m-48 0a48 48 0 1 0 96 0 48 48 0 1 0-96 0Z" fill="#1296db" p-id="18885"></path></svg>',
+        title: '互动',
+        bindfunc: 'openInteractionPage',
+        subNavs: [
+            {
+                id: INTERACTION_SUBSCRIBE_NAV_ID,
+                key: 'interactionSubscribe',
+                title: '订阅',
+                icon1: '<svg t="1774947800001" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="18891" width="16" height="16"><path d="M160 224h704a64 64 0 0 1 64 64v448a64 64 0 0 1-64 64H160a64 64 0 0 1-64-64V288a64 64 0 0 1 64-64z m0 64v448h704V288H160z" fill="#444444" p-id="18892"></path><path d="M216.896 323.648l295.104 230.272 295.104-230.272 39.296 50.304-314.816 245.632a32 32 0 0 1-39.168 0L177.6 373.952z" fill="#444444" p-id="18893"></path></svg>',
+                icon2: '<svg t="1774947800001" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="18891" width="16" height="16"><path d="M160 224h704a64 64 0 0 1 64 64v448a64 64 0 0 1-64 64H160a64 64 0 0 1-64-64V288a64 64 0 0 1 64-64z m0 64v448h704V288H160z" fill="#1296db" p-id="18892"></path><path d="M216.896 323.648l295.104 230.272 295.104-230.272 39.296 50.304-314.816 245.632a32 32 0 0 1-39.168 0L177.6 373.952z" fill="#1296db" p-id="18893"></path></svg>',
+                prompt: '用于查看推荐频道、搜索并进入已加入频道。',
+                operation: '点击后进入订阅页面。'
+            },
+            {
+                id: INTERACTION_PUBLISH_NAV_ID,
+                key: 'interactionPublish',
+                title: '发布',
+                icon1: '<svg t="1774947800002" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="18901" width="16" height="16"><path d="M832 128H192a64 64 0 0 0-64 64v640a64 64 0 0 0 64 64h640a64 64 0 0 0 64-64V192a64 64 0 0 0-64-64z m0 64v640H192V192h640z" fill="#444444" p-id="18902"></path><path d="M544 320v160h160v64H544v160h-64V544H320v-64h160V320z" fill="#444444" p-id="18903"></path></svg>',
+                icon2: '<svg t="1774947800002" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="18901" width="16" height="16"><path d="M832 128H192a64 64 0 0 0-64 64v640a64 64 0 0 0 64 64h640a64 64 0 0 0 64-64V192a64 64 0 0 0-64-64z m0 64v640H192V192h640z" fill="#1296db" p-id="18902"></path><path d="M544 320v160h160v64H544v160h-64V544H320v-64h160V320z" fill="#1296db" p-id="18903"></path></svg>',
+                prompt: '用于创建和管理频道的发布入口。',
+                operation: '点击后进入发布页面。',
+                disabled: window.isMateMode === true,
+                disabledLabel: 'Mate'
+            },
+            {
+                id: INTERACTION_CASCADE_NAV_ID,
+                key: 'interactionCascade',
+                title: '级联',
+                icon1: '<svg t="1774947800003" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="18911" width="16" height="16"><path d="M512 96c229.76 0 416 186.24 416 416S741.76 928 512 928 96 741.76 96 512 282.24 96 512 96z m0 64C317.6 160 160 317.6 160 512s157.6 352 352 352 352-157.6 352-352S706.4 160 512 160z" fill="#444444" p-id="18912"></path><path d="M160 480h704v64H160zM512 128c98.56 91.2 153.6 224 153.6 384S610.56 804.8 512 896c-98.56-91.2-153.6-224-153.6-384S413.44 219.2 512 128z m0 96c-57.6 72-89.6 171.2-89.6 288s32 216 89.6 288c57.6-72 89.6-171.2 89.6-288s-32-216-89.6-288z" fill="#444444" p-id="18913"></path></svg>',
+                icon2: '<svg t="1774947800003" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="18911" width="16" height="16"><path d="M512 96c229.76 0 416 186.24 416 416S741.76 928 512 928 96 741.76 96 512 282.24 96 512 96z m0 64C317.6 160 160 317.6 160 512s157.6 352 352 352 352-157.6 352-352S706.4 160 512 160z" fill="#1296db" p-id="18912"></path><path d="M160 480h704v64H160zM512 128c98.56 91.2 153.6 224 153.6 384S610.56 804.8 512 896c-98.56-91.2-153.6-224-153.6-384S413.44 219.2 512 128z m0 96c-57.6 72-89.6 171.2-89.6 288s32 216 89.6 288c57.6-72 89.6-171.2 89.6-288s-32-216-89.6-288z" fill="#1296db" p-id="18913"></path></svg>',
+                prompt: '用于配置互动级联服务器地址。',
+                operation: '点击后进入服务器设置页面。',
+                disabled: window.isMateMode === false,
+                disabledLabel: 'Server'
+            }
+        ]
+    },
+    {
         id: MINE_NAV_ID,
         key: 'setting',
         icon1: '<svg t="1774321575524" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="5230" width="16" height="16"><path d="M512 305.318124a205.708492 205.708492 0 1 0 205.708492 205.708492 205.708492 205.708492 0 0 0-205.708492-205.708492z m0 346.200254a140.816223 140.816223 0 1 1 140.816223-140.816223 140.816223 140.816223 0 0 1-140.816223 141.140684z" fill="" p-id="5231"></path><path d="M958.78327 393.57161l-73.003802-11.031686a391.949303 391.949303 0 0 0-16.87199-40.882129l44.126743-60.025349a64.892269 64.892269 0 0 0 0-91.82256l-77.2218-77.870723a64.892269 64.892269 0 0 0-91.82256 0L684.937896 155.741445a392.273764 392.273764 0 0 0-40.882129-17.196451L632.69962 64.892269a64.892269 64.892269 0 0 0-64.892269-64.892269h-109.343473a64.892269 64.892269 0 0 0-64.892268 64.892269l-11.031686 72.679341a392.598226 392.598226 0 0 0-40.882129 16.871989L281.307985 110.316857a64.892269 64.892269 0 0 0-91.82256 0L111.939163 187.863118a64.892269 64.892269 0 0 0 0 91.82256l44.126743 60.025349a392.273764 392.273764 0 0 0-16.547528 39.908745L64.892269 389.353612a64.892269 64.892269 0 0 0-64.892269 64.892269v109.667934a64.892269 64.892269 0 0 0 64.892269 64.892269l74.301647 11.356147a392.273764 392.273764 0 0 0 16.223068 41.20659L110.316857 742.367554a64.892269 64.892269 0 0 0 0 91.82256l77.546261 77.546261a64.892269 64.892269 0 0 0 91.82256 0l60.674271-44.775665a392.598226 392.598226 0 0 0 39.259823 16.547528l11.356147 75.599493a64.892269 64.892269 0 0 0 64.892269 64.892269h109.667934a64.892269 64.892269 0 0 0 64.892268-64.892269l11.356147-74.301647a392.922687 392.922687 0 0 0 39.584284-16.223068l61.323194 45.100127a64.892269 64.892269 0 0 0 91.82256 0l77.546262-77.546261a64.892269 64.892269 0 0 0 0-91.82256l-44.126743-60.025349a392.273764 392.273764 0 0 0 16.87199-39.908745l74.626109-11.356147a64.892269 64.892269 0 0 0 64.892268-64.892269v-109.667934a64.892269 64.892269 0 0 0-65.541191-64.892268z m0 174.560202h-9.73384l-74.626109 11.356147-38.286439 5.840305-12.978454 36.33967a329.328264 329.328264 0 0 1-13.951837 32.446134l-17.196452 35.366287 23.361217 32.446134 44.126743 60.025349 2.920152 3.893536 3.569075 3.569075-77.546261 78.195183-3.569075-3.569074-3.893536-2.920152-61.323194-45.100127-32.446135-23.036756-33.743979 18.169836a329.652725 329.652725 0 0 1-32.446135 13.627376l-36.988593 12.978454-6.489227 38.286438-11.356147 74.301648v9.73384h-110.316856V949.04943l-11.356147-75.599493-5.840305-38.286439-36.664131-12.978454a329.003802 329.003802 0 0 1-32.446135-13.627376l-35.366286-16.87199-32.446135 23.036755-60.674271 44.775666-3.893536 2.920152-3.569075 3.569075-77.546261-77.546261 3.569075-3.569075 2.595691-3.893536 45.424588-61.323194 23.036755-32.446135-16.87199-35.041825a329.328264 329.328264 0 0 1-13.627376-32.446134L187.538657 584.030418l-38.6109-6.489227-74.301648-11.356147H64.892269V454.245881h9.73384l74.626109-11.356147 38.6109-5.840304 12.978454-36.664132a329.328264 329.328264 0 0 1 13.951837-32.446135l16.87199-35.041825-23.036755-32.446134-44.451204-59.376426L162.230672 237.181242l-4.217998-3.569075 77.2218-77.546261 3.569075 3.569075 3.893536 2.595691 60.34981 44.775665 32.446134 23.036756 35.041825-16.87199a329.003802 329.003802 0 0 1 34.068441-14.276299l36.988593-12.978454 5.840305-38.6109 10.058301-72.679341V64.892269h110.316857v9.73384l11.356147 73.652725 4.86692 38.286438 36.664132 12.978454a329.003802 329.003802 0 0 1 34.392902 14.276299l35.366287 17.196452 32.446134-23.361217 59.376426-43.47782 4.217998-1.946768 3.569074-3.569075 77.546261 77.546261-3.569074 3.569075-2.920152 3.893536-44.451204 59.376426-23.036756 32.446134 17.520913 33.74398a328.679341 328.679341 0 0 1 13.951837 34.068441l12.653993 36.988593 38.935361 5.840304 73.003802 11.031686h9.733841z" fill="" p-id="5232"></path></svg>',
@@ -435,6 +535,24 @@ promptNavs = [
         ]
     }
 ];
+
+const interactionNav = promptNavs.find(nav => nav.id === INTERACTION_NAV_ID);
+if (interactionNav && Array.isArray(interactionNav.subNavs)) {
+    const interactionSubNavOrder = {
+        interactionCascade: 0,
+        interactionSubscribe: 1,
+        interactionPublish: 2
+    };
+    interactionNav.subNavs.sort((left, right) => {
+        const leftOrder = Object.prototype.hasOwnProperty.call(interactionSubNavOrder, left.key)
+            ? interactionSubNavOrder[left.key]
+            : Number.MAX_SAFE_INTEGER;
+        const rightOrder = Object.prototype.hasOwnProperty.call(interactionSubNavOrder, right.key)
+            ? interactionSubNavOrder[right.key]
+            : Number.MAX_SAFE_INTEGER;
+        return leftOrder - rightOrder;
+    });
+}
 
 promptNavs = localizeDataDeepFn(promptNavs);
 
@@ -1205,6 +1323,7 @@ function backToChat() {
     $('#mytab').hide();
     $('#queryBox').show();
     $('#footer-info').show();
+    $('#not-content').show();
     $('#introduces').show();
     $('#topTitle').show();
     $('#item-content').show();
@@ -1219,6 +1338,7 @@ function backToChat() {
         formElement.style.visibility = 'visible';
     }
     document.body.classList.remove('home-mode');
+    document.body.classList.remove('interaction-mode');
     document.querySelectorAll('#conversationsNav a.active').forEach(a => {
         a.classList.remove('active');
     });
@@ -1243,12 +1363,14 @@ function backToChat() {
 function ensureChatBottomBarVisible() {
     $('#queryBox').show();
     $('#footer-info').show();
+    $('#not-content').show();
     const formElement = document.querySelector('#not-content form');
     if (formElement) {
         formElement.style.display = 'flex';
         formElement.style.visibility = 'visible';
     }
     document.body.classList.remove('home-mode');
+    document.body.classList.remove('interaction-mode');
 }
 
 function hideBallDiv() {
@@ -1410,8 +1532,7 @@ function updatePlaceholder(id, subId) {
 
 function goToUserTab(id, e) {
     if (id === 666 || id == 667 || id == 668 || id == 669) {
-        if (!getCookie('userId')) {
-            openModal(e);
+        if (!promptLoginIfNotAuthenticated(e)) {
             return;
         }
     }
@@ -1458,8 +1579,7 @@ function goToUserTabV2(navId, subNavId, e) {
     const subNav = getSubNav(navId, subNavId);
     const id = subNav.id;
     if (id === 666 || id == 667 || id == 668 || id == 669) {
-        if (!getCookie('userId')) {
-            openModal(e);
+        if (!promptLoginIfNotAuthenticated(e)) {
             return;
         }
     }
@@ -1654,21 +1774,38 @@ function toggleFolder(element) {
     }
 }
 
+function getNavDisabledLabel(navItem) {
+    return navItem && navItem.disabledLabel ? navItem.disabledLabel : 'Mate';
+}
+
+function getNavDisabledTitle(navItem) {
+    const label = getNavDisabledLabel(navItem);
+    const isEnglish = typeof window.getCurrentLang === 'function' && window.getCurrentLang() === 'en-US';
+    return isEnglish ? `${label} mode unavailable` : `${label} 模式下暂不可用`;
+}
+
 function loadNavBar() {
     $("#nav_body").empty();
     const navs = promptNavs;
 
     const buildThirdClickHandler = (topNav, secondNav, thirdNav) => {
+        let funcName;
+        let parentId;
         if (topNav.key === 'integrationTest') {
+            parentId = secondNav.id;
             if (secondNav.key === 'integrationAgent' || secondNav.title === '智能体') {
-                return `updateSelectAgentV2(${secondNav.id}, ${thirdNav.id}, event)`;
+                funcName = 'updateSelectAgentV2';
+            } else if (secondNav.key === 'integrationOrchestration' || secondNav.title === '编排') {
+                funcName = 'clickOrchestration';
+            } else {
+                funcName = 'getPromptDialog';
             }
-            if (secondNav.key === 'integrationOrchestration' || secondNav.title === '编排') {
-                return `clickOrchestration(${secondNav.id}, ${thirdNav.id}, event)`;
-            }
-            return `getPromptDialog(${secondNav.id}, ${thirdNav.id}, event)`;
+        } else {
+            funcName = 'getPromptDialog';
+            parentId = topNav.id;
         }
-        return `getPromptDialog(${topNav.id}, ${thirdNav.id}, event)`;
+        const navKey = (thirdNav && thirdNav.key) ? thirdNav.key : '';
+        return `dispatchNavClick('${funcName}', ${parentId}, ${thirdNav.id}, '${navKey}', event)`;
     };
 
     for (const nav of navs) {
@@ -1710,32 +1847,129 @@ function loadNavBar() {
                 const subFolderContent = folder_content.find(".sub-folder-content:last");
                 for (const thirdNav of subNav.subNavs) {
                     const thirdClickHandler = buildThirdClickHandler(nav, subNav, thirdNav);
+                    const thirdNavDisabled = thirdNav.disabled === true;
+                    const thirdDisabledLabel = getNavDisabledLabel(thirdNav);
+                    const thirdNavClassName = thirdNavDisabled ? 'file-item third-file-item interaction-nav-disabled' : 'file-item third-file-item';
+                    const thirdNavAttrs = thirdNavDisabled
+                        ? `data-disabled="true" aria-disabled="true" title="${getNavDisabledTitle(thirdNav)}"`
+                        : `onclick="${thirdClickHandler}"`;
                     subFolderContent.append(`
-                        <div class="file-item third-file-item" data-nav-id="${thirdNav.id}" onclick="${thirdClickHandler}">
+                        <div class="${thirdNavClassName}" data-nav-id="${thirdNav.id}" ${thirdNavAttrs}>
                             <div class="file-icon">
                                 <i class="fa fa-file-code-o">
                                     ${thirdNav.icon1 || ''}
                                 </i>
                             </div>
                             <span class="file-text">${thirdNav.title}</span>
+                            ${thirdNavDisabled ? `<span class="nav-disabled-badge">${thirdDisabledLabel}</span>` : ''}
                         </div>
                     `);
                 }
                 continue;
             }
 
+            const subNavDisabled = subNav.disabled === true;
+            const subNavDisabledLabel = getNavDisabledLabel(subNav);
+            const subNavClassName = subNavDisabled ? 'file-item interaction-nav-disabled' : 'file-item';
+            const subNavAttrs = subNavDisabled
+                ? `data-disabled="true" aria-disabled="true" title="${getNavDisabledTitle(subNav)}"`
+                : `onclick="dispatchNavClick('${nav.bindfunc}', ${nav.id}, ${subNav.id}, '${subNav.key || ''}', event)"`;
             folder_content.append(`
-                <div class="file-item" data-nav-id="${subNav.id}" onclick="${nav.bindfunc}(${nav.id}, ${subNav.id}, event)">
+                <div class="${subNavClassName}" data-nav-id="${subNav.id}" ${subNavAttrs}>
                     <div class="file-icon">
                         <i class="fa fa-file-code-o">
                             ${subNav.icon1 || ''}
                         </i>
                     </div>
                     <span class="file-text" >${subNav.title}</span>
+                    ${subNavDisabled ? `<span class="nav-disabled-badge">${subNavDisabledLabel}</span>` : ''}
                 </div>
             `);
         }
     }
+}
+
+function refreshInteractionPublishNavState(isMateMode) {
+    updateInteractionNavItemState(INTERACTION_PUBLISH_NAV_ID, isMateMode === true, 'Mate');
+    updateInteractionNavItemState(INTERACTION_CASCADE_NAV_ID, isMateMode !== true, 'Server');
+}
+
+function updateInteractionNavItemState(navId, disabled, disabledLabel) {
+    let targetSubNav = null;
+    for (const nav of promptNavs) {
+        if (!Array.isArray(nav.subNavs)) {
+            continue;
+        }
+        for (const subNav of nav.subNavs) {
+            if (subNav && subNav.id === navId) {
+                subNav.disabled = disabled;
+                subNav.disabledLabel = disabledLabel;
+                targetSubNav = subNav;
+            }
+        }
+    }
+
+    const navItem = document.querySelector('#nav_body .file-item[data-nav-id="' + navId + '"]');
+    if (!navItem) {
+        return;
+    }
+
+    if (disabled) {
+        navItem.classList.add('interaction-nav-disabled');
+        navItem.setAttribute('data-disabled', 'true');
+        navItem.setAttribute('aria-disabled', 'true');
+        navItem.setAttribute('title', getNavDisabledTitle(targetSubNav || { disabledLabel: disabledLabel }));
+        navItem.removeAttribute('onclick');
+        let badge = navItem.querySelector('.nav-disabled-badge');
+        if (!badge) {
+            navItem.insertAdjacentHTML('beforeend', '<span class="nav-disabled-badge"></span>');
+            badge = navItem.querySelector('.nav-disabled-badge');
+        }
+        if (badge) {
+            badge.textContent = disabledLabel;
+        }
+    } else {
+        navItem.classList.remove('interaction-nav-disabled');
+        navItem.removeAttribute('data-disabled');
+        navItem.removeAttribute('aria-disabled');
+        navItem.removeAttribute('title');
+        const navKey = (targetSubNav && targetSubNav.key) ? targetSubNav.key : '';
+        navItem.setAttribute('onclick', "dispatchNavClick('openInteractionPage', " + INTERACTION_NAV_ID + ", " + navId + ", '" + navKey + "', event)");
+        const badge = navItem.querySelector('.nav-disabled-badge');
+        if (badge) {
+            badge.remove();
+        }
+    }
+}
+
+window.refreshInteractionPublishNavState = refreshInteractionPublishNavState;
+
+function detectMateModeOnPageLoad() {
+    if (typeof $ === 'undefined' || !$.ajax) {
+        return;
+    }
+    $.ajax({
+        type: 'GET',
+        contentType: 'application/x-www-form-urlencoded; charset=UTF-8',
+        url: '/socialChannel/runningMode',
+        success: function (res) {
+            const isMateMode = !!(res && res.status === 'success' && res.isMateMode);
+            window.isMateMode = isMateMode;
+            window.menuLoginRequired = !!(res && res.status === 'success' && res.menuLoginRequired);
+            refreshInteractionPublishNavState(isMateMode);
+        },
+        error: function () {
+            window.isMateMode = false;
+            window.menuLoginRequired = false;
+            refreshInteractionPublishNavState(false);
+        }
+    });
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', detectMateModeOnPageLoad);
+} else {
+    detectMateModeOnPageLoad();
 }
 
 // Leaf items only (#nav_body is filled by loadNavBar after parse — use delegation)
@@ -1747,6 +1981,9 @@ function loadNavBar() {
     navBody.addEventListener('click', function (e) {
         const fileItem = e.target.closest && e.target.closest('.file-item');
         if (!fileItem || !navBody.contains(fileItem)) {
+            return;
+        }
+        if (fileItem.getAttribute('data-disabled') === 'true') {
             return;
         }
         clearNavBodyLeafActive();

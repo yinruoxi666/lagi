@@ -17,6 +17,7 @@ import ai.llm.adapter.ILlmAdapter;
 import ai.openai.pojo.ChatCompletionRequest;
 import ai.openai.pojo.ChatCompletionResult;
 import ai.openai.pojo.ChatMessage;
+import ai.utils.AiGlobal;
 import io.reactivex.Observable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,17 +31,18 @@ public class GPTAdapter extends ModelService implements ILlmAdapter {
     private static final Logger logger = LoggerFactory.getLogger(GPTAdapter.class);
     private static final String COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
     private static final String RESPONSES_URL = "https://api.openai.com/v1/responses";
-    private static final int HTTP_TIMEOUT = 15 * 1000;
+    private static final int HTTP_TIMEOUT = AiGlobal.LLM_TIME_OUT_SECONDS;
     private static final ResponseSessionManager SESSION_MANAGER = ResponseSessionManager.getInstance();
 
     @Override
     public ChatCompletionResult completions(ChatCompletionRequest chatCompletionRequest) {
+        String reqApiKey = getApiKey(chatCompletionRequest);
         setDefaultField(chatCompletionRequest);
         if (ResponseProtocolUtil.isResponseProtocol(this)) {
             ResponseSessionContext sessionContext = SESSION_MANAGER.prepare(chatCompletionRequest, this);
-            LlmApiResponse response = OpenAiResponsesApiUtil.createResponse(apiKey, RESPONSES_URL, HTTP_TIMEOUT,
+            LlmApiResponse response = OpenAiResponsesApiUtil.createResponse(reqApiKey, RESPONSES_URL, HTTP_TIMEOUT,
                     ResponsesChatCompletionConverter.toRequest(chatCompletionRequest, sessionContext, chatCompletionRequest.getModel()),
-                    GptConvert::convertByResponse, defaultHeaders());
+                    GptConvert::convertByResponse, defaultHeaders(reqApiKey));
             if(response.getCode() != 200) {
                 logger.error(response.getMsg());
                 throw new RRException(response.getCode(), response.getMsg());
@@ -50,7 +52,7 @@ public class GPTAdapter extends ModelService implements ILlmAdapter {
                     extractAssistantMessage(response.getData()));
             return response.getData();
         }
-        LlmApiResponse completions = OpenAiApiUtil.completions(apiKey, COMPLETIONS_URL, HTTP_TIMEOUT, chatCompletionRequest,
+        LlmApiResponse completions = OpenAiApiUtil.completions(reqApiKey, COMPLETIONS_URL, HTTP_TIMEOUT, chatCompletionRequest,
                 GptConvert::convert2ChatCompletionResult,
                 GptConvert::convertByResponse);
         if(completions.getCode() != 200) {
@@ -62,12 +64,13 @@ public class GPTAdapter extends ModelService implements ILlmAdapter {
 
     @Override
     public Observable<ChatCompletionResult> streamCompletions(ChatCompletionRequest chatCompletionRequest) {
+        String reqApiKey = getApiKey(chatCompletionRequest);
         setDefaultField(chatCompletionRequest);
         if (ResponseProtocolUtil.isResponseProtocol(this)) {
             ResponseSessionContext sessionContext = SESSION_MANAGER.prepare(chatCompletionRequest, this);
-            LlmApiResponse response = OpenAiResponsesApiUtil.streamResponse(apiKey, RESPONSES_URL, HTTP_TIMEOUT,
+            LlmApiResponse response = OpenAiResponsesApiUtil.streamResponse(reqApiKey, RESPONSES_URL, HTTP_TIMEOUT,
                     ResponsesChatCompletionConverter.toRequest(chatCompletionRequest, sessionContext, chatCompletionRequest.getModel()),
-                    GptConvert::convertByResponse, defaultHeaders());
+                    GptConvert::convertByResponse, defaultHeaders(reqApiKey));
             if(response.getCode() != 200) {
                 logger.error("open ai responses stream api error {}", response.getMsg());
                 throw new RRException(response.getCode(), response.getMsg());
@@ -83,7 +86,7 @@ public class GPTAdapter extends ModelService implements ILlmAdapter {
                     })
                     .doOnComplete(() -> SESSION_MANAGER.onSuccess(sessionContext, responseId.get(), assistantMessage.get()));
         }
-        LlmApiResponse completions = OpenAiApiUtil.streamCompletions(apiKey, COMPLETIONS_URL, HTTP_TIMEOUT, chatCompletionRequest,
+        LlmApiResponse completions = OpenAiApiUtil.streamCompletions(reqApiKey, COMPLETIONS_URL, HTTP_TIMEOUT, chatCompletionRequest,
                 GptConvert::convertSteamLine2ChatCompletionResult,
                 GptConvert::convertByResponse);
         if(completions.getCode() != 200) {
@@ -93,7 +96,7 @@ public class GPTAdapter extends ModelService implements ILlmAdapter {
         return completions.getStreamData();
     }
 
-    private Map<String, String> defaultHeaders() {
+    private Map<String, String> defaultHeaders(String apiKey) {
         Map<String, String> headers = new HashMap<>();
         headers.put("Content-Type", "application/json");
         headers.put("Authorization", "Bearer " + apiKey);

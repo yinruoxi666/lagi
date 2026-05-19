@@ -1,7 +1,11 @@
 package ai.servlet;
 
+import ai.config.ConfigUtil;
 import ai.dto.ModelApiKey;
 import ai.migrate.service.ApiKeyService;
+import ai.utils.ApikeyUtil;
+import ai.utils.OkHttpUtil;
+import cn.hutool.core.util.StrUtil;
 import com.google.gson.Gson;
 import lombok.extern.slf4j.Slf4j;
 
@@ -54,6 +58,9 @@ public class ApiKeyServlet extends BaseServlet {
             case "toggle":
                 this.toggle(req, resp);
                 break;
+            case "invalidList":
+                this.invalidList(req, resp);
+                break;
         }
     }
 
@@ -67,6 +74,7 @@ public class ApiKeyServlet extends BaseServlet {
             result.put("data", data);
             result.put("localApiKeyEditable", apiKeyService.isLocalApiKeyEditable());
         } catch (Exception e) {
+            log.error("Failed to list API keys: {}", e.getMessage(), e);
             result.put("status", "failed");
             result.put("msg", e.getMessage());
         }
@@ -88,6 +96,7 @@ public class ApiKeyServlet extends BaseServlet {
                 result.put("data", data);
             }
         } catch (Exception e) {
+            log.error("Failed to get API key: {}", e.getMessage(), e);
             result.put("status", "failed");
             result.put("msg", e.getMessage());
         }
@@ -103,6 +112,7 @@ public class ApiKeyServlet extends BaseServlet {
             result.put("data", data);
             result.put("localApiKeyEditable", apiKeyService.isLocalApiKeyEditable());
         } catch (Exception e) {
+            log.error("Failed to list providers: {}", e.getMessage(), e);
             result.put("status", "failed");
             result.put("msg", e.getMessage());
         }
@@ -145,6 +155,7 @@ public class ApiKeyServlet extends BaseServlet {
             result.put("status", "success");
             result.put("msg", "delete success");
         } catch (Exception e) {
+            log.error("Failed to delete API key: {}", e.getMessage(), e);
             result.put("status", "failed");
             result.put("msg", e.getMessage());
         }
@@ -164,10 +175,62 @@ public class ApiKeyServlet extends BaseServlet {
             result.put("status", "success");
             result.put("msg", "toggle success");
         } catch (Exception e) {
+            log.error("Failed to toggle API key: {}", e.getMessage(), e);
             result.put("status", "failed");
             result.put("msg", e.getMessage());
         }
         responsePrint(resp, gson.toJson(result));
+    }
+
+    private void invalidList(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        resp.setContentType("application/json;charset=utf-8");
+        if (shouldProxyToCascade()) {
+            String cascadeApiAddress = ConfigUtil.CASCADE_API_ADDRESS.trim();
+            String targetUrl = buildTargetUrl(cascadeApiAddress, req);
+            try {
+                String body = requestToJson(req);
+                String result = OkHttpUtil.post(targetUrl, new HashMap<>(), new HashMap<>(), body);
+                responsePrint(resp, result);
+                return;
+            } catch (Exception e) {
+                Map<String, Object> result = new HashMap<>();
+                result.put("status", "failed");
+                result.put("msg", "proxy request failed: " + e.getMessage());
+                responsePrint(resp, gson.toJson(result));
+                return;
+            }
+        }
+        Map<String, Object> result = new HashMap<>();
+        try {
+            InvalidApiKeyRequest body = reqBodyToObj(req, InvalidApiKeyRequest.class);
+            List<String> apiKeys = body == null ? null : body.getApiKeys();
+            if (apiKeys == null) {
+                throw new IOException("apiKeys is required");
+            }
+            result.put("status", "success");
+            result.put("data", ApikeyUtil.listInvalidApiKeys(apiKeys));
+        } catch (Exception e) {
+            log.error("Failed to list invalid API keys: {}", e.getMessage(), e);
+            result.put("status", "failed");
+            result.put("msg", e.getMessage());
+        }
+        responsePrint(resp, gson.toJson(result));
+    }
+
+    private boolean shouldProxyToCascade() {
+        return ConfigUtil.MODE_MATE.equalsIgnoreCase(ConfigUtil.getRunningMode())
+                && StrUtil.isNotBlank(ConfigUtil.CASCADE_API_ADDRESS);
+    }
+
+    private String buildTargetUrl(String cascadeApiAddress, HttpServletRequest req) {
+        String requestUri = req.getRequestURI();
+        if (cascadeApiAddress.endsWith("/") && requestUri.startsWith("/")) {
+            return cascadeApiAddress.substring(0, cascadeApiAddress.length() - 1) + requestUri;
+        }
+        if (!cascadeApiAddress.endsWith("/") && !requestUri.startsWith("/")) {
+            return cascadeApiAddress + "/" + requestUri;
+        }
+        return cascadeApiAddress + requestUri;
     }
 
     private static class AddApiKeyRequest {
@@ -192,6 +255,22 @@ public class ApiKeyServlet extends BaseServlet {
         String provider;
         String userId;
         Boolean enabled;
+    }
+
+    private static class InvalidApiKeyRequest {
+        List<String> apiKeys;
+        List<String> apiKeyList;
+        List<String> apikeys;
+
+        List<String> getApiKeys() {
+            if (apiKeys != null) {
+                return apiKeys;
+            }
+            if (apiKeyList != null) {
+                return apiKeyList;
+            }
+            return apikeys;
+        }
     }
 
     private String maskApiKey(String apiKey) {

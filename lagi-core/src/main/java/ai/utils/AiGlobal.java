@@ -25,4 +25,6 @@ public class AiGlobal {
     public static final String SAAS_URL = "https://saas.landingbj.com";
 //    public static final String SAAS_URL = "http://localhost:8090";
     public static final String DEFAULT_DB = "saas";
+
+    public static final int LLM_TIME_OUT_SECONDS = 600;
 }

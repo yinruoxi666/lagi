@@ -1,23 +1,50 @@
-# API参考指南
+---
+title: 默认模块
+language_tabs:
+  - shell: Shell
+  - http: HTTP
+  - javascript: JavaScript
+  - ruby: Ruby
+  - python: Python
+  - php: PHP
+  - java: Java
+  - go: Go
+toc_footers: []
+includes: []
+search: true
+code_clipboard: true
+highlight_theme: darkula
+headingLevel: 2
+generator: "@tarslib/widdershins v4.0.30"
 
-## 问答接口
 
-POST `/chat/completions`
+---
 
-输入prompt，获取大模型的回答。
+# 默认模块
 
-### 请求示例
+Base URLs:
+
+# Authentication
+
+# 文本
+
+## POST 推理接口
+
+POST /v1/chat/completions
+
+OpenAI 兼容的对话补全接口，用于统一调用文本模型并返回标准聊天结果。
+
+> Body 请求参数
 
 ```json
 {
-  "model": "gpt-3.5-turbo-1106",
-  "temperature": 0.8,
-  "max_tokens": 500,
-  "category": "xxxx",
+  "model": "qwen-plus",
+  "stream": false,
+  "max_completion_tokens": 256,
   "messages": [
     {
       "role": "user",
-      "content": "查看大数据中心上云的单位数量。"
+      "content": "Hello, LinkMind."
     }
   ]
 }
@@ -25,90 +52,381 @@ POST `/chat/completions`
 
 ### 请求参数
 
-| 名称          | 位置 | 类型     | 必选 | 说明                                                         |
-| ------------- | ---- | -------- | ---- | ------------------------------------------------------------ |
-| body          | body | object   | 否   | none                                                         |
-| » model       | body | string   | 否   | 模型类型                                                     |
-| » temperature | body | number   | 是   | 用来控制语言模型生成文本的创造性和多样性的参数，范围再0-1之间，调低温度会让模型生成更加确定和高概率的文本，而调高温度则会增加文本的随机性和多样性。 |
-| » max_tokens  | body | integer  | 是   | 可以生成的最大token数。                                      |
-| » category    | body | string   | 否   | 数据类别                                                     |
-| » messages    | body | [object] | 是   | 提交的消息列表                                               |
-| »» role       | body | string   | 否   | user或者assistant, user表示用户提交，assistant表示大模型输出 |
-| »» content    | body | string   | 否   | 请求内容                                                     |
+| 名称                         | 位置   | 类型     | 必选 | 说明                                                         |
+| ---------------------------- | ------ | -------- | ---- | ------------------------------------------------------------ |
+| Content-Type                 | header | string   | 否   | 请求体内容类型。                                             |
+| Authorization                | header | string   | 是   | Bearer 令牌，用于调用需要鉴权的接口。                        |
+| body                         | body   | object   | 否   | none                                                         |
+| » model                      | body   | string   | 是   | 模型类型                                                     |
+| » messages                   | body   | [object] | 是   | 提交的消息列表                                               |
+| »» role                      | body   | string   | 是   | user或者assistant, user表示用户提交，assistant表示大模型输出 |
+| »» content                   | body   | [object] | 是   | 如果role是user，则context是用户输入的内容吗， 如果role是assistant，则context是大模型的输出内容 |
+| »»» type                     | body   | string   | 否   | 内容项类型。                                                 |
+| »»» text                     | body   | string   | 否   | 文本内容。                                                   |
+| » stream                     | body   | boolean  | 是   | 是否使用流式返回。                                           |
+| » store                      | body   | boolean  | 是   | 是否保存本次调用结果。                                       |
+| » max_completion_tokens      | body   | integer  | 是   | 本次生成允许的最大输出 token 数。                            |
+| » tools                      | body   | [object] | 是   | 可选工具定义列表。                                           |
+| »» type                      | body   | string   | 是   | 工具类型。                                                   |
+| »» function                  | body   | object   | 是   | 工具函数定义。                                               |
+| »»» name                     | body   | string   | 是   | 函数名称。                                                   |
+| »»» description              | body   | string   | 是   | 函数说明。                                                   |
+| »»» parameters               | body   | object   | 是   | 函数参数定义。                                               |
+| »»»» type                    | body   | string   | 是   | 字段类型。                                                   |
+| »»»» required                | body   | [string] | 是   | none                                                         |
+| »»»» properties              | body   | object   | 是   | none                                                         |
+| »»»»» path                   | body   | object   | 是   | none                                                         |
+| »»»»»» description           | body   | string   | 否   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» offset                 | body   | object   | 否   | 结果偏移量。                                                 |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» limit                  | body   | object   | 否   | 返回记录数上限。                                             |
+| »»»»»» description           | body   | string   | 否   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»»» minimum               | body   | integer  | 是   | none                                                         |
+| »»»»» file_path              | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» filePath               | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» file                   | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» oldText                | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» newText                | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» edits                  | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»»» items                 | body   | object   | 是   | none                                                         |
+| »»»»»»» additionalProperties | body   | boolean  | 是   | none                                                         |
+| »»»»»»» type                 | body   | string   | 是   | 字段类型。                                                   |
+| »»»»»»» required             | body   | [string] | 是   | none                                                         |
+| »»»»»»» properties           | body   | object   | 是   | none                                                         |
+| »»»»»»»» oldText             | body   | object   | 是   | none                                                         |
+| »»»»»»»»» description        | body   | string   | 是   | none                                                         |
+| »»»»»»»»» type               | body   | string   | 是   | 字段类型。                                                   |
+| »»»»»»»» newText             | body   | object   | 是   | none                                                         |
+| »»»»»»»»» description        | body   | string   | 是   | none                                                         |
+| »»»»»»»»» type               | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» old_string             | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» old_text               | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» oldString              | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» new_string             | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» new_text               | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» newString              | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» content                | body   | object   | 否   | 消息内容。                                                   |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» command                | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» workdir                | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» env                    | body   | object   | 否   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»»» patternProperties     | body   | object   | 是   | none                                                         |
+| »»»»»»» ^(.*)$               | body   | object   | 是   | none                                                         |
+| »»»»»»»» type                | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» yieldMs                | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» background             | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» timeout                | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»»» minimum               | body   | integer  | 是   | none                                                         |
+| »»»»» pty                    | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» elevated               | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» host                   | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» security               | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» ask                    | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» node                   | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» action                 | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 否   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»»» enum                  | body   | [string] | 是   | none                                                         |
+| »»»»» sessionId              | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» data                   | body   | object   | 否   | 接口返回数据。                                               |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» keys                   | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»»» items                 | body   | object   | 是   | none                                                         |
+| »»»»»»» type                 | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» hex                    | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»»» items                 | body   | object   | 是   | none                                                         |
+| »»»»»»» type                 | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» literal                | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» text                   | body   | object   | 否   | 输入文本。                                                   |
+| »»»»»» description           | body   | string   | 否   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» bracketed              | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» eof                    | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» gatewayUrl             | body   | object   | 否   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» gatewayToken           | body   | object   | 否   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» timeoutMs              | body   | object   | 否   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» includeDisabled        | body   | object   | 否   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» job                    | body   | object   | 否   | none                                                         |
+| »»»»»» additionalProperties  | body   | boolean  | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»»» properties            | body   | object   | 是   | none                                                         |
+| »»»»» jobId                  | body   | object   | 否   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» id                     | body   | object   | 否   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» patch                  | body   | object   | 否   | none                                                         |
+| »»»»»» additionalProperties  | body   | boolean  | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»»» properties            | body   | object   | 是   | none                                                         |
+| »»»»» mode                   | body   | object   | 否   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»»» enum                  | body   | [string] | 是   | none                                                         |
+| »»»»» runMode                | body   | object   | 否   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»»» enum                  | body   | [string] | 是   | none                                                         |
+| »»»»» contextMessages        | body   | object   | 否   | none                                                         |
+| »»»»»» minimum               | body   | integer  | 是   | none                                                         |
+| »»»»»» maximum               | body   | integer  | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» kinds                  | body   | object   | 否   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»»» items                 | body   | object   | 是   | none                                                         |
+| »»»»»»» type                 | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» activeMinutes          | body   | object   | 否   | none                                                         |
+| »»»»»» minimum               | body   | integer  | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» messageLimit           | body   | object   | 否   | none                                                         |
+| »»»»»» minimum               | body   | integer  | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» sessionKey             | body   | object   | 否   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» includeTools           | body   | object   | 否   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» label                  | body   | object   | 否   | none                                                         |
+| »»»»»» minLength             | body   | integer  | 否   | none                                                         |
+| »»»»»» maxLength             | body   | integer  | 否   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» agentId                | body   | object   | 否   | 目标 Agent 标识。                                            |
+| »»»»»» minLength             | body   | integer  | 否   | none                                                         |
+| »»»»»» maxLength             | body   | integer  | 否   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» message                | body   | object   | 否   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» timeoutSeconds         | body   | object   | 否   | none                                                         |
+| »»»»»» minimum               | body   | integer  | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» task                   | body   | object   | 否   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» runtime                | body   | object   | 否   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»»» enum                  | body   | [string] | 是   | none                                                         |
+| »»»»» resumeSessionId        | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» model                  | body   | object   | 否   | 调用时使用的模型名称。                                       |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» thinking               | body   | object   | 否   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» cwd                    | body   | object   | 否   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» runTimeoutSeconds      | body   | object   | 否   | none                                                         |
+| »»»»»» minimum               | body   | integer  | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» thread                 | body   | object   | 否   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» cleanup                | body   | object   | 否   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»»» enum                  | body   | [string] | 是   | none                                                         |
+| »»»»» sandbox                | body   | object   | 否   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»»» enum                  | body   | [string] | 是   | none                                                         |
+| »»»»» streamTo               | body   | object   | 否   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»»» enum                  | body   | [string] | 是   | none                                                         |
+| »»»»» attachments            | body   | object   | 否   | none                                                         |
+| »»»»»» maxItems              | body   | integer  | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»»» items                 | body   | object   | 是   | none                                                         |
+| »»»»»»» type                 | body   | string   | 是   | 字段类型。                                                   |
+| »»»»»»» required             | body   | [string] | 是   | none                                                         |
+| »»»»»»» properties           | body   | object   | 是   | none                                                         |
+| »»»»»»»» name                | body   | object   | 是   | none                                                         |
+| »»»»»»»»» type               | body   | string   | 是   | 字段类型。                                                   |
+| »»»»»»»» content             | body   | object   | 是   | 消息内容。                                                   |
+| »»»»»»»»» type               | body   | string   | 是   | 字段类型。                                                   |
+| »»»»»»»» encoding            | body   | object   | 是   | none                                                         |
+| »»»»»»»»» type               | body   | string   | 是   | 字段类型。                                                   |
+| »»»»»»»»» enum               | body   | [string] | 是   | none                                                         |
+| »»»»»»»» mimeType            | body   | object   | 是   | none                                                         |
+| »»»»»»»»» type               | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» attachAs               | body   | object   | 否   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»»» properties            | body   | object   | 是   | none                                                         |
+| »»»»»»» mountPath            | body   | object   | 是   | none                                                         |
+| »»»»»»»» type                | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» target                 | body   | object   | 否   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» recentMinutes          | body   | object   | 否   | none                                                         |
+| »»»»»» minimum               | body   | integer  | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» query                  | body   | object   | 否   | 查询条件。                                                   |
+| »»»»»» description           | body   | string   | 否   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» count                  | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» minimum               | body   | integer  | 是   | none                                                         |
+| »»»»»» maximum               | body   | integer  | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» region                 | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» safeSearch             | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» url                    | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» extractMode            | body   | object   | 否   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»»» enum                  | body   | [string] | 是   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» default               | body   | string   | 是   | none                                                         |
+| »»»»» maxChars               | body   | object   | 否   | none                                                         |
+| »»»»»» description           | body   | string   | 是   | none                                                         |
+| »»»»»» minimum               | body   | integer  | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» maxResults             | body   | object   | 否   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» minScore               | body   | object   | 否   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» from                   | body   | object   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»»» lines                  | body   | object   | 是   | none                                                         |
+| »»»»»» type                  | body   | string   | 是   | 字段类型。                                                   |
+| »»»» additionalProperties    | body   | boolean  | 否   | none                                                         |
 
-### 返回示例
+> 返回示例
 
-> 成功
+> 200 Response
 
 ```json
 {
-  "id": "chatcmpl-W9Hp9zbUjE572UKvPZvybz",
+  "id": "chatcmpl-example-001",
   "object": "chat.completion",
-  "created": 1709287530,
+  "created": 1700000000,
+  "model": "qwen-plus",
   "choices": [
     {
       "index": 0,
       "message": {
         "role": "assistant",
-        "content": " 知识图谱是一种表示和组织人类知识的结构化方式。它通过将知识点（即事实、概念、关系等）以及其相互联系的方式用图形化的方式呈现，以便人类或机器可以更好地理解和使用这些知识。知识图谱可以帮助人们更好地探索和理解一个特定领域的知识，并在需要时快速找到所需的信息。在本文的背景信息中，知识图谱被用于沉淀和存储专家知识，以支持业务决策和转化成盈利中心。"
+        "content": "Hello! How can I help you today?"
       },
       "finish_reason": "stop"
     }
   ],
   "usage": {
-    "prompt_tokens": 0,
-    "completion_tokens": 0,
-    "total_tokens": 0
+    "prompt_tokens": 12,
+    "completion_tokens": 10,
+    "total_tokens": 22
   }
 }
 ```
 
 ### 返回结果
 
-| 状态码 | 状态码含义 | 说明 |
-|-----|-------|----|
-| 200 | OK    | 成功 |
+| 状态码 | 状态码含义                                              | 说明       | 数据模型 |
+| ------ | ------------------------------------------------------- | ---------- | -------- |
+| 200    | [OK](https://tools.ietf.org/html/rfc7231#section-6.3.1) | 成功响应。 | Inline   |
 
 ### 返回数据结构
 
 状态码 **200**
 
-| 名称                 | 类型     | 必选  | 说明                                                       |
-| -------------------- | -------- | ----- | ---------------------------------------------------------- |
-| » id                 | string   | true  | 唯一标识符                                                 |
-| » object             | string   | true  | 对象类型                                                   |
-| » created            | integer  | true  | 聊天完成创建时的Unix时间戳（秒）                           |
-| » choices            | [object] | true  | 选择的列表                                                 |
-| »» index             | integer  | false | 对象的索引                                                 |
-| »» message           | object   | false | 返回的消息                                                 |
-| »»» role             | string   | true  | user或assistant, user表示用户提交，assistant表示大模型输出 |
-| »»» content          | string   | true  | 大模型的输出内容                                           |
-| »»» context          | string   | false | 向量数据库查出来的上下文信息                               |
-| »» finish_reason     | string   | false | 模型停止生成的原因                                         |
-| » usage              | object   | true  | 完成请求的使用统计                                         |
-| »» prompt_tokens     | integer  | true  | 提示中的词元数量。                                         |
-| »» completion_tokens | integer  | true  | 生成的词元数量                                             |
-| »» total_tokens      | integer  | true  | 请求中使用的总词元数量                                     |
+| 名称                 | 类型     | 必选  | 约束 | 中文名 | 说明                                                         |
+| -------------------- | -------- | ----- | ---- | ------ | ------------------------------------------------------------ |
+| » id                 | string   | true  | none |        | 唯一标识符                                                   |
+| » object             | string   | true  | none |        | 对象类型                                                     |
+| » created            | integer  | true  | none |        | 聊天完成创建时的Unix时间戳（秒）                             |
+| » model              | string   | true  | none |        | 使用的模型                                                   |
+| » choices            | [object] | true  | none |        | 选择的列表                                                   |
+| »» index             | integer  | false | none |        | 对象的索引                                                   |
+| »» message           | object   | false | none |        | 返回的消息                                                   |
+| »»» role             | string   | true  | none |        | user或者assistant, user表示用户提交，assistant表示大模型输出 |
+| »»» content          | string   | true  | none |        | 如果role是user，则context是用户输入的内容吗， 如果role是assistant，则context是大模型的输出内容 |
+| »» finish_reason     | string   | false | none |        | 模型停止生成的原因                                           |
+| » usage              | object   | true  | none |        | 完成请求的使用统计                                           |
+| »» prompt_tokens     | integer  | true  | none |        | 提示中的令牌数量。                                           |
+| »» completion_tokens | integer  | true  | none |        | 生成的令牌数量                                               |
+| »» total_tokens      | integer  | true  | none |        | 请求中使用的总令牌数量                                       |
 
+## POST chat/go
 
-## 智能体调用接口
+POST /chat/go
 
-POST `/chat/go`
+Agent / Worker 统一调用入口，用于通过指定 worker 执行编排后的对话请求。
 
-输入prompt，获取智能体的回答。
-
-### 请求示例
+> Body 请求参数
 
 ```json
 {
-  "router": "pass",
-  "agentId": "weather_agent",
-  "temperature": 0.8,
-  "max_tokens": 500,
+  "category": "default",
+  "worker": "appointedWorker",
+  "stream": false,
+  "temperature": 0.7,
+  "max_tokens": 256,
   "messages": [
     {
       "role": "user",
-      "content": "今天武汉的天气如何。"
+      "content": "Translate \"Hello\" into Chinese."
     }
   ]
 }
@@ -116,1024 +434,1217 @@ POST `/chat/go`
 
 ### 请求参数
 
-| 名称              | 位置   | 类型       | 必选 | 说明                                                                                         |
-|-----------------|------|----------|----|--------------------------------------------------------------------------------------------|
-| body            | body | object   | 否  | none                                                                                       |
-| » router         | body | string   | 是  | 路由规则,该值取于router 配置项, 具体请参考[路由配置](./config.md#路由配置) 接口会按规则调用智能体                             |
-| » agentId      | body | string   | 否  | 当指定路由规则为%通配时，能指定调用所有智能体, 值为智能体配置里配置的智能体名字。                                                 |
-| » temperature   | body | number   | 是  | 用来控制语言模型生成文本的创造性和多样性的参数，范围再0-1之间，调低温度会让模型生成更加确定和高概率的文本，而调高温度则会增加文本的随机性和多样性。 |
-| » max_tokens    | body | integer  | 是  | 可以生成的最大token数。                                                                             |
-| » messages      | body | [object] | 是  | 提交的消息列表                                                                                    |
-| »» role         | body | string   | 否  | user或者assistant, user表示用户提交，assistant表示智能体输出                                          |
-| »» content      | body | string   | 否  | 请求内容                                                                                       |
+| 名称          | 位置   | 类型     | 必选 | 说明                                                         |
+| ------------- | ------ | -------- | ---- | ------------------------------------------------------------ |
+| Content-Type  | header | string   | 否   | 请求体内容类型。                                             |
+| Authorization | header | string   | 是   | Bearer 令牌，用于调用需要鉴权的接口。                        |
+| body          | body   | object   | 否   | none                                                         |
+| » model       | body   | string   | 否   | 模型类型                                                     |
+| » temperature | body   | number   | 是   | 使用什么样的采样温度                                         |
+| » max_tokens  | body   | integer  | 是   | 可以生成的最大token数。                                      |
+| » category    | body   | string   | 否   | 数据类别                                                     |
+| » messages    | body   | [object] | 是   | 提交的消息列表                                               |
+| »» role       | body   | string   | 否   | user或者assistant, user表示用户提交，assistant表示大模型输出 |
+| »» content    | body   | string   | 否   | 如果role是user，则context是用户输入的内容吗， 如果role是assistant，则context是大模型的输出内容 |
+| » worker      | body   | string   | 否   | 调用的 worker 名称。                                         |
+| » agentId     | body   | string   | 否   | 调用的 Agent 标识。                                          |
+| » stream      | body   | boolean  | 否   | 是否使用流式返回。                                           |
 
-### 返回示例
+> 返回示例
 
-> 成功
+> 200 Response
 
 ```json
 {
-  "source": "weather_agent",
-  "created": 0,
+  "id": "chatcmpl-worker-001",
+  "object": "chat.completion",
+  "created": 1700000000,
+  "model": "qwen-plus",
   "choices": [
     {
       "index": 0,
       "message": {
-        "content": "今天武汉的天气是晴天，温度为7℃，湿度为59%，风力小于等于3级，风向为北。更新时间为2024-12-16 18:01:56。"
-      }
+        "role": "assistant",
+        "content": "LinkMind can help route and execute your request."
+      },
+      "finish_reason": "stop"
     }
-  ]
-}
-```
-
-### 返回结果
-
-| 状态码 | 状态码含义 | 说明 |
-|-----|-------|----|
-| 200 | OK    | 成功 |
-
-### 返回数据结构
-
-状态码 **200**
-
-| 名称                   | 类型       | 必选    | 说明                                            |
-|----------------------|----------|-------|-----------------------------------------------|
-| » id                 | string   | true  | 唯一标识符                                         |
-| » object             | string   | true  | 对象类型                                          |
-| » created            | integer  | true  | 聊天完成创建时的Unix时间戳（秒）                            |
-| » source             | integer  | true  | 源智能体名称                                        |
-| » imageList          | array   | true  | 图片理解列表                                        |
-| » filepath          | array   | true  | 文件列表                                          |
-| » created            | integer  | true  | 聊天完成创建时的Unix时间戳（秒）                            |
-| » choices            | [object] | true  | 选择的列表                                         |
-| »» index             | integer  | false | 对象的索引                                         |
-| »» message           | object   | false | 返回的消息                                         |
-| »»» role             | string   | true  | user或assistant, user表示用户提交，assistant表示大模型输出 |
-| »»» content          | string   | true  | 大模型的输出内容                                      |
-| »»» context          | string   | false | 向量数据库查出来的上下文信息                                |
-| »» finish_reason     | string   | false | 模型停止生成的原因                                     |
-| » usage              | object   | true  | 完成请求的使用统计                                     |
-| »» prompt_tokens     | integer  | true  | 提示中的词元数量。                                     |
-| »» completion_tokens | integer  | true  | 生成的词元数量                                       |
-| »» total_tokens      | integer  | true  | 请求中使用的总词元数量                                   |
-| »» total_tokens      | integer  | true  | 请求中使用的总词元数量                                   |
-
-## 语音识别
-
-POST `/audio/speech2text`
-
-语音识别接口，返回识别后的文字。
-
-### 请求参数
-
-请求体传入的是二进制音频数据，因此在HTTPS请求头部中的`Content-Type`必须设置为`application/octet-stream`。
-
-| 名称           | 位置     | 类型             | 必选 | 说明   |
-|--------------|--------|----------------|----|------|
-| Content-Type | header | string         | 否  | none |
-| body         | body   | string(binary) | 否  | none |
-
-### 返回示例
-
-> 成功
-
-```json
-{
-  "result": "万一出现了这种情况你准备怎么办",
-  "status": 20000000
-}
-```
-
-### 返回结果
-
-| 状态码 | 状态码含义 | 说明 |
-|-----|-------|----|
-| 200 | OK    | 成功 |
-
-### 返回数据结构
-
-状态码 **200**
-
-| 名称       | 类型      | 必选   | 说明      |
-|----------|---------|------|---------|
-| » result | string  | true | 语音识别结果。 |
-| » status | integer | true | 服务状态码。  |
-
-## 文字转语音
-
-GET `/audio/text2speech`
-
-输入文字，返回播报的语音文件。
-
-### 请求参数
-
-| 名称   | 位置    | 类型     | 必选 | 说明     |
-|------|-------|--------|----|--------|
-| text | query | string | 是  | 待合成的文本 |
-
-### 响应结果
-
-- 成功响应
-    - HTTPS Headers的`Content-Type`字段内容为`audio/mpeg`，表示合成成功，合成的语音数据在响应体中。
-    - 响应内容为合成音频的二进制数据。
-- 失败响应
-    - HTTP Headers没有`Content-Type`字段，或者`Content-Type`字段内容为`application/json`，表示合成失败，错误信息在响应体中。
-
-### 返回结果
-
-| 状态码 | 状态码含义 | 说明 |
-|------|-------|----|
-| 200  | OK    | 成功 |
-
-## 图片生成
-
-POST `/image/text2image`
-
-输入生成图片的指令返回图片。
-
-### 请求示例
-
-```json
-{
-  "prompt": "a.pig"
-}
-```
-
-### 请求参数
-
-| 名称        | 位置   | 类型     | 必选 | 说明      |
-|-----------|------|--------|----|---------|
-| body      | body | object | 否  | none    |
-| » prompt  | body | string | 是  | 生成图片的指令 |
-
-### 返回示例
-
-> 成功
-
-```json
-{
-  "created": 1709288374,
-  "data": [
-    {
-      "url": "http://116.255.226.214:9000/stable-diffusion/tlnniooq240301181913.png?response-content-type=image%2F%2A&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=9OMV1OGIpDH29iDq1HWC%2F20240301%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20240301T101913Z&X-Amz-Expires=7200&X-Amz-SignedHeaders=host&X-Amz-Signature=6670b8278a61aa8953e424da4c77386c120821ab5bf49ee31970b027a88430ae"
-    }
-  ]
-}
-```
-
-### 返回结果
-
-| 状态码 | 状态码含义 | 说明 |
-|-----|-------|----|
-| 200 | OK    | 成功 |
-
-### 返回数据结构
-
-状态码 **200**
-
-| 名称         | 类型       | 必选    | 说明                 |
-|------------|----------|-------|--------------------|
-| » created  | integer  | true  | 聊天完成创建时的Unix时间戳（秒） |
-| » data     | [object] | true  | 生成的图片数据            |
-| »» url     | string   | false | 生成的图片地址            |
-
-## 上传私训学习文件
-
-POST `/training/upload`
-
-上传私训学习文件，支持txt、word、pdf、excel、csv、jpeg、png、jpg、webp、ppt、pptx格式.
-
-### 请求示例
-
-```yaml
-fileToUpload: file://D:/知识图谱.pdf
-```
-
-### 请求参数
-
-| 名称              | 位置    | 类型             | 必选 | 说明       |
-|-----------------|-------|----------------|----|----------|
-| category        | query | string         | 是  | 指定的数据类别  |
-| body            | body  | object         | 否  | none     |
-| » fileToUpload  | body  | string(binary) | 是  | 所上传的私训文件 |
-
-### 返回示例
-
-> 成功
-
-```json
-{
-  "result": true
-}
-```
-
-### 返回结果
-
-| 状态码 | 状态码含义 | 说明 |
-|-----|-------|----|
-| 200 | OK    | 成功 |
-
-### 返回数据结构
-
-状态码 **200**
-
-| 名称        | 类型      | 必选   | 说明        |
-|-----------|---------|------|-----------|
-| » result  | boolean | true | 上传私训文件的状态 |
-
-## 私训问答对数据
-
-POST `/training/pairing`
-
-私训问答对数据，要求为json格式
-
-### 请求示例
-
-data和instruction字段支持对象或对象列表，参考如下请求示例。
-
-```json
-{
-  "category": "default",
-  "data": {
-    "instruction": "补办医师执业证书的整个流程包括哪些步骤？",
-    "output": "补办医师执业证书的流程包括五个步骤：申报/收件、受理、决定、制证、发证。",
-    "image":"[{\"path\": \"https://downloads.saasai.top/vector/szu/8EB8BC9D3E5F4D987BBDB93ECEB_58E46C1C_6DCB0.png\"}]"
+  ],
+  "usage": {
+    "prompt_tokens": 14,
+    "completion_tokens": 2,
+    "total_tokens": 16
   }
 }
 ```
 
-```json
-{
-  "category": "default",
-  "data": [
-    {
-      "instruction": "补办医师执业证书的整个流程包括哪些步骤？",
-      "output": "补办医师执业证书的流程包括五个步骤：申报/收件、受理、决定、制证、发证。"
-    },
-    {
-      "instruction": "医师执业证书补办流程有哪些环节？",
-      "output": "补办医师执业证书的流程包括五个步骤：申报/收件、受理、决定、制证、发证。",
-      "image":"[{\"path\": \"https://downloads.saasai.top/vector/szu/8EB8BC9D3E5F4D987BBDB93ECEB_58E46C1C_6DCB0.png\"}]"
-    }
-  ]
-}
-```
-
-```json
-{
-  "category": "default",
-  "data": [
-    {
-      "instruction": [
-        "补办医师执业证书的整个流程包括哪些步骤？",
-        "医师执业证书补办流程有哪些环节？"
-      ],
-      "output": "补办医师执业证书的流程包括五个步骤：申报/收件、受理、决定、制证、发证。",
-      "image":"[{\"path\": \"https://downloads.saasai.top/vector/szu/8EB8BC9D3E5F4D987BBDB93ECEB_58E46C1C_6DCB0.png\"}]"
-    }
-  ]
-}
-```
-
-### 请求参数
-
-| 名称             | 位置   | 类型                 | 必选 | 说明       |
-|----------------|------|--------------------|---|----------|
-| body           | body | object             | 否 | none     |
-| » category     | body | string             | 是 | 指定的数据类别  |
-| » data         | body | [object] or object | 是 | 问答对数据    |
-| »» instruction | body  | [object] or object | 是 | 问题字符串或集合 |
-| »» output      | body  | [object] or object | 是 | 答案字符串或集合 |
-| »» image       | body  | [object] or object | 否 | 相关图片对象集合 |
-
-### 返回示例
-
-> 成功
-
-```json
-{
-  "status": "success"
-}
-```
-
 ### 返回结果
 
-| 状态码 | 状态码含义 | 说明 |
-|-----|-------|----|
-| 200 | OK    | 成功 |
+| 状态码 | 状态码含义                                              | 说明       | 数据模型 |
+| ------ | ------------------------------------------------------- | ---------- | -------- |
+| 200    | [OK](https://tools.ietf.org/html/rfc7231#section-6.3.1) | 成功响应。 | Inline   |
 
 ### 返回数据结构
 
 状态码 **200**
 
-| 名称       | 类型     | 必选   | 说明       |
-|-----------|--------|------|----------|
-| » result  | string | true | 问答对数据的状态 |
+| 名称                 | 类型     | 必选  | 约束 | 中文名 | 说明                                                         |
+| -------------------- | -------- | ----- | ---- | ------ | ------------------------------------------------------------ |
+| » id                 | string   | true  | none |        | 唯一标识符                                                   |
+| » object             | string   | true  | none |        | 对象类型                                                     |
+| » created            | integer  | true  | none |        | 聊天完成创建时的Unix时间戳（秒）                             |
+| » model              | string   | true  | none |        | 使用的模型                                                   |
+| » choices            | [object] | true  | none |        | 选择的列表                                                   |
+| »» index             | integer  | false | none |        | 对象的索引                                                   |
+| »» message           | object   | false | none |        | 返回的消息                                                   |
+| »»» role             | string   | true  | none |        | user或者assistant, user表示用户提交，assistant表示大模型输出 |
+| »»» content          | string   | true  | none |        | 如果role是user，则context是用户输入的内容吗， 如果role是assistant，则context是大模型的输出内容 |
+| »» finish_reason     | string   | false | none |        | 模型停止生成的原因                                           |
+| » usage              | object   | true  | none |        | 完成请求的使用统计                                           |
+| »» prompt_tokens     | integer  | true  | none |        | 提示中的令牌数量。                                           |
+| »» completion_tokens | integer  | true  | none |        | 生成的令牌数量                                               |
+| »» total_tokens      | integer  | true  | none |        | 请求中使用的总令牌数量                                       |
 
-## 向量数据库查询
+# 语音
 
-如模型响应的答案和您的答案之间存在差异，您可以使用`POST /v1/vector/query`接口，查看您的答案。
+## POST 语音识别
 
-### 请求示例
+POST /audio/speech2text
 
-```json
-{
-    "text": "哪能寄存行李？", 
-    "n": 6,
-    "where": {},
-    "category": "default"
-}
-```
+语音转文本接口，上传音频二进制流后返回识别结果。
 
-| 名称       | 位置   | 类型                 | 必选   | 说明      |
-| -------- | ---- | ------------------ | ---- | ------- |
-| text     | body | string             | true | 问题      |
-| n        | body | integer            | true | 回答的条数   |
-| where    | body | [object] or object | true | 条件      |
-| category | body | string             | true | 指定的数据类别 |
-
-### 返回示列
-
-```json
-{
-  "data": [
-    {
-      "document": "哪能寄存行李？\n",
-      "id": "a5a74ace0f7d4339b52feb8900c6dc77",
-      "metadata": {
-        "category": "default",
-        "level": "user"
-      },
-      "distance": 0.041246016
-    },
-    {
-      "document": "行李寄存在哪？\n",
-      "id": "16061c3e59344544987806ed457285a2",
-      "metadata": {
-        "category": "default",
-        "level": "user"
-      },
-      "distance": 0.22894014
-    },
-    {
-      "document": "行李寄存有什么要求\n",
-      "id": "80a5d0abcf804e16b0227c95e48c671e",
-      "metadata": {
-        "category": "default",
-        "level": "user"
-      },
-      "distance": 0.31431544
-    }
-  ],
-  "status": "success"
-}
-```
-
-### 返回数据结构
-
-| 名称         | 类型     | 必选  | 说明                                       |
-| ------------ | -------- | ----- | ------------------------------------------ |
-| data         | [object] | true  | 选择的列表                                 |
-| status       | string   | true  | 服务状态码。                               |
-| » document   | string   | true  | 命中问题                                   |
-| » id         | string   | true  | 该数据id                                   |
-| » distance   | flat     | true  | 向量距离                                   |
-| » metadata   | [object] | true  | 上传对象信息                               |
-| »» category  | string   | true  | 指定的数据类别                             |
-| »» level     | string   | true  | 上传角色                                   |
-| »» parent_id | string   | false | 该条答案对应问题的id(一般只会在答案中出现) |
-
-## 问答删除
-
-如果某些问答对与您的整体问题集不相关或质量较低，您可以通过 `POST /v1/vector/deleteByld`接口将其从数据集中移除，以避免对模型训练产生负面影响。
-
-### 请求示例
-
-```json
-{
-    "category":"default",
-    "ids":[
-        "a4ac6c2511e94a54b454f1daaa270ee5"
-    ]
-}
-```
-
-| 名称       | 位置   | 类型             | 必选   | 说明      |
-| -------- | ---- | -------------- | ---- | ------- |
-| category | body | string         | true | 指定的数据类别 |
-| ids      | body | List< string > | true | 数据id集合  |
-
-### 返回示列
-
-```json
-{
-    "status": "success"
-}
-```
-
-### 返回数据结构
-
-| 名称     | 类型     | 必选   | 说明    |
-| ------ | ------ | ---- | ----- |
-| status | string | true | 服务状态码 |
-
-## 看图说话
-
-POST `/image/image2text`
-
-上传一张图片返回图片的描述。
-
-### 请求示例
+> Body 请求参数
 
 ```yaml
-file: file://D:\Test\Datasets\Image\kppziguz230716233346.jpg
+file://./examples/audio/sample.wav
+
 ```
 
 ### 请求参数
 
-| 名称     | 位置   | 类型             | 必选 | 说明       |
-|---------|------|----------------|----|----------|
-| body    | body | object         | 否  | none     |
-| » file  | body | string(binary) | 是  | 所上传的图片文件 |
+| 名称         | 位置   | 类型           | 必选 | 说明                   |
+| ------------ | ------ | -------------- | ---- | ---------------------- |
+| model        | query  | string         | 否   | 调用时使用的模型名称。 |
+| format       | query  | string         | 否   | 返回结果格式。         |
+| Content-Type | header | string         | 否   | 请求体内容类型。       |
+| body         | body   | string(binary) | 否   | none                   |
 
-### 返回示例
+> 返回示例
 
-> 成功
+> 200 Response
 
 ```json
 {
-  "classification": "叉车 加油泵 ",
-  "caption": "一堆自行车停放在街边",
-  "samUrl": "http://116.255.226.214:9000/sam/qlztvdkv240301172715.png?response-content-type=image%2F%2A&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=9OMV1OGIpDH29iDq1HWC%2F20240301%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20240301T092715Z&X-Amz-Expires=7200&X-Amz-SignedHeaders=host&X-Amz-Signature=0199b49a10eb6a18f01c4cec8e10549642ee6953c0f00c308bfc644e55d86c66",
-  "status": "success"
+  "result": "Hello LinkMind",
+  "status": 200
 }
 ```
 
 ### 返回结果
 
-| 状态码 | 状态码含义 | 说明 |
-|-----|-------|----|
-| 200 | OK    | 成功 |
+| 状态码 | 状态码含义                                              | 说明       | 数据模型 |
+| ------ | ------------------------------------------------------- | ---------- | -------- |
+| 200    | [OK](https://tools.ietf.org/html/rfc7231#section-6.3.1) | 成功响应。 | Inline   |
 
 ### 返回数据结构
 
 状态码 **200**
 
-| 名称                | 类型     | 必选   | 约束   | 中文名 | 说明        |
-|-------------------|--------|------|------|-----|-----------|
-| » status          | string | true | none |     | 看图说话的调用状态 |
-| » classification  | string | true | none |     | 识别出图片的类别  |
-| » caption         | string | true | none |     | 返回图片的识别结果 |
-| » samUrl          | string | true | none |     | 上传图片的切割结果 |
+| 名称     | 类型    | 必选 | 约束 | 中文名 | 说明           |
+| -------- | ------- | ---- | ---- | ------ | -------------- |
+| » result | string  | true | none |        | 语音识别结果。 |
+| » status | integer | true | none |        | 服务状态码。   |
 
-## 视频追踪
+## GET 文字转语音
 
-POST `/video/video2tracking`
+GET /audio/text2speech
 
-上传一段视频实现视频追踪。
-
-### 请求示例
-
-```yaml
-file: file://D:\Test\Datasets\Video\demo.mp4
-```
+文本转语音接口，根据查询参数生成音频流响应。
 
 ### 请求参数
 
-| 名称      | 位置   | 类型             | 必选 | 说明      |
-|---------|------|----------------|----|---------|
-| body    | body | object         | 否  | none    |
-| » file  | body | string(binary) | 是  | 上传的视频文件 |
+| 名称   | 位置  | 类型   | 必选 | 说明                   |
+| ------ | ----- | ------ | ---- | ---------------------- |
+| text   | query | string | 是   | 待合成的文本           |
+| model  | query | string | 否   | 调用时使用的模型名称。 |
+| format | query | string | 否   | 返回结果格式。         |
 
-### 返回示例
+> 返回示例
 
-> 成功
-
-```json
-{
-  "data": "static/video/d01476eb-80de-4a7d-a5bb-566644c96a81.mp4",
-  "status": "success"
-}
-```
+> 200 Response
 
 ### 返回结果
 
-| 状态码 | 状态码含义 | 说明 |
-|-----|-------|----|
-| 200 | OK    | 成功 |
+| 状态码 | 状态码含义                                              | 说明                     | 数据模型 |
+| ------ | ------------------------------------------------------- | ------------------------ | -------- |
+| 200    | [OK](https://tools.ietf.org/html/rfc7231#section-6.3.1) | 成功时返回音频二进制流。 | Inline   |
 
 ### 返回数据结构
 
-状态码 **200**
+# 图片
 
-| 名称        | 类型     | 必选   | 说明          |
-|-----------|--------|------|-------------|
-| » status  | string | true | 返回的结果状态     |
-| » data    | string | true | 返回视频追踪的视频地址 |
+## POST 看图说话
 
-## 图像增强
+POST /image/image2text
 
-POST `/image/image2enhance`
+图像理解接口，上传图片后返回分类、描述和分割结果。
 
-上传一张图片可以将模糊的图片进行增强。
-
-### 请求示例
+> Body 请求参数
 
 ```yaml
-file: file://D:\Test\Datasets\Image\kppziguz230716233346.jpg
+model: default
+emotion: default
+text: Please describe the image.
+category: default
+
 ```
 
 ### 请求参数
 
-| 名称      | 位置   | 类型             | 必选 | 说明      |
-|---------|------|----------------|----|---------|
-| body    | body | object         | 否  | none    |
-| » file  | body | string(binary) | 是  | 上传的图片文件 |
+| 名称   | 位置 | 类型           | 必选 | 说明             |
+| ------ | ---- | -------------- | ---- | ---------------- |
+| body   | body | object         | 否   | none             |
+| » file | body | string(binary) | 是   | 所上传的图片文件 |
 
-### 返回示例
+> 返回示例
 
-> 成功
+> 200 Response
 
 ```json
 {
   "status": "success",
-  "enhanceImageUrl": "http://116.255.226.214:9000/realesrgan/tfukxzrq240301172914.png?response-content-type=image%2F%2A&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=9OMV1OGIpDH29iDq1HWC%2F20240301%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20240301T092921Z&X-Amz-Expires=7200&X-Amz-SignedHeaders=host&X-Amz-Signature=931b1c9d1b850095d58763db042bd982108dc0c2415985df37d6efa824f33fff"
+  "classification": "cat",
+  "caption": "A cat sitting on a sofa.",
+  "samUrl": "https://example.com/segmented-image.png"
 }
 ```
 
 ### 返回结果
 
-| 状态码  | 状态码含义 | 说明 |
-|------|-------|----|
-| 200  | OK    | 成功 |
+| 状态码 | 状态码含义                                              | 说明       | 数据模型 |
+| ------ | ------------------------------------------------------- | ---------- | -------- |
+| 200    | [OK](https://tools.ietf.org/html/rfc7231#section-6.3.1) | 成功响应。 | Inline   |
 
 ### 返回数据结构
 
 状态码 **200**
 
-| 名称                 | 类型     | 必选   | 说明          |
-|--------------------|--------|------|-------------|
-| » enhanceImageUrl  | string | true | 返回的结果状态     |
-| » status           | string | true | 返回图像增强的图片地址 |
+| 名称             | 类型   | 必选 | 约束 | 中文名 | 说明               |
+| ---------------- | ------ | ---- | ---- | ------ | ------------------ |
+| » status         | string | true | none |        | 看图说话的调用状态 |
+| » classification | string | true | none |        | 识别出图片的类别   |
+| » caption        | string | true | none |        | 返回图片的识别结果 |
+| » samUrl         | string | true | none |        | 上传图片的切割结果 |
 
-## 图生视频
+## POST 图片生成
 
-POST `/image/image2video`
+POST /image/text2image
 
-上传一张图片，然后根据该图片生成一个短视频。
+文生图接口，根据提示词生成图片。
 
-### 请求示例
-
-```yaml
-file: file://D:\Test\Datasets\Image\kppziguz230716233346.jpg
-```
-
-### 请求参数
-
-| 名称      | 位置   | 类型             | 必选 | 说明      |
-|---------|------|----------------|----|---------|
-| body    | body | object         | 否  | none    |
-| » file  | body | string(binary) | 是  | 上传的图片文件 |
-
-### 返回示例
-
-> 成功
+> Body 请求参数
 
 ```json
 {
-  "svdVideoUrl": "static/img/svd/7ef10bdd-1c72-4091-a7aa-db651966f076.mp4",
-  "status": "success"
-}
-```
-
-### 返回结果
-
-| 状态码 | 状态码含义 | 说明 |
-|-----|-------|----|
-| 200 | OK    | 成功 |
-
-### 返回数据结构
-
-状态码 **200**
-
-| 名称             | 类型     | 必选   | 说明          |
-|----------------|--------|------|-------------|
-| » svdVideoUrl  | string | true | 返回视频生成的视频地址 |
-| » status       | string | true | 返回的结果状态     |
-
-## 视频增强
-
-POST `/video/video2enhance`
-
-上传一段视频实现视频插帧。
-
-### 请求示例
-
-```yaml
-file: file://D:\Test\Datasets\Video\demo.mp4
-```
-
-### 请求参数
-
-| 名称      | 位置   | 类型             | 必选 | 说明      |
-|---------|------|----------------|----|---------|
-| body    | body | object         | 否  | none    |
-| » file  | body | string(binary) | 是  | 上传的视频文件 |
-
-### 返回示例
-
-> 成功
-
-```json
-{
-  "data": "static/video/d01476eb-80de-4a7d-a5bb-566644c96a81.mp4",
-  "status": "success"
-}
-```
-
-### 返回结果
-
-| 状态码 | 状态码含义 | 说明 |
-|-----|-------|----|
-| 200 | OK    | 成功 |
-
-### 返回数据结构
-
-状态码 **200**
-
-| 名称        | 类型     | 必选   | 说明          |
-|-----------|--------|------|-------------|
-| » status  | string | true | 返回的结果状态     |
-| » data    | string | true | 返回视频增强的视频地址 |
-
-## 图文识别
-
-POST `/image/image2ocr`
-
-上传一张图片，识别该图片上的文字。
-
-### 请求示例
-
-```yaml
-file: file://D:\Test\Datasets\Image\kppziguz230716233346.jpg
-```
-
-### 请求参数
-
-| 名称    | 位置  | 类型            | 必选    | 说明   |
-|--------|------|----------------|--------|---------|
-| body   | body | object         | 否      | none    |
-| » file | body | string(binary) | 是      | 上传图片文件|
-
-### 返回示例
-
-> 成功
-
-```json
-{
-  "data": ["图文识别转换技术的发展极大地提高了人们处理信息的效率，使得信息更加便于存储、检索和分析。"],
-  "status": "success"
-}
-```
-
-### 返回结果
-
-| 状态码 | 状态码含义 | 说明   |
-|-----|-------|------|
-| 200 | OK    | 成功   |
-
-### 返回数据结构
-
-状态码 **200**
-
-| 名称        | 类型             | 必选   | 说明        |
-|-----------|----------------|------|-----------|
-| » status  | string         | true | 返回的结果状态   |
-| » data    | List< string > | true | 返回识别的文字数组 |
-
-## 文本生成SQL
-
-POST `/sql/text2sql`
-
-选择一张表后输入需求，生成一个可执行的SQL语句。
-
-### 请求示例
-
-```json
-{
-  "demand":"帮我查一下京伦饭店的情况",
-  "tables":"ai.hotel_agreement",
-  "storage": "mysql"
+  "prompt": "A cat sitting on a sofa."
 }
 ```
 
 ### 请求参数
 
-| 名称        | 位置  | 类型     | 必选 | 说明                                                                  |
-|-----------|------|---------|----|---------------------------------------------------------------------|
-| body      | body | object  | 否  | none                                                                |
-| » demand  | body | string  | 是  | 用户需求                                                                |
-| » tables  | body | string  | 是  | 用户选定的表,多表之间用逗号拼接(命名规则：数据库名.数据表名 例如：ai.hotel_agreement,ai.library)   |
-| » storage | body | string  | 是  | 数据库配置名称                                                             |      
+| 名称         | 位置   | 类型   | 必选 | 说明             |
+| ------------ | ------ | ------ | ---- | ---------------- |
+| Content-Type | header | string | 否   | 请求体内容类型。 |
+| body         | body   | object | 否   | none             |
+| » prompt     | body   | string | 是   | 生成图片的指令   |
 
-### 返回示例
+> 返回示例
 
-> 成功
-
-```json
-{
-  "data": {
-    "sql": "SELECT * FROM hotel_agreement WHERE hotel_name LIKE '%京伦饭店%';",
-    "demand": "帮我查一下京伦饭店的情况",
-    "tables": "ai.hotel_agreement",
-    "storage": "mysql"
-  },
-  "status": "success"
-}
-```
-
-### 返回结果
-
-| 状态码 | 状态码含义 | 说明   |
-|------|-------|------|
-| 200  | OK    | 成功   |
-
-### 返回数据结构
-
-状态码 **200**
-
-| 名称         | 类型       | 必选    | 说明                                                      |
-|------------|----------|-------|---------------------------------------------------------|
-| » status   | string   | true  | 返回的结果状态                                                 |
-| » data     | object   | true  | 返回内容                                                    |
-| »» sql     | string   | true  | 生成的SQL语句                                                |
-| »» demand  | string   | true  | 用户需求                                                    |
-| »» tables  | string   | true  | 用户选定的表,多表之间用逗号拼接(命名规则：数据库名.数据表名 例如：ai.hotel_agreement,ai.library) |
-| »» storage | string   | true  | 数据库配置名称                                                 |   
-
-## SQL生成文本
-
-POST `/sql/sql2text`
-
-传入SQL查询文本信息。
-
-### 请求示例
+> 200 Response
 
 ```json
 {
-  "sql": " SELECT * FROM hotel_agreement WHERE hotel_name LIKE '%京伦饭店%'; ",
-  "demand": "帮我查一下京伦饭店的情况",
-  "tables": "ai.hotel_agreement",
-  "storage": "mysql"
-}
-```
-
-### 请求参数
-
-| 名称        | 位置  | 类型    | 必选 | 说明                                                                  |
-|-----------|------|---------|----|---------------------------------------------------------------------|
-| body      | body | object  | 否  | none                                                                |
-| » sql     | body | string  | 是  | 生成的SQL语句                                                            |
-| » demand  | body | string  | 是  | 用户需求                                                                |
-| » tables  | body | string  | 是  | 用户选定的表,多表之间用逗号拼接(命名规则：数据库名.数据表名 例如：ai.hotel_agreement,ai.library)   |
-| » storage | body | string  | 是  | 数据库配置名称                                                             |
-
-### 返回示例
-
-> 成功
-
-```json
-{
-  "data": "您好，关于您查询的京伦饭店的信息如下：\n\n- **城市**: 北京市\n- **协议价**: 650元/间（具体价格可能因房型和日期有所不同）\n- **距离集团**: 10.3公里\n- **酒店地址**: 北京市朝阳区建国门外大街3号\n- **联系方式**: 010-65002266转客房预定部\n- **数据来源**: 附件3：2024年中国电信集团总部及全国连锁协议酒店清单\n- **酒店名称**: 京伦饭店\n- **星级**: 四星\n- **房间类型**: 标准间\n- **备注**: 目前没有特别的备注信息\n\n如有其他问题，请随时告知。",
-  "list": [
+  "created": 1700000000,
+  "data": [
     {
-      "city": "北京市",
-      "unavailable_dates": "",
-      "agreement_price": "650，600",
-      "distance_from_group": "10.3",
-      "hotel_address": "北京市朝阳区建国门外大街3号",
-      "contact_info": "010-65002266转客房预定部",
-      "data_source": "附件3：2024年中国电信集团总部及全国连锁协议酒店清单",
-      "hotel_name": "京伦饭店",
-      "tier": "档位一：600元以内/天标准-1人入住推荐（含单早）",
-      "province": "北京",
-      "applicable_brand": "",
-      "star_rating": "四星",
-      "id": 10,
-      "remarks": "",
-      "room_type": "标准间"
+      "url": "https://example.com/generated-image.png"
+    }
+  ]
+}
+```
+
+### 返回结果
+
+| 状态码 | 状态码含义                                              | 说明       | 数据模型 |
+| ------ | ------------------------------------------------------- | ---------- | -------- |
+| 200    | [OK](https://tools.ietf.org/html/rfc7231#section-6.3.1) | 成功响应。 | Inline   |
+
+### 返回数据结构
+
+状态码 **200**
+
+| 名称      | 类型     | 必选  | 约束 | 中文名 | 说明                             |
+| --------- | -------- | ----- | ---- | ------ | -------------------------------- |
+| » created | integer  | true  | none |        | 聊天完成创建时的Unix时间戳（秒） |
+| » data    | [object] | true  | none |        | 生成的图片数据                   |
+| »» url    | string   | false | none |        | 生成的图片地址                   |
+
+## POST 图像增强
+
+POST /image/image2enhance
+
+图像增强接口，上传图片后返回增强结果地址。
+
+> Body 请求参数
+
+```yaml
+model: default
+emotion: default
+text: Please enhance this image.
+category: default
+
+```
+
+### 请求参数
+
+| 名称   | 位置 | 类型           | 必选 | 说明           |
+| ------ | ---- | -------------- | ---- | -------------- |
+| body   | body | object         | 否   | none           |
+| » file | body | string(binary) | 是   | 上传的图片文件 |
+
+> 返回示例
+
+> 200 Response
+
+```json
+{
+  "status": "success",
+  "enhanceImageUrl": "https://example.com/enhanced-image.png"
+}
+```
+
+### 返回结果
+
+| 状态码 | 状态码含义                                              | 说明       | 数据模型 |
+| ------ | ------------------------------------------------------- | ---------- | -------- |
+| 200    | [OK](https://tools.ietf.org/html/rfc7231#section-6.3.1) | 成功响应。 | Inline   |
+
+### 返回数据结构
+
+状态码 **200**
+
+| 名称              | 类型   | 必选 | 约束 | 中文名 | 说明                             |
+| ----------------- | ------ | ---- | ---- | ------ | -------------------------------- |
+| » enhanceImageUrl | string | true | none |        | 增强后的图片地址。               |
+| » status          | string | true | none |        | 接口执行状态，success 表示成功。 |
+
+# 视频
+
+## POST 视频生成
+
+POST /image/image2video
+
+图生视频接口，上传图片后返回生成视频地址。
+
+> Body 请求参数
+
+```yaml
+model: default
+emotion: default
+text: Generate a short video from this image.
+category: default
+
+```
+
+### 请求参数
+
+| 名称   | 位置 | 类型           | 必选 | 说明           |
+| ------ | ---- | -------------- | ---- | -------------- |
+| body   | body | object         | 否   | none           |
+| » file | body | string(binary) | 是   | 上传的图片文件 |
+
+> 返回示例
+
+> 200 Response
+
+```json
+{
+  "status": "success",
+  "svdVideoUrl": "https://example.com/generated-video.mp4"
+}
+```
+
+### 返回结果
+
+| 状态码 | 状态码含义                                              | 说明       | 数据模型 |
+| ------ | ------------------------------------------------------- | ---------- | -------- |
+| 200    | [OK](https://tools.ietf.org/html/rfc7231#section-6.3.1) | 成功响应。 | Inline   |
+
+### 返回数据结构
+
+状态码 **200**
+
+| 名称          | 类型   | 必选 | 约束 | 中文名 | 说明                             |
+| ------------- | ------ | ---- | ---- | ------ | -------------------------------- |
+| » svdVideoUrl | string | true | none |        | 生成的视频地址。                 |
+| » status      | string | true | none |        | 接口执行状态，success 表示成功。 |
+
+## POST 视频追踪
+
+POST /video/video2tracking
+
+视频追踪接口，上传视频后返回追踪结果视频地址。
+
+> Body 请求参数
+
+```yaml
+file: file://./examples/video/sample.mp4
+
+```
+
+### 请求参数
+
+| 名称   | 位置 | 类型           | 必选 | 说明           |
+| ------ | ---- | -------------- | ---- | -------------- |
+| body   | body | object         | 否   | none           |
+| » file | body | string(binary) | 是   | 上传的视频文件 |
+
+> 返回示例
+
+> 200 Response
+
+```json
+{
+  "status": "success",
+  "data": "https://example.com/tracked-video.mp4"
+}
+```
+
+### 返回结果
+
+| 状态码 | 状态码含义                                              | 说明       | 数据模型 |
+| ------ | ------------------------------------------------------- | ---------- | -------- |
+| 200    | [OK](https://tools.ietf.org/html/rfc7231#section-6.3.1) | 成功响应。 | Inline   |
+
+### 返回数据结构
+
+状态码 **200**
+
+| 名称     | 类型   | 必选 | 约束 | 中文名 | 说明                   |
+| -------- | ------ | ---- | ---- | ------ | ---------------------- |
+| » status | string | true | none |        | 返回的结果状态         |
+| » data   | string | true | none |        | 返回视频追踪的视频地址 |
+
+## POST 视频增强
+
+POST /video/mmeditingInference
+
+视频增强接口，上传视频后返回增强后的视频地址。
+
+> Body 请求参数
+
+```yaml
+file: file://./examples/video/sample.mp4
+
+```
+
+### 请求参数
+
+| 名称   | 位置 | 类型           | 必选 | 说明           |
+| ------ | ---- | -------------- | ---- | -------------- |
+| body   | body | object         | 否   | none           |
+| » file | body | string(binary) | 是   | 上传的视频文件 |
+
+> 返回示例
+
+> 200 Response
+
+```json
+{
+  "status": "success",
+  "data": "https://example.com/enhanced-video.mp4"
+}
+```
+
+### 返回结果
+
+| 状态码 | 状态码含义                                              | 说明       | 数据模型 |
+| ------ | ------------------------------------------------------- | ---------- | -------- |
+| 200    | [OK](https://tools.ietf.org/html/rfc7231#section-6.3.1) | 成功响应。 | Inline   |
+
+### 返回数据结构
+
+状态码 **200**
+
+| 名称     | 类型   | 必选 | 约束 | 中文名 | 说明                   |
+| -------- | ------ | ---- | ---- | ------ | ---------------------- |
+| » status | string | true | none |        | 返回的结果状态         |
+| » data   | string | true | none |        | 返回视频增强的视频地址 |
+
+# RAG
+
+## POST 获取向量
+
+POST /v1/vector/get
+
+按条件读取向量库中的原始记录。
+
+> Body 请求参数
+
+```json
+{
+  "category": "default",
+  "where": {
+    "source": "file"
+  },
+  "limit": 10,
+  "offset": 0
+}
+```
+
+### 请求参数
+
+| 名称       | 位置 | 类型    | 必选 | 说明                     |
+| ---------- | ---- | ------- | ---- | ------------------------ |
+| body       | body | object  | 否   | none                     |
+| » category | body | string  | 是   | 知识分类或向量集合名称。 |
+| » where    | body | object  | 是   | 过滤条件。               |
+| » limit    | body | integer | 是   | 返回记录数上限。         |
+| » offset   | body | integer | 是   | 结果偏移量。             |
+
+> 返回示例
+
+> 200 Response
+
+```json
+{
+  "status": "success",
+  "data": [
+    {
+      "document": "LinkMind provides a unified AI middleware layer.",
+      "id": "doc_001",
+      "metadata": {
+        "category": "default",
+        "file_id": "file_001",
+        "filename": "sample-handbook.pdf",
+        "filepath": "202504240001.pdf",
+        "level": "user",
+        "parent_id": "chunk_root_001",
+        "source": "file"
+      }
+    }
+  ]
+}
+```
+
+### 返回结果
+
+| 状态码 | 状态码含义                                              | 说明       | 数据模型 |
+| ------ | ------------------------------------------------------- | ---------- | -------- |
+| 200    | [OK](https://tools.ietf.org/html/rfc7231#section-6.3.1) | 成功响应。 | Inline   |
+
+### 返回数据结构
+
+状态码 **200**
+
+| 名称          | 类型     | 必选 | 约束 | 中文名 | 说明                             |
+| ------------- | -------- | ---- | ---- | ------ | -------------------------------- |
+| » data        | [object] | true | none |        | 接口返回数据。                   |
+| »» document   | string   | true | none |        | 文本内容。                       |
+| »» id         | string   | true | none |        | none                             |
+| »» metadata   | object   | true | none |        | 与文本关联的元数据。             |
+| »»» category  | string   | true | none |        | 知识分类或向量集合名称。         |
+| »»» file_id   | string   | true | none |        | 文件 ID。                        |
+| »»» filename  | string   | true | none |        | 文件名。                         |
+| »»» filepath  | string   | true | none |        | 文件路径。                       |
+| »»» level     | string   | true | none |        | 知识级别，默认值为 user。        |
+| »»» parent_id | string   | true | none |        | none                             |
+| »»» source    | string   | true | none |        | none                             |
+| » status      | string   | true | none |        | 接口执行状态，success 表示成功。 |
+
+## POST 添加向量
+
+POST /v1/vector/add
+
+向量写入接口，用于新增文本及其元数据。
+
+> Body 请求参数
+
+```json
+{
+  "category": "default",
+  "data": [
+    {
+      "metadata": {
+        "category": "default",
+        "filename": "sample-handbook.pdf",
+        "filepath": "202504240001.pdf",
+        "source": "file"
+      },
+      "document": "LinkMind provides a unified AI middleware layer."
+    }
+  ]
+}
+```
+
+### 请求参数
+
+| 名称        | 位置 | 类型     | 必选 | 说明                       |
+| ----------- | ---- | -------- | ---- | -------------------------- |
+| body        | body | object   | 否   | none                       |
+| » category  | body | string   | 是   | 知识分类或向量集合名称。   |
+| » data      | body | [object] | 是   | 待写入的文本及元数据列表。 |
+| »» metadata | body | object   | 是   | 与文本关联的元数据。       |
+| »» document | body | string   | 是   | 文本内容。                 |
+
+> 返回示例
+
+> 200 Response
+
+```json
+{
+  "status": "success"
+}
+```
+
+### 返回结果
+
+| 状态码 | 状态码含义                                              | 说明       | 数据模型 |
+| ------ | ------------------------------------------------------- | ---------- | -------- |
+| 200    | [OK](https://tools.ietf.org/html/rfc7231#section-6.3.1) | 成功响应。 | Inline   |
+
+### 返回数据结构
+
+状态码 **200**
+
+| 名称     | 类型   | 必选 | 约束 | 中文名 | 说明                             |
+| -------- | ------ | ---- | ---- | ------ | -------------------------------- |
+| » status | string | true | none |        | 接口执行状态，success 表示成功。 |
+
+## POST 更新向量
+
+POST /v1/vector/update
+
+向量更新接口，用于按记录 ID 更新文本或元数据。
+
+> Body 请求参数
+
+```json
+{
+  "category": "default",
+  "data": [
+    {
+      "id": "doc_001",
+      "metadata": {
+        "category": "default",
+        "filename": "sample-handbook.pdf",
+        "filepath": "202504240001.pdf",
+        "source": "file"
+      },
+      "document": "LinkMind provides a unified AI middleware layer for model routing."
+    }
+  ]
+}
+```
+
+### 请求参数
+
+| 名称        | 位置 | 类型     | 必选 | 说明                       |
+| ----------- | ---- | -------- | ---- | -------------------------- |
+| body        | body | object   | 否   | none                       |
+| » category  | body | string   | 是   | 知识分类或向量集合名称。   |
+| » data      | body | [object] | 是   | 待更新的文本及元数据列表。 |
+| »» id       | body | string   | 是   | none                       |
+| »» metadata | body | object   | 是   | 与文本关联的元数据。       |
+| »»» chapter | body | integer  | 是   | none                       |
+| »»» verse   | body | integer  | 是   | none                       |
+| »» document | body | string   | 是   | 文本内容。                 |
+
+> 返回示例
+
+> 200 Response
+
+```json
+{
+  "status": "success"
+}
+```
+
+### 返回结果
+
+| 状态码 | 状态码含义                                              | 说明       | 数据模型 |
+| ------ | ------------------------------------------------------- | ---------- | -------- |
+| 200    | [OK](https://tools.ietf.org/html/rfc7231#section-6.3.1) | 成功响应。 | Inline   |
+
+### 返回数据结构
+
+状态码 **200**
+
+| 名称     | 类型   | 必选 | 约束 | 中文名 | 说明                             |
+| -------- | ------ | ---- | ---- | ------ | -------------------------------- |
+| » status | string | true | none |        | 接口执行状态，success 表示成功。 |
+
+## POST 删除向量
+
+POST /v1/vector/delete
+
+向量删除接口，用于按记录 ID 删除向量数据。
+
+> Body 请求参数
+
+```json
+{
+  "category": "default",
+  "ids": [
+    "doc_001"
+  ]
+}
+```
+
+### 请求参数
+
+| 名称       | 位置 | 类型     | 必选 | 说明                     |
+| ---------- | ---- | -------- | ---- | ------------------------ |
+| body       | body | object   | 否   | none                     |
+| » category | body | string   | 是   | 知识分类或向量集合名称。 |
+| » ids      | body | [string] | 是   | 待删除记录 ID 列表。     |
+
+> 返回示例
+
+> 200 Response
+
+```json
+{
+  "status": "success"
+}
+```
+
+### 返回结果
+
+| 状态码 | 状态码含义                                              | 说明       | 数据模型 |
+| ------ | ------------------------------------------------------- | ---------- | -------- |
+| 200    | [OK](https://tools.ietf.org/html/rfc7231#section-6.3.1) | 成功响应。 | Inline   |
+
+### 返回数据结构
+
+状态码 **200**
+
+| 名称     | 类型   | 必选 | 约束 | 中文名 | 说明                             |
+| -------- | ------ | ---- | ---- | ------ | -------------------------------- |
+| » status | string | true | none |        | 接口执行状态，success 表示成功。 |
+
+## POST 查询向量
+
+POST /v1/vector/query
+
+向量检索接口，根据查询文本返回相似结果。
+
+> Body 请求参数
+
+```json
+{
+  "category": "default",
+  "text": "How does model routing work?",
+  "n": 5,
+  "where": {
+    "source": "file"
+  }
+}
+```
+
+### 请求参数
+
+| 名称       | 位置 | 类型    | 必选 | 说明                     |
+| ---------- | ---- | ------- | ---- | ------------------------ |
+| body       | body | object  | 否   | none                     |
+| » text     | body | string  | 是   | 输入文本。               |
+| » n        | body | integer | 是   | 返回的近邻结果数量。     |
+| » where    | body | object  | 是   | 过滤条件。               |
+| » category | body | string  | 是   | 知识分类或向量集合名称。 |
+
+> 返回示例
+
+> 200 Response
+
+```json
+{
+  "status": "success",
+  "data": [
+    {
+      "document": "LinkMind can route requests across multiple model backends.",
+      "id": "doc_002",
+      "metadata": {
+        "category": "default",
+        "file_id": "file_001",
+        "filename": "sample-handbook.pdf",
+        "filepath": "202504240001.pdf",
+        "level": "user",
+        "parent_id": "chunk_root_001",
+        "source": "file"
+      },
+      "distance": 0.12
+    }
+  ]
+}
+```
+
+### 返回结果
+
+| 状态码 | 状态码含义                                              | 说明       | 数据模型 |
+| ------ | ------------------------------------------------------- | ---------- | -------- |
+| 200    | [OK](https://tools.ietf.org/html/rfc7231#section-6.3.1) | 成功响应。 | Inline   |
+
+### 返回数据结构
+
+状态码 **200**
+
+| 名称                      | 类型     | 必选 | 约束 | 中文名 | 说明                             |
+| ------------------------- | -------- | ---- | ---- | ------ | -------------------------------- |
+| » data                    | [object] | true | none |        | 接口返回数据。                   |
+| »» document               | string   | true | none |        | 文本内容。                       |
+| »» id                     | string   | true | none |        | none                             |
+| »» metadata               | object   | true | none |        | 与文本关联的元数据。             |
+| »»» category              | string   | true | none |        | 知识分类或向量集合名称。         |
+| »»» file_id               | string   | true | none |        | 文件 ID。                        |
+| »»» filename              | string   | true | none |        | 文件名。                         |
+| »»» filepath              | string   | true | none |        | 文件路径。                       |
+| »»» level                 | string   | true | none |        | 知识级别，默认值为 user。        |
+| »»» parent_id             | string   | true | none |        | none                             |
+| »»» source                | string   | true | none |        | none                             |
+| »»» reference_document_id | string   | true | none |        | none                             |
+| »» distance               | number   | true | none |        | 相似度距离或得分。               |
+| » status                  | string   | true | none |        | 接口执行状态，success 表示成功。 |
+
+## POST 嵌入生成
+
+POST /v1/embeddings
+
+Embedding 接口，输入文本后返回向量结果。
+
+> Body 请求参数
+
+```json
+{
+  "model": "text-embedding",
+  "input": [
+    "Hello LinkMind"
+  ]
+}
+```
+
+### 请求参数
+
+| 名称         | 位置   | 类型     | 必选 | 说明                   |
+| ------------ | ------ | -------- | ---- | ---------------------- |
+| Content-Type | header | string   | 否   | 请求体内容类型。       |
+| body         | body   | object   | 否   | none                   |
+| » input      | body   | [string] | 是   | 待生成向量的文本内容。 |
+| » model      | body   | string   | 是   | 调用时使用的模型名称。 |
+
+> 返回示例
+
+> 200 Response
+
+```json
+{
+  "status": "success",
+  "data": [
+    [
+      0.12,
+      -0.03,
+      0.44,
+      0.08
+    ]
+  ]
+}
+```
+
+### 返回结果
+
+| 状态码 | 状态码含义                                              | 说明       | 数据模型 |
+| ------ | ------------------------------------------------------- | ---------- | -------- |
+| 200    | [OK](https://tools.ietf.org/html/rfc7231#section-6.3.1) | 成功响应。 | Inline   |
+
+### 返回数据结构
+
+状态码 **200**
+
+| 名称     | 类型    | 必选 | 约束 | 中文名 | 说明                             |
+| -------- | ------- | ---- | ---- | ------ | -------------------------------- |
+| » status | string  | true | none |        | 接口执行状态，success 表示成功。 |
+| » data   | [array] | true | none |        | Embedding 向量列表。             |
+
+## GET 获取向量集合
+
+GET /v1/vector/listCollections
+
+获取当前向量集合列表。
+
+### 请求参数
+
+| 名称         | 位置   | 类型   | 必选 | 说明             |
+| ------------ | ------ | ------ | ---- | ---------------- |
+| Content-Type | header | string | 否   | 请求体内容类型。 |
+
+> 返回示例
+
+> 200 Response
+
+```json
+{
+  "status": "success",
+  "data": [
+    {
+      "category": "default",
+      "vectorCount": 128
+    }
+  ]
+}
+```
+
+### 返回结果
+
+| 状态码 | 状态码含义                                              | 说明       | 数据模型 |
+| ------ | ------------------------------------------------------- | ---------- | -------- |
+| 200    | [OK](https://tools.ietf.org/html/rfc7231#section-6.3.1) | 成功响应。 | Inline   |
+
+### 返回数据结构
+
+状态码 **200**
+
+| 名称           | 类型     | 必选 | 约束 | 中文名 | 说明                             |
+| -------------- | -------- | ---- | ---- | ------ | -------------------------------- |
+| » status       | string   | true | none |        | 接口执行状态，success 表示成功。 |
+| » data         | [object] | true | none |        | 向量集合列表。                   |
+| »» category    | string   | true | none |        | 知识分类或向量集合名称。         |
+| »» vectorCount | integer  | true | none |        | 集合中的向量数量。               |
+
+# 私训
+
+## POST 上传私训学习文件
+
+POST /training/upload
+
+上传通用知识文件并写入私有知识库。
+
+> Body 请求参数
+
+```yaml
+fileToUpload: file://./examples/docs/sample.pdf
+
+```
+
+### 请求参数
+
+| 名称           | 位置  | 类型           | 必选 | 说明                      |
+| -------------- | ----- | -------------- | ---- | ------------------------- |
+| category       | query | string         | 是   | 知识分类或向量集合名称。  |
+| level          | query | string         | 否   | 知识级别，默认值为 user。 |
+| body           | body  | object         | 否   | none                      |
+| » fileToUpload | body  | string(binary) | 是   | 要上传的知识文件。        |
+
+> 返回示例
+
+> 200 Response
+
+```json
+{
+  "status": "success",
+  "data": "[{\"filename\":\"sample.pdf\",\"filepath\":\"202504240001.pdf\",\"fileId\":\"file_001\",\"vectorIds\":[[\"vec_001\",\"vec_002\"]]}]",
+  "task_id": "task_001"
+}
+```
+
+### 返回结果
+
+| 状态码 | 状态码含义                                              | 说明       | 数据模型 |
+| ------ | ------------------------------------------------------- | ---------- | -------- |
+| 200    | [OK](https://tools.ietf.org/html/rfc7231#section-6.3.1) | 成功响应。 | Inline   |
+
+### 返回数据结构
+
+状态码 **200**
+
+| 名称      | 类型   | 必选 | 约束 | 中文名 | 说明                                   |
+| --------- | ------ | ---- | ---- | ------ | -------------------------------------- |
+| » status  | string | true | none |        | 接口执行状态，success 表示成功。       |
+| » data    | string | true | none |        | 上传结果，内容为文件信息 JSON 字符串。 |
+| » task_id | string | true | none |        | 异步任务 ID。                          |
+
+## POST 上传私训问答对
+
+POST /uploadFile/pairing
+
+上传通用问答对并写入私有知识库。
+
+> Body 请求参数
+
+```json
+{
+  "category": "default",
+  "level": "user",
+  "data": [
+    {
+      "instruction": [
+        "What is LinkMind?"
+      ],
+      "output": "LinkMind is an AI middleware layer for routing, RAG, and multimodal orchestration."
+    }
+  ]
+}
+```
+
+### 请求参数
+
+| 名称           | 位置 | 类型     | 必选 | 说明                                         |
+| -------------- | ---- | -------- | ---- | -------------------------------------------- |
+| body           | body | object   | 否   | none                                         |
+| » category     | body | string   | 是   | 知识分类或向量集合名称。                     |
+| » level        | body | string   | 否   | 知识级别，默认值为 user。                    |
+| » data         | body | [object] | 是   | 问答对列表。                                 |
+| »» instruction | body | [string] | 是   | 问题或指令列表。单条字符串也可被服务端接收。 |
+| »» output      | body | string   | 是   | 答案或输出内容。                             |
+
+> 返回示例
+
+> 200 Response
+
+```json
+{
+  "status": "success"
+}
+```
+
+### 返回结果
+
+| 状态码 | 状态码含义                                              | 说明       | 数据模型 |
+| ------ | ------------------------------------------------------- | ---------- | -------- |
+| 200    | [OK](https://tools.ietf.org/html/rfc7231#section-6.3.1) | 成功响应。 | Inline   |
+
+### 返回数据结构
+
+状态码 **200**
+
+| 名称     | 类型   | 必选 | 约束 | 中文名 | 说明                             |
+| -------- | ------ | ---- | ---- | ------ | -------------------------------- |
+| » status | string | true | none |        | 接口执行状态，success 表示成功。 |
+
+## GET 获取文件列表
+
+GET /uploadFile/getUploadFileList
+
+分页查询已上传知识文件列表。
+
+### 请求参数
+
+| 名称       | 位置  | 类型   | 必选 | 说明       |
+| ---------- | ----- | ------ | ---- | ---------- |
+| category   | query | string | 否   | 数据类别   |
+| pageSize   | query | string | 否   | 分页的大小 |
+| pageNumber | query | string | 否   | 分页的序号 |
+
+> 返回示例
+
+> 200 Response
+
+```json
+{
+  "status": "success",
+  "totalRow": 1,
+  "pageNumber": 1,
+  "data": [
+    {
+      "fileId": "file_001",
+      "filename": "sample.pdf",
+      "filepath": "202504240001.pdf",
+      "category": "default",
+      "createTime": 1700000000000
     }
   ],
+  "totalPage": 1,
+  "pageSize": 10
+}
+```
+
+### 返回结果
+
+| 状态码 | 状态码含义                                              | 说明       | 数据模型 |
+| ------ | ------------------------------------------------------- | ---------- | -------- |
+| 200    | [OK](https://tools.ietf.org/html/rfc7231#section-6.3.1) | 成功响应。 | Inline   |
+
+### 返回数据结构
+
+状态码 **200**
+
+| 名称         | 类型     | 必选 | 约束 | 中文名 | 说明           |
+| ------------ | -------- | ---- | ---- | ------ | -------------- |
+| » totalRow   | integer  | true | none |        | 数据总数       |
+| » pageNumber | integer  | true | none |        | 分页的序号     |
+| » data       | [object] | true | none |        | 知识文件列表。 |
+| »» fileId    | string   | true | none |        | 文件ID         |
+| »» filename  | string   | true | none |        | 文件名         |
+| »» filepath  | string   | true | none |        | 文件相对路径   |
+| »» category  | string   | true | none |        | 数据类别       |
+| » totalPage  | integer  | true | none |        | 分页总数       |
+| » pageSize   | integer  | true | none |        | 分页的大小     |
+| » status     | string   | true | none |        | 接口返回状态   |
+
+## POST 删除上传文件
+
+POST /uploadFile/deleteFile
+
+删除已上传知识文件及其关联向量。
+
+> Body 请求参数
+
+```json
+[
+  "file_001"
+]
+```
+
+### 请求参数
+
+| 名称     | 位置  | 类型          | 必选 | 说明                     |
+| -------- | ----- | ------------- | ---- | ------------------------ |
+| category | query | string        | 否   | 知识分类或向量集合名称。 |
+| body     | body  | array[string] | 否   | none                     |
+
+> 返回示例
+
+> 200 Response
+
+```json
+{
   "status": "success"
 }
 ```
 
 ### 返回结果
 
-| 状态码 | 状态码含义 | 说明   |
-|------|-------|------|
-| 200  | OK    | 成功   |
+| 状态码 | 状态码含义                                              | 说明       | 数据模型 |
+| ------ | ------------------------------------------------------- | ---------- | -------- |
+| 200    | [OK](https://tools.ietf.org/html/rfc7231#section-6.3.1) | 成功响应。 | Inline   |
 
 ### 返回数据结构
 
 状态码 **200**
 
-| 名称     | 类型   | 必选 | 说明             |
-| -------- | ------ | ---- | ---------------- |
-| » status | string | true | 返回的结果状态   |
-| » data   | string | true | 返回内容         |
-| » list   | object | true | 数据表中询的内容 |
+| 名称     | 类型   | 必选 | 约束 | 中文名   | 说明                             |
+| -------- | ------ | ---- | ---- | -------- | -------------------------------- |
+| » status | string | true | none | 返回状态 | 接口执行状态，success 表示成功。 |
 
-## 生成指令集
+# 二次开发约定
 
-POST `/instruction/generate`  
+除特别说明外，下述二次开发接口统一返回 JSON 包装结构 `{"status":"success|failed","msg":"...","data":...}`。
 
-上传pdf文件，从文件中提取可用于训练的指令集。  
+## OpenAI 兼容 `extra_body`
 
-### Body 请求参数
-
-```yaml
-fileToUpload: file://E:\file\知识图谱.PDF
-```
-
-### 请求参数
-
-| 名称         | 位置 | 类型 | 必选 | 说明     |
-| ------------ | ---- | ---- | ---- | -------- |
-| fileToUpload | body | File | 是   | 上传文件 |
-
-### 返回示例
-
-> 成功  
+`POST /chat/completions` 和 `POST /v1/chat/completions` 支持可选的 `extra_body` 对象，用于承载业务侧带外元数据。
 
 ```json
 {
-    "data": [
-        {
-            "instruction": "知识图谱的构建通常采用哪种方式？",
-            "input": "",
-            "output": "知识图谱的构建通常采用自底向上的方式进行。"
-        },
-        {
-            "instruction": "如何利用知识图谱在金融领域实现业务场景的分析与决策，以及其在数据变现方面的优势？",
-            "input": "",
-            "output": "利用知识图谱在金融领域实现业务场景的分析与决策主要通过以下几个方面：首先，知识图谱能够帮助建立客户画像，通过对用户行为、偏好等多维度数据分析，形成详细的用户画像；其次，基于知识图谱可以进行精准营销获客，通过客户画像识别潜在客户，并向他们推送相关产品或服务，提高转化率；再次，知识图谱还能够用于发现异常交易模式，如信用卡套现、资金挪用等非法活动，提高风险控制能力。\n\n在数据变现方面的优势主要包括：知识图谱能够更好地表达、分析金融业务场景的交易全貌，使金融机构能够更高效地利用自身拥有的海量、多结构多维度的数据资源（符合大数据的“4V”特征），并将其转化为有价值的信息和服务；此外，基于知识图谱的智能运维系统能够将运维人员的经验和知识转化为可复用的知识库，提高工作效率，降低成本，进一步促进数据的价值提升和变现。因此，知识图谱在金融领域的应用有助于推动金融机构从成本中心向盈利中心转变。"
-        },
-        {
-            "instruction": "知识图谱在金融领域中的风控应用具体包括哪些方面？",
-            "input": "",
-            "output": "知识图谱在金融领域中的风控应用具体包括信用风险评估、欺诈检测、交易监控和风险预警等方面。通过构建实体之间的关联关系，知识图谱能够帮助金融机构更准确地识别潜在的风险点，提高风险管理的效率和效果。"
-        }
-    ],
-    "status": "success"
-}
-```
-
-### 返回结果
-
-| 状态码  | 状态码含义 | 说明 |
-| ------- | ---------- | ---- |
-| success | OK         | 成功 |
-
-### 返回数据结构
-
-状态码 **200**  
-
-| 名称        | 类型   | 必选 | 说明 |
-| ----------- | ------ | ---- | ---- |
-| instruction | string | true | 问题 |
-| input       | string | true |      |
-| output      | string | true | 回答 |
-
-根据您提供的 PDF 文件内容，我可以将其解析成如下格式的训练指令集：
-
-```json
-{
-    "data": [
-        {
-            "instruction": "知识图谱的概念由谁提出，其目标是什么？",
-            "input": "",
-            "output": "知识图谱的概念由 Google 在 2012 年 5 月提出，其目标是改善搜索结果，描述真实世界中存在的各种实体和概念，以及这些实体、概念之间的关联关系。"
-        },
-        {
-            "instruction": "传统知识图谱的架构特点是什么？",
-            "input": "",
-            "output": "传统知识图谱的架构包括自身的逻辑结构和体系架构，通常采用自底向上的方式构建。以实体概念为节点，以关系为边，从关系的视角描述客观世界。"
-        },
-        {
-            "instruction": "基于知识图谱的智能运维系统有哪些优势？",
-            "input": "",
-            "output": "基于知识图谱的智能运维系统能够结合大数据和机器学习，不断完善知识图谱，成为运维大脑。其作用在于支持业务决策，将运维从成本中心转变为盈利中心。"
-        }
-    ],
-    "status": "success"
-}
-```
-
-## Rerank
-
-POST `/rerank`
-
-输入查询文本和需要重排的字符串数组进行重排序。
-
-### Body 请求参数
-
-```json
-{
-  "query": "人工智能机器学习算法",
-  "documents": [
-    "深度学习神经网络算法研究",
-    "传统数据库系统设计原理",
-    "机器学习分类算法实现",
-    "前端用户界面开发技术",
-    "人工智能自然语言处理"
-  ]
-}
-```
-
-### 请求参数
-
-| 名称      | 位置 | 类型     | 必选 | 说明                 |
-| --------- | ---- | -------- | ---- | -------------------- |
-| query     | body | string   | 是   | 查询文本             |
-| documents | body | [string] | 是   | 需要重排的字符串数组 |
-
-### 返回示例
-
-```json
-{
-  "id": "b41b9dec-22b5-42fc-b2df-174b71702192",
-  "results": [
+  "model": "qwen-plus",
+  "stream": false,
+  "messages": [
     {
-      "index": 0,
-      "document": {
-        "text": "机器学习分类算法实现"
-      }
-    },
-    {
-      "index": 1,
-      "document": {
-        "text": "深度学习神经网络算法研究"
-      }
-    },
-    {
-      "index": 2,
-      "document": {
-        "text": "传统数据库系统设计原理"
-      }
-    },
-    {
-      "index": 3,
-      "document": {
-        "text": "前端用户界面开发技术"
-      }
-    },
-    {
-      "index": 4,
-      "document": {
-        "text": "人工智能自然语言处理"
-      }
+      "role": "user",
+      "content": "列出我已订阅的频道。"
     }
-  ]
+  ],
+  "extra_body": {
+    "user_id": "u_1001"
+  }
 }
 ```
 
-## Embedding
+| 字段 | 类型 | 必选 | 说明 |
+| --- | --- | --- | --- |
+| `user_id` | string | 否 | 逻辑用户标识，供社交 Skill、频道接口和需要识别调用方身份的业务流程使用。 |
+| `user` | string | 否 | `user_id` 的兼容别名。 |
 
-POST `/v1/embeddings`
+说明：
 
-输入文本返回对应的embedding结果。
+- `extra_body` 是承载带外业务上下文的推荐位置，不需要为此修改 OpenAI 兼容消息结构。
+- 当运行时注入 Skill 时，系统可能暂时把该载荷序列化到内部的 `<extra_body>...</extra_body>` 片段中，以便跨工具调用保留上下文。这只是内部传递细节，调用方仍然只需要发送标准 JSON `extra_body`。
+- 在 `Agent Mate` 模式下，`LandingAdapter` 也可以为本地运行时调用自动补齐当前登录用户。
 
-### Body 请求参数
+# 二次开发接口
 
-```json
-{
-  "input": [
-    "人工智能，指由人制造出来的机器所表现出来的智能。"
-  ]
-}
-```
+## 社交频道接口
 
-### Body 请求参数
+| 路径 | 方法 | 必要输入 | 用途 | 成功返回 |
+| --- | --- | --- | --- | --- |
+| `/socialChannel/runningMode` | GET | 无 | 查看当前节点运行在 `mate` 还是 `server` 模式。 | `runningMode`、`isMateMode` |
+| `/socialChannel/registerUser` | POST | `userId`、`username` | 注册或同步社交用户身份。 | `created` |
+| `/socialChannel/saveLastLoginUser` | POST | `userId` | 保存当前登录用户，供 `Agent Mate` 模式自动注入用户上下文。 | `status` |
+| `/socialChannel/createChannel` | POST | `userId`、`name` | 创建频道并自动为所有者建立订阅。`description`、`isPublic` 可作为兼容字段传入。 | `channelId` |
+| `/socialChannel/subscribe` | POST | `userId`、`channelId` | 订阅频道。 | `msg: subscribed` |
+| `/socialChannel/unsubscribe` | POST | `userId`、`channelId` | 取消订阅。频道所有者不能取消自己的订阅。 | `msg: unsubscribed` |
+| `/socialChannel/listMyChannels` | GET | `userId` | 查询当前用户已订阅频道。 | `data: SocialChannel[]` |
+| `/socialChannel/listPublicChannels` | GET | 无 | 查询公开频道。支持可选 `limit`。 | `data: SocialChannel[]` |
+| `/socialChannel/listOwnedChannels` | GET | `userId` | 查询当前用户拥有的频道。 | `data: SocialChannel[]` |
+| `/socialChannel/getChannel` | GET | `channelId` | 在启用状态校验后读取频道元数据。 | `data: SocialChannel` |
+| `/socialChannel/listMessages` | GET | `userId`、`channelId` | 查询已订阅频道的消息。支持可选 `limit`、`beforeId` 分页。 | `data: SocialChannelMessage[]` |
+| `/socialChannel/sendMessage` | POST | `userId`、`content`，以及 `channelId` 或 `channelName` 二选一 | 向已订阅频道发送消息。 | `messageId` |
+| `/socialChannel/toggleChannel` | POST | `userId`、`channelId`、`enabled` | 启用或禁用频道，仅所有者可操作。 | `msg: enabled|disabled` |
+| `/socialChannel/deleteChannel` | POST | `userId`、`channelId` | 删除频道，仅所有者可操作。 | `msg: deleted` |
 
-| 名称    | 位置 | 类型     | 必选 | 说明     |
-| ------- | ---- | -------- | ---- | -------- |
-| body    | body | object   | 否   |          |
-| » input | body | [string] | 是   | 文本列表 |
-| » model | body | string   | 是   | 模型名   |
+说明：
 
-### 返回示例
+- 在 `Agent Mate` 模式下，除 `runningMode` 和 `saveLastLoginUser` 外，其余社交接口都可以自动代理到配置好的级联上级节点。
+- `social-channel` Skill 通过这些接口复用社交能力，而不是把存储逻辑写入聊天 Adapter 主路径。
 
-```json
-{
-    "data": [
-        [
-            -146.10352,
-            559.4121,
-            1342.8379,
-            -543.29297     
-        ]
-    ],
-    "status": "success"
-}
-```
+## 用户与认证接口
+
+| 路径 | 方法 | 必要输入 | 用途 | 成功返回 |
+| --- | --- | --- | --- | --- |
+| `/user/login` | POST | `username`、`password`、`captcha` | 登录控制台或嵌入式用户会话。 | `data.username`、`data.userId`，并写入 `lagi-auth`、`userId` Cookie |
+| `/user/register` | POST | `username`、`password`、`captcha` | 注册新用户。`domainName` 为兼容字段，当前实现会默认回填为用户名。 | `status`、可选 `channelId`，成功时同时写入登录 Cookie |
+| `/user/authLoginCookie` | POST | `cookieValue` | 校验持久化登录 Cookie 并刷新会话 Cookie。 | 与 `/user/login` 相同 |
+| `/user/getCaptcha` | GET | 无 | 输出绑定到当前 HTTP Session 的验证码图片。支持可选 `charNum`、`width`、`height`、`fontSize`。 | JPEG 二进制 |
+| `/user/getRandomCategory` | GET | 无 | 获取随机或当前默认分类。支持可选 `currentCategory`、`userId`。 | `data.category` |
+| `/user/getDefaultTitle` | GET | 无 | 读取默认系统标题。 | `data` |
+
+这组接口是接入企业级 SSO、租户体系或账号中心时最适合替换的边界层。
+
+## API Key 管理接口
+
+| 路径 | 方法 | 必要输入 | 用途 | 成功返回 |
+| --- | --- | --- | --- | --- |
+| `/apiKey/list` | GET | 无 | 列出当前部署可见的 API Key。传入可选 `userId` 时可合并 Landing 用户级 Key。 | `data: ModelApiKey[]`、`localApiKeyEditable` |
+| `/apiKey/get` | GET | `modelName` | 读取单个模型当前配置的密钥，返回值会自动脱敏。 | `data.name`、`data.provider`、`data.api_key`、`data.api_address` |
+| `/apiKey/providers` | GET | 无 | 列出 UI 可管理的提供方类型。 | `data: string[]`、`localApiKeyEditable` |
+| `/apiKey/add` | POST | `name`、`provider`、`apiKey` | 新增 API Key，并在适用时同步到当前配置。支持可选 `model`、`apiAddress`、`userId`。 | `msg: add success` |
+| `/apiKey/delete` | POST | `provider`，以及 `apiKey` 或 `id` | 删除本地配置中的 Key 或 Landing 用户 Key。Landing 场景要求传入 `userId`。 | `msg: delete success` |
+| `/apiKey/toggle` | POST | `id`、`provider`、`enabled` | 在当前配置或远端 Landing Key 池中启用或停用某个 Key。支持可选 `userId`。 | `msg: toggle success` |
+
+说明：
+
+- 该服务同时识别 `api_key` 与 `api_keys`，因此单个 Provider 可以对外保持同一套 HTTP 协议，同时在内部启用 Key 池。
+- 当 `localApiKeyEditable` 为 `false` 时，部署会将本地 YAML 视为只读，并只通过该接口管理远端 Landing Key。
+
+## 计费接口
+
+| 路径 | 方法 | 必要输入 | 用途 | 成功返回 |
+| --- | --- | --- | --- | --- |
+| `/credit/prepay` | POST | `lagiUserId`、`fee` | 发起预支付订单。 | `outTradeNo`、`qrCode`、`mWebUrl`、`totalFee`、`result` |
+| `/credit/getChargeDetail` | GET | `outTradeNo` | 按支付订单号读取一条计费记录。 | `seq`、`userId`、`amount`、`time`、`status` |
+| `/credit/getChargeDetailByUserId` | GET | `userId` | 按用户查询计费记录列表。 | `data: ChargeDetail[]` |
+| `/credit/getCreditUserBalance` | GET | `userId` | 查询用户当前余额。 | `data.userId`、`data.balance` |
+| `/credit/getChargeDetailBySeq` | GET | `seq` | 按流水号读取一条计费记录。 | `data: ChargeDetail` |
+
+这组接口被刻意放在模型路由与聊天执行之外，便于企业部署在保留控制台和 HTTP 合同不变的前提下，替换为自己的计费提供方。
+
+## 二次开发数据对象
+
+| 对象 | 关键字段 |
+| --- | --- |
+| `SocialChannel` | `id`、`name`、`description`、`ownerUserId`、`isPublic`、`enabled`、`createdAt` |
+| `SocialChannelMessage` | `id`、`channelId`、`channelName`、`userId`、`userName`、`content`、`createdAt` |
+| `ModelApiKey` | `id`、`name`、`provider`、`apiKey`、`apiAddress`、`createdTime`、`userId`、`status` |
+| `CreditUserBalance` | `userId`、`balance` |
+| `ChargeDetail` | `seq`、`userId`、`amount`、`time`、`status` |
+
+# 数据模型
+

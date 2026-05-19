@@ -1,8 +1,14 @@
 package ai.common.pojo;
 
+import ai.router.utils.RouteGlobal;
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonSetter;
 import lombok.*;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Builder
 @AllArgsConstructor
@@ -42,4 +48,23 @@ public class Backend {
     private Integer concurrency;
     private String protocol = "completion";
     protected Boolean function;
+    @JsonFormat(with = JsonFormat.Feature.ACCEPT_SINGLE_VALUE_AS_ARRAY)
+    private List<String> apiKeys;
+    private String keyRoute = RouteGlobal.POLLING;
+
+    @JsonSetter("api_keys")
+    public void setApiKeys(List<String> apiKeys) {
+        if (apiKeys != null && apiKeys.size() == 1 && apiKeys.get(0).contains(",")) {
+            this.apiKeys = Arrays.stream(apiKeys.get(0).split(","))
+                    .map(String::trim).filter(s -> !s.isEmpty())
+                    .collect(Collectors.toList());
+        } else {
+            this.apiKeys = apiKeys;
+        }
+        if (apiKey != null && !apiKey.isEmpty() && !apiKey.startsWith("your")) {
+            if (this.apiKeys != null && !this.apiKeys.contains(apiKey)) {
+                this.apiKeys.add(0, apiKey);
+            }
+        }
+    }
 }

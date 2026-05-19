@@ -18,8 +18,9 @@ fi
 
 LINKMIND_DIR="$HOME/LinkMind"
 JAR_NAME="LinkMind.jar"
-DOWNLOAD_URL="https://downloads.landingbj.com/lagi/installer/LinkMind.jar"
-POPULAR_SKILLS_URL="https://downloads.landingbj.com/lagi/installer/popular_skills.zip"
+DOWNLOADS_HOST="cdn.linkmind.top"
+DOWNLOAD_URL="https://${DOWNLOADS_HOST}/installer/LinkMind.jar"
+POPULAR_SKILLS_URL="https://${DOWNLOADS_HOST}/installer/popular_skills.zip"
 #DOWNLOAD_URL="http://localhost:8000/LinkMind.jar"
 JAR_PATH="$LINKMIND_DIR/$JAR_NAME"
 SKILLS_ROOT=""
@@ -40,7 +41,7 @@ trap cleanup EXIT
 echo "Downloading $DOWNLOAD_URL ..."
 
 if command -v curl >/dev/null 2>&1; then
-    if ! curl -fL --progress-bar -o "$TEMP_FILE" "$DOWNLOAD_URL"; then
+    if ! curl -kfL --progress-bar -o "$TEMP_FILE" "$DOWNLOAD_URL"; then
         echo "Error: Failed to download $DOWNLOAD_URL"
         exit 1
     fi
@@ -151,7 +152,7 @@ if [ "$runtime_choice" = "server" ]; then
     mkdir -p "$SKILLS_ROOT"
     echo "Downloading $POPULAR_SKILLS_URL ..."
     if command -v curl >/dev/null 2>&1; then
-        if ! curl -fL --progress-bar -o "$POPULAR_SKILLS_ZIP" "$POPULAR_SKILLS_URL"; then
+        if ! curl -kfL --progress-bar -o "$POPULAR_SKILLS_ZIP" "$POPULAR_SKILLS_URL"; then
             echo "Error: Failed to download $POPULAR_SKILLS_URL"
             exit 1
         fi

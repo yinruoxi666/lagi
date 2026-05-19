@@ -1,5 +1,6 @@
 package ai.config;
 
+import ai.config.pojo.GeneralConfig;
 import ai.manager.Html2ContentManager;
 import ai.manager.LlmInstructionManager;
 import ai.manager.LlmManager;
@@ -203,9 +204,6 @@ public class ContextLoader {
         if (configPath != null && !configPath.trim().isEmpty()) {
             try {
                 loadContextByFilePath(configPath.trim(), extensionJarFolder);
-                if (configuration != null) {
-                    return;
-                }
             } catch (Exception e) {
                 log.error("Failed to load configuration from command line path: {}", configPath, e);
             }
@@ -230,6 +228,13 @@ public class ContextLoader {
                 loadContextByFilePath("../lagi-web/src/main/resources/lagi.yml", extensionJarFolder);
             } catch (Exception e) {
                 log.warn("loadContextByFilePath failed: ../lagi-web/src/main/resources/lagi.yml", e);
+            }
+        }
+        GeneralConfig general = configuration.getGeneral();
+        if (general != null) {
+            String containerUrl = general.getContainerUrl();
+            if (containerUrl != null) {
+                ConfigUtil.APP_CONTAINER_URL = containerUrl;
             }
         }
     }

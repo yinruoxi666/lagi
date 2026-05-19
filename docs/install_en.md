@@ -1,106 +1,297 @@
 # LinkMind Installation Guide
 
-This guide explains how to install the JDK and run LinkMind via JAR on Windows, macOS, and Linux.
+Prerequisite: LinkMind requires **JDK 8 or later**. If Java is not installed yet, jump to [Appendix: Install JDK 8+](#appendix-install-jdk-8).
 
----
+This page treats the four installation paths as alternatives, not sequential steps. Pick the one that best matches how you want to run LinkMind.
 
-## 1. Install JDK
+## Option 1. Official Installer
 
-**JDK** is required to run or develop LinkMind (it includes the JRE runtime and the `javac` compiler). You can use:
+### Install
 
-- **Oracle JDK**: Commercial license, free for non-commercial use
-- **Eclipse Temurin (Adoptium) OpenJDK**: Open source, free for all use (recommended)
+- Windows PowerShell
 
----
+  ```powershell
+  iwr -useb https://cdn.linkmind.top/install.ps1 | iex
+  ```
 
-### 1.1 Windows
+- macOS / Linux
 
-#### Step 1: Download JDK
+  ```bash
+  curl -fsSL https://cdn.linkmind.top/install.sh | bash
+  ```
 
-1. Open a browser and go to: [Oracle Java Downloads](https://www.oracle.com/java/technologies/downloads/#java8) or [Eclipse Temurin Downloads](https://adoptium.net/temurin/releases/)
-2. Select **Windows** and **x64** architecture
-3. Select **JDK 8**
-4. Package format:
-   - Oracle JDK: `.exe` installer (e.g. `jdk-8u391-windows-x64.exe`)
-   - Temurin JDK: `.msi` installer (can configure PATH automatically, recommended)
+### Choose a Runtime Mode
 
-#### Step 2: Install
+During installation, LinkMind asks you to choose a runtime mode:
 
-1. Double-click the installer; when User Account Control appears, click **Yes**
-2. For Oracle JDK, check "Accept License Agreement", then click **Next**
-3. Use an install path without spaces or special characters, e.g. `C:\Development_tools\jdk1.8.0_391`
-4. If the wizard offers to install the JRE, leave it checked
-5. Click **Next** to finish, then **Close**
+| Mode | Choose this when |
+| --- | --- |
+| `Agent Mate` | OpenClaw, Hermes Agent, or DeerFlow is already part of your local workflow and you want LinkMind to sit in the middle as the shared AI layer |
+| `Agent Server` | You want a standalone LinkMind service first, or you are evaluating the web console and API directly |
 
-#### Step 3: Environment variables (optional)
+If you are only trying LinkMind for the first time, start with `Agent Server`.
 
-If you chose "Add to PATH" during install (Temurin .msi usually does this), you can skip this step and go to Step 4 to verify.
+### What the Installer Does
 
-1. Right-click **This PC** → **Properties** → **Advanced system settings** → **Environment variables**
-2. Under **System variables**, click **New**:
-   - Variable name: `JAVA_HOME`
-   - Variable value: JDK install path (e.g. `C:\Development_tools\jdk1.8.0_391`)
-3. Edit the **Path** system variable and add:
-   - `%JAVA_HOME%\bin`
-   - `%JAVA_HOME%\jre\bin`
-4. Click **OK** to save, then close any open command windows
+The current installer does more than just download one file:
 
-#### Step 4: Verify
+1. Creates the LinkMind home directory, usually `%USERPROFILE%\\LinkMind` on Windows or `~/LinkMind` on macOS and Linux.
+2. Downloads `LinkMind.jar` into that directory.
+3. Asks whether LinkMind should run as `Agent Mate` or `Agent Server`.
+4. If you choose `Agent Mate`, it asks which runtime should be injected or synchronized: OpenClaw, DeerFlow, or Hermes. DeerFlow also asks for its install directory.
+5. If you choose `Agent Server`, it downloads the bundled popular skills package and expands it under `skills/popular_skills`.
+6. Runs the runtime initializer so that the first startup already knows which runtime mode and skill settings to use.
 
-1. Press `Win + R`, type `cmd`, press Enter
-2. In the command window, run:
+### First Launch
+
+After installation, the script can start LinkMind for you immediately. The normal success flow is:
+
+1. The installer prints `LinkMind installed successfully!`
+2. It asks `Would you like to start LinkMind now?`
+3. Enter `yes`
+4. Wait for the startup logs to finish
+5. Open `http://localhost:8080`
+
+On the first real launch, LinkMind automatically prepares:
+
+- `config/`
+- `config/lagi.yml`
+- `data/`
+- bundled local data files copied into `data/` when you are using the default runtime paths
+
+### macOS Notes
+
+- Run the installer from Terminal instead of double-clicking downloaded files.
+- If `java -version` still fails after you install JDK, open a new Terminal window or run `source ~/.zshrc`.
+- On Apple Silicon Macs, choose an `aarch64` or `arm64` JDK package in the appendix below.
+
+### First-Time Console Steps
+
+1. Open the web console.
+2. Register or sign in.
+3. Open the API key or provider settings page.
+4. Fill in at least one real provider key.
+5. Return to chat and send a first message.
+
+If you are calling the REST API directly and auth is enabled, copy the LinkMind API key from the console and send it as:
+
+```http
+Authorization: Bearer <your-linkmind-api-key>
+```
+
+## Option 2. Download Packaged Jar
+
+Use this flow when you want a ready-to-run package without building from source.
+
+### Packaged Downloads
+
+- Application package: `LinkMind.jar` ([Download](https://cdn.linkmind.top/installer/LinkMind.jar))
+- Core library: `lagi-core-1.2.0-jar-with-dependencies.jar` ([Download](https://ai.linkmind.top/lagi/lib/lagi-core-1.2.0-jar-with-dependencies.jar))
+
+### Prepare and Start
+
+- Windows
+
+  ```powershell
+  mkdir D:\LinkMind
+  cd D:\LinkMind
+  java -jar LinkMind.jar
+  ```
+
+- macOS
+
+  ```bash
+  mkdir -p ~/Documents/LinkMind
+  cd ~/Documents/LinkMind
+  java -jar LinkMind.jar
+  ```
+
+- Linux
+
+  ```bash
+  mkdir -p ~/LinkMind
+  cd ~/LinkMind
+  java -jar LinkMind.jar
+  ```
+
+### What Happens on First Run
+
+When you launch the packaged JAR without custom path arguments, LinkMind automatically:
+
+- creates `config/`
+- creates `data/`
+- writes `config/lagi.yml`
+- copies bundled local data assets into `data/`
+
+Then open:
+
+- `http://localhost:8080`
+
+### Default Output Locations
+
+If you run the JAR from `D:\LinkMind`, `~/Documents/LinkMind`, or `~/LinkMind`, LinkMind keeps the generated config and data directories next to that JAR by default.
+
+## Option 3. With Docker Image
+
+Use this flow when you want a prebuilt container image.
+
+### Image
+
+- Image name: `landingbj/linkmind`
+
+### Pull
+
+```bash
+docker pull landingbj/linkmind
+```
+
+### Start the Container
+
+```bash
+docker run -d -p 8080:8080 landingbj/linkmind
+```
+
+Then open `http://localhost:8080`.
+
+## Option 4. Build from Source
+
+Use this path when you want the latest local code or need both the executable JAR and the WAR package.
+
+### Package
+
+```bash
+mvn clean package -pl lagi-web -am -DskipTests -U
+```
+
+### Build Outputs
+
+The current Maven build produces:
+
+- `lagi-web/target/LinkMind.jar`
+- `lagi-web/target/ROOT.war`
+
+### Run the Packaged JAR
+
+```bash
+java -jar lagi-web/target/LinkMind.jar
+```
+
+### Deploy the WAR
+
+If you prefer a servlet container, deploy:
+
+- `lagi-web/target/ROOT.war`
+
+The embedded JAR remains the recommended default for local evaluation and daily operation.
+
+## Common Runtime Options For JAR Launches
+
+These flags apply when you start `LinkMind.jar` directly, including builds produced from source.
+
+### Change the Port
+
+```bash
+java -jar LinkMind.jar --port=8090
+```
+
+Then open `http://localhost:8090`.
+
+### Bind to a Specific Host
+
+```bash
+java -jar LinkMind.jar --host=0.0.0.0
+```
+
+### Use Custom Config and Data Directories
+
+- Windows
+
+  ```powershell
+  java -jar LinkMind.jar --config=D:\LinkMindConfig --data-dir=D:\LinkMindData
+  ```
+
+- macOS / Linux
+
+  ```bash
+  java -jar LinkMind.jar --config=/opt/linkmind/config --data-dir=/var/lib/linkmind/data
+  ```
+
+### Preselect the Runtime Mode
+
+```bash
+java -jar LinkMind.jar --runtime-choice=server
+```
+
+Valid values are `mate` and `server`.
+
+### Point DeerFlow Sync at a Custom Path
+
+```bash
+java -jar LinkMind.jar --deer-flow-path=/path/to/deer-flow
+```
+
+## What To Configure Next
+
+After the service is running, continue in this order:
+
+1. [Configuration Reference](config_en.md)
+2. [API Reference](API_en.md)
+3. [Tutorial](tutor_en.md)
+4. [Integration Guide](guide_en.md)
+
+If you want RAG, local vector storage, or document ingestion, also read the [Annex](annex_en.md).
+
+## Appendix: Install JDK 8+
+
+JDK is required to run or develop LinkMind. Temurin OpenJDK is the safest default when you do not already have Java installed.
+
+### Windows
+
+1. Download JDK 8 from [Eclipse Temurin](https://adoptium.net/temurin/releases/) or [Oracle Java](https://www.oracle.com/java/technologies/downloads/#java8).
+2. Choose the Windows x64 installer.
+3. Install it with the default wizard. Temurin `.msi` can usually add `PATH` automatically.
+4. If needed, set:
+
+   - `JAVA_HOME=C:\Development_tools\jdk1.8.0_xxx`
+   - add `%JAVA_HOME%\bin` to `Path`
+
+5. Verify:
+
    ```powershell
    java -version
+   javac -version
    ```
-3. If you see output similar to the following, the install succeeded:
-   ```
-   java version "1.8.0_221"
-   Java(TM) SE Runtime Environment (build 1.8.0_221-b11)
-   Java HotSpot(TM) 64-Bit Server VM (build 25.221-b11, mixed mode)
-   ```
-4. If you see "'java' is not recognized as an internal or external command", restart the computer and try again
 
----
+### macOS
 
-### 1.2 macOS
+#### Temurin OpenJDK
 
-#### Method 1: Temurin OpenJDK (recommended, no registration)
+1. Open [Eclipse Temurin Releases](https://adoptium.net/temurin/releases/).
+2. Choose JDK 8 for macOS.
+3. Pick `aarch64` for Apple Silicon or `x64` for Intel Macs.
+4. Install the `.pkg`.
 
-1. **Download**  
-   Go to the [Eclipse Temurin download page](https://adoptium.net/temurin/releases/) and choose:
-   - Version: 8
-   - OS: macOS
-   - Architecture: **aarch64** for Apple Silicon, **x64** for Intel
-   - Package: **PKG Installer**
+If `JAVA_HOME` is not set automatically, add it manually:
 
-2. **Install**  
-   Double-click the `.pkg` and follow the installer. Default path: `/Library/Java/JavaVirtualMachines/temurin-8.jdk`
+```bash
+# zsh (default on modern macOS)
+nano ~/.zshrc
+```
 
-3. **Environment variables** (manual install often does not set these)  
-   - Open Terminal (Launchpad → Other → Terminal)  
-   - Edit your shell config (macOS 10.15+ uses Zsh by default):
-     ```bash
-     # Zsh
-     nano ~/.zshrc
-     # If using Bash
-     nano ~/.bash_profile
-     ```
-   - Add at the end (adjust path if your install differs):
-     ```bash
-     export JAVA_HOME=/Library/Java/JavaVirtualMachines/temurin-8.jdk/Contents/Home
-     export PATH=$JAVA_HOME/bin:$PATH
-     ```
-   - Save and exit, then run: `source ~/.zshrc` or `source ~/.bash_profile`
+Then add:
 
-#### Method 2: Oracle JDK
+```bash
+export JAVA_HOME=/Library/Java/JavaVirtualMachines/temurin-8.jdk/Contents/Home
+export PATH=$JAVA_HOME/bin:$PATH
+```
 
-1. Go to the [Oracle JDK download page](https://www.oracle.com/java/technologies/downloads/#java8), choose the macOS `.dmg` for your architecture
-2. Double-click the `.dmg` and drag the icon into **Applications**
-3. Set environment variables as in Method 1; default path example: `/Library/Java/JavaVirtualMachines/jdk1.8.0_391.jdk/Contents/Home`
+Reload the shell:
 
-#### Verify
+```bash
+source ~/.zshrc
+```
 
-In Terminal, run:
+Verify:
 
 ```bash
 java -version
@@ -108,197 +299,53 @@ javac -version
 echo $JAVA_HOME
 ```
 
-Example output:
+#### Oracle JDK
 
-```
-openjdk version "1.8.0_392"
-OpenJDK Runtime Environment (Temurin)(build 1.8.0_392-b08)
-OpenJDK 64-Bit Server VM (Temurin)(build 25.392-b08, mixed mode)
-javac 1.8.0_392
-/Library/Java/JavaVirtualMachines/temurin-8.jdk/Contents/Home
-```
+You can also install Oracle JDK 8 from the Oracle download page, then set `JAVA_HOME` the same way.
 
----
+### Linux
 
-### 1.3 Linux
+#### Package Manager
 
-#### Method 1: Package manager (recommended)
+- Ubuntu / Debian
 
-**Ubuntu / Debian:**
+  ```bash
+  sudo apt update
+  sudo apt install openjdk-8-jdk
+  sudo update-alternatives --config java
+  ```
 
-```bash
-# Update package list
-sudo apt update
+- CentOS / RHEL / Fedora
 
-# Install OpenJDK 8
-sudo apt install openjdk-8-jdk
+  ```bash
+  sudo yum install java-1.8.0-openjdk-devel
+  # or on newer Fedora
+  sudo dnf install java-1.8.0-openjdk-devel
+  ```
 
-# If you have multiple JDKs, switch default with:
-sudo update-alternatives --config java
-```
+- Arch Linux
 
-**CentOS / RHEL / Fedora:**
+  ```bash
+  sudo pacman -S jdk8-openjdk
+  ```
 
-```bash
-# CentOS/RHEL 7/8, Fedora
-sudo yum install java-1.8.0-openjdk-devel
+#### Manual Temurin Install
 
-# On newer Fedora you can use dnf
-sudo dnf install java-1.8.0-openjdk-devel
-```
+1. Download the Linux JDK 8 `.tar.gz` from Temurin.
+2. Extract it, for example under `/opt/java`.
+3. Add `JAVA_HOME` and `PATH` in `~/.bashrc`, `~/.profile`, or `~/.zshrc`.
 
-**Arch Linux:**
+Example:
 
 ```bash
-sudo pacman -S jdk8-openjdk
+export JAVA_HOME=/opt/java/jdk8u-xxx
+export PATH=$JAVA_HOME/bin:$PATH
 ```
 
-#### Method 2: Temurin manual install
-
-1. Open the [Eclipse Temurin download page](https://adoptium.net/temurin/releases/)
-2. Select **Linux**, your architecture (x64 or aarch64), and **JDK 8**, then download the `.tar.gz`
-3. Extract to a directory, for example:
-   ```bash
-   sudo mkdir -p /opt/java
-   sudo tar -xzf OpenJDK8U-jdk_*.tar.gz -C /opt/java
-   ```
-4. Set environment variables in `~/.bashrc` or `~/.profile` (or `~/.zshrc` if using Zsh):
-   ```bash
-   export JAVA_HOME=/opt/java/jdk8u-xxx  # Replace with actual extracted directory name
-   export PATH=$JAVA_HOME/bin:$PATH
-   ```
-5. Reload the config: `source ~/.bashrc` or `source ~/.zshrc`
-
-#### Verify
+Reload your shell and verify:
 
 ```bash
 java -version
 javac -version
 echo $JAVA_HOME
-```
-
----
-
-## 2. Install and run via JAR
-
-This is the **simplest and recommended** way to run LinkMind on any platform.
-
----
-
-### 2.1 Windows
-
-#### Step 1: Prepare directory
-
-1. Create a folder named `LinkMind` on any drive (e.g. D:)
-2. Copy `LinkMind.jar` into that folder
-
-#### Step 2: Start
-
-1. Press `Win + X` and choose **Windows PowerShell** or **Terminal (Admin)**
-2. Go to the folder and start (change path if needed):
-   ```powershell
-   cd D:\LinkMind
-   java -jar LinkMind.jar
-   ```
-3. On **first run**, the app will:
-   - Create `config` (configuration) and `data` (data and SQLite, etc.) in the same folder
-   - Generate the default config file `lagi.yml`
-4. **Success**: You see `Tomcat started on port(s): 8080 (http)` in the console with no red errors
-
-#### Step 3: Open in browser
-
-Go to: **http://localhost:8080**
-
----
-
-### 2.2 macOS
-
-#### Step 1: Prepare directory
-
-1. In Finder, go to **Documents** and create a folder named `LinkMind`
-2. Put `LinkMind.jar` inside that folder
-
-#### Step 2: Start
-
-1. Open Terminal (Launchpad → Other → Terminal)
-2. Run:
-   ```bash
-   cd ~/Documents/LinkMind
-   java -jar LinkMind.jar
-   ```
-3. On first run, `config` and `data` are created automatically
-
-#### Step 3: Open in browser
-
-Go to: **http://localhost:8080**
-
----
-
-### 2.3 Linux
-
-#### Step 1: Prepare directory
-
-```bash
-mkdir -p ~/LinkMind
-# Copy LinkMind.jar to ~/LinkMind/LinkMind.jar
-cp /path/to/LinkMind.jar ~/LinkMind
-```
-
-#### Step 2: Start
-
-```bash
-cd ~/LinkMind
-java -jar LinkMind.jar
-```
-
-To run in the background (keeps running after closing the terminal):
-
-```bash
-nohup java -jar LinkMind.jar > linkmind.log 2>&1 &
-```
-
-On first run, `config` and `data` are created automatically.
-
-#### Step 3: Open in browser
-
-Go to: **http://localhost:8080**. From another machine, use the Linux host’s IP, e.g. **http://192.168.1.100:8080**.
-
----
-
-## 3. Change port and data directories
-
-### 3.1 Change port
-
-If port 8080 is in use, specify another port:
-
-```powershell
-# Windows PowerShell
-java -jar LinkMind.jar --port=8090
-```
-
-```bash
-# macOS / Linux
-java -jar LinkMind.jar --port=8090
-```
-
-Then open: **http://localhost:8090**
-
-### 3.2 Custom config and data directories
-
-**Windows:**
-
-```powershell
-java -jar LinkMind.jar --config=D:\LinkMindConfig --data-dir=D:\LinkMindData
-```
-
-**macOS / Linux:**
-
-```bash
-java -jar LinkMind.jar --config=/path/to/config --data-dir=/path/to/data
-```
-
-Example on Linux:
-
-```bash
-java -jar LinkMind.jar --config=/opt/linkmind/config --data-dir=/var/lib/linkmind/data
 ```
