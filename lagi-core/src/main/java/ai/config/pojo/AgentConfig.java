@@ -20,4 +20,5 @@ public class AgentConfig {
     private String wrongCase;
     private String endpoint;
     private String mcps;
+    private String tenantId;
 }

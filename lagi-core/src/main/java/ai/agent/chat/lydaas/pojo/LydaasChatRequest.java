@@ -17,5 +17,6 @@ public class LydaasChatRequest {
     private String bizInvokeFrom;
     private String tenantId;
     private Boolean isStream;
+    private String userId;
     private List<LydaasChatDataItem> dataList;
 }

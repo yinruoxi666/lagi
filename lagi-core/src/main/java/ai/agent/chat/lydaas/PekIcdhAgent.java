@@ -212,14 +212,15 @@ public class PekIcdhAgent extends BaseChatAgent {
         System.out.println("mode: " + mode);
         String query = args.length > 1 ? args[1] : System.getenv("LYDAAS_QUERY");
         if (StrUtil.isBlank(query)) {
-            query = "你好";
+            query = "帮我查下北京到上海的航班";
         }
 
         AgentConfig config = AgentConfig.builder()
                 .name("pek-icdh")
                 .token("Basic Tno1eUVFeFcyZFVFZ2E0NE12Z052dVJSQVJRNkNnMmFHR1FCUDl3OXFZNzpDSGZtaHMzZlRFSlhKWHd4bzNQZlptM2lzQ3FNQzI0aw==")
                 .appId("81a337cc-6f7e-4719-8aa6-0379edadf97e")
-                .userId("25081917363309")
+                .userId("888143833883693489")
+                .tenantId("25081917363309")
                 .endpoint(StrUtil.blankToDefault(System.getenv("LYDAAS_ENDPOINT"), DEFAULT_BASE_URL))
                 .build();
 
@@ -260,7 +261,7 @@ public class PekIcdhAgent extends BaseChatAgent {
             String url = resolveApiUrl();
             LydaasChatRequest lydaasRequest = convertRequest(request);
             String requestJson = GSON.toJson(lydaasRequest);
-            log.info("[pek_icdh][streamResponses] start, url={}, appId={}, tenantId={}, authorization={}, request={}",
+            log.info("[pek_icdh][streamResponses] start, url={}, appId={}, userId={}, authorization={}, request={}",
                     url,
                     agentConfig.getAppId(),
                     agentConfig.getUserId(),
@@ -388,7 +389,8 @@ public class PekIcdhAgent extends BaseChatAgent {
                 .query(extractQuery(request))
                 .agentInstanceId(agentConfig.getAppId())
                 .bizInvokeFrom(BIZ_INVOKE_FROM)
-                .tenantId(agentConfig.getUserId())
+                .tenantId(agentConfig.getTenantId())
+                .userId(agentConfig.getUserId())
                 .isStream(request == null ? null : request.getStream())
                 .dataList(historyDataList.isEmpty() ? null : historyDataList)
                 .build();
