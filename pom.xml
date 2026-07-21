@@ -73,7 +73,7 @@
                 <version>3.2.5</version>
                 <configuration>
                     <excludes>
-                        <exclude>**/._*.java</exclude>
+                        <exclude>%regex[.*\._.*\.class]</exclude>
                     </excludes>
                 </configuration>
             </plugin>
