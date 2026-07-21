@@ -14,6 +14,9 @@ import ai.intent.pojo.IntentResult;
 import ai.manager.VectorStoreManager;
 import ai.openai.pojo.ChatCompletionRequest;
 import ai.openai.pojo.ChatMessage;
+import ai.rerank.pojo.RerankRequest;
+import ai.rerank.pojo.RerankResponse;
+import ai.rerank.service.RerankService;
 import ai.utils.LagiGlobal;
 import ai.utils.StoppingWordUtil;
 import ai.utils.qa.ChatCompletionUtil;
@@ -70,6 +73,7 @@ public class VectorStoreService {
 
     private final IntentService intentService = new SampleIntentServiceImpl();
     private final BigdataService bigdataService = new BigdataService();
+    private final RerankService rerankService = new RerankService();
     private static final VectorCache vectorCache = VectorCache.getInstance();
 
     public VectorStoreService() {
@@ -476,10 +480,39 @@ public class VectorStoreService {
 
         List<HybridSearchResult> fused = ReciprocalRankFusion.fuse(
                 denseRecords, sparseHits, recordsById, rrfK, denseWeight, sparseWeight, fusionTopK);
-        if (fused.size() > finalTopK) {
-            return new ArrayList<>(fused.subList(0, finalTopK));
+        if (request.getRerank() == null || request.getRerank()) {
+            fused = rerankHybridResults(request.getText(), request.getRerankModel(), fused);
         }
-        return fused;
+        return fused.size() > finalTopK
+                ? new ArrayList<>(fused.subList(0, finalTopK)) : fused;
+    }
+
+    private List<HybridSearchResult> rerankHybridResults(String query, String model,
+                                                          List<HybridSearchResult> candidates) {
+        if (candidates == null || candidates.size() < 2) {
+            return candidates;
+        }
+        List<String> documents = candidates.stream()
+                .map(result -> result.getDocument() == null ? "" : result.getDocument())
+                .collect(Collectors.toList());
+        RerankRequest rerankRequest = RerankRequest.builder()
+                .model(model)
+                .query(query)
+                .documents(documents)
+                .build();
+        RerankResponse response = rerankService.rerank(rerankRequest);
+        List<HybridSearchResult> reranked = new ArrayList<>();
+        if (response != null && response.getResults() != null) {
+            for (RerankResponse.RerankResult result : response.getResults()) {
+                Integer index = result.getIndex();
+                if (index != null && index >= 0 && index < candidates.size()) {
+                    HybridSearchResult candidate = candidates.get(index);
+                    candidate.setRerankScore(result.getRelevanceScore());
+                    reranked.add(candidate);
+                }
+            }
+        }
+        return reranked.isEmpty() ? candidates : reranked;
     }
 
     private int normalizeLimit(Integer value, int defaultValue, int maxValue) {
