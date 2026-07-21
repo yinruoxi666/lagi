@@ -385,14 +385,14 @@ public class VectorStoreService {
     }
 
     public void upsert(List<UpsertRecord> upsertRecords, String category) {
-        for (UpsertRecord upsertRecord : upsertRecords) {
-            TextIndexData data = new TextIndexData();
-            data.setId(upsertRecord.getId());
-            data.setText(upsertRecord.getDocument());
-            data.setCategory(category);
-            bigdataService.upsert(data);
+        if (upsertRecords == null || upsertRecords.isEmpty()) {
+            return;
         }
+        category = resolveCategory(category);
         this.vectorStore.upsert(upsertRecords, category);
+        for (UpsertRecord upsertRecord : upsertRecords) {
+            syncTermUpsert(upsertRecord.getId(), upsertRecord.getDocument(), category);
+        }
     }
 
     public List<IndexRecord> query(QueryCondition queryCondition) {
@@ -443,23 +443,44 @@ public class VectorStoreService {
     }
 
     public void delete(List<String> ids) {
-        this.vectorStore.delete(ids);
+        this.delete(ids, vectorStore.getConfig().getDefaultCategory());
     }
 
     public void delete(List<String> ids, String category) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        category = resolveCategory(category);
         this.vectorStore.delete(ids, category);
+        syncTermDelete(category, ids);
     }
 
     public void deleteWhere(List<Map<String, String>> whereList) {
-        this.vectorStore.deleteWhere(whereList);
+        this.deleteWhere(whereList, vectorStore.getConfig().getDefaultCategory());
     }
 
     public void deleteWhere(List<Map<String, String>> whereList, String category) {
+        if (whereList == null || whereList.isEmpty()) {
+            return;
+        }
+        category = resolveCategory(category);
+        Set<String> ids = new LinkedHashSet<>();
+        for (Map<String, String> where : whereList) {
+            List<IndexRecord> records = this.vectorStore.fetch(where, category);
+            if (records != null) {
+                records.stream().map(IndexRecord::getId).filter(Objects::nonNull).forEach(ids::add);
+            }
+        }
         this.vectorStore.deleteWhere(whereList, category);
+        syncTermDelete(category, new ArrayList<>(ids));
     }
 
     public void deleteCollection(String category) {
+        category = resolveCategory(category);
         this.vectorStore.deleteCollection(category);
+        if (bigdataService.isAvailable() && !bigdataService.delete(category)) {
+            throw new IllegalStateException("Failed to delete term index category " + category);
+        }
     }
 
     public List<IndexSearchData> searchByIds(List<String> ids, String category) {
@@ -772,15 +793,84 @@ public class VectorStoreService {
     }
 
     public void add(AddEmbedding addEmbedding) {
+        if (addEmbedding == null || addEmbedding.getData() == null || addEmbedding.getData().isEmpty()) {
+            return;
+        }
+        String category = resolveCategory(addEmbedding.getCategory());
+        addEmbedding.setCategory(category);
+        for (AddEmbedding.AddEmbeddingData data : addEmbedding.getData()) {
+            if (data.getId() == null || data.getId().isEmpty()) {
+                data.setId(UUID.randomUUID().toString().replace("-", ""));
+            }
+            syncTermUpsert(data.getId(), data.getDocument(), category);
+        }
         this.vectorStore.add(addEmbedding);
     }
 
     public void update(UpdateEmbedding updateEmbedding) {
+        if (updateEmbedding == null || updateEmbedding.getData() == null || updateEmbedding.getData().isEmpty()) {
+            return;
+        }
+        String category = resolveCategory(updateEmbedding.getCategory());
+        updateEmbedding.setCategory(category);
         this.vectorStore.update(updateEmbedding);
+        for (UpdateEmbedding.UpdateEmbeddingData data : updateEmbedding.getData()) {
+            if (data.getDocument() != null) {
+                syncTermUpsert(data.getId(), data.getDocument(), category);
+            }
+        }
     }
 
     public void delete(DeleteEmbedding deleteEmbedding) {
+        if (deleteEmbedding == null) {
+            return;
+        }
+        String category = resolveCategory(deleteEmbedding.getCategory());
+        deleteEmbedding.setCategory(category);
+        Set<String> ids = new LinkedHashSet<>();
+        if (deleteEmbedding.getIds() != null) {
+            ids.addAll(deleteEmbedding.getIds());
+        }
+        if ((deleteEmbedding.getWhere() != null && !deleteEmbedding.getWhere().isEmpty())
+                || (deleteEmbedding.getWhereDocument() != null && !deleteEmbedding.getWhereDocument().isEmpty())) {
+            GetEmbedding getEmbedding = GetEmbedding.builder()
+                    .category(category)
+                    .where(deleteEmbedding.getWhere())
+                    .whereDocument(deleteEmbedding.getWhereDocument())
+                    .build();
+            List<IndexRecord> records = this.vectorStore.get(getEmbedding);
+            if (records != null) {
+                records.stream().map(IndexRecord::getId).filter(Objects::nonNull).forEach(ids::add);
+            }
+        }
         this.vectorStore.delete(deleteEmbedding);
+        syncTermDelete(category, new ArrayList<>(ids));
+    }
+
+    private String resolveCategory(String category) {
+        return category == null ? vectorStore.getConfig().getDefaultCategory() : category;
+    }
+
+    private void syncTermUpsert(String id, String document, String category) {
+        if (!bigdataService.isAvailable()) {
+            return;
+        }
+        TextIndexData data = new TextIndexData();
+        data.setId(id);
+        data.setText(document == null ? "" : document);
+        data.setCategory(category);
+        if (!bigdataService.upsert(data)) {
+            throw new IllegalStateException("Failed to upsert term index id " + id);
+        }
+    }
+
+    private void syncTermDelete(String category, List<String> ids) {
+        if (!bigdataService.isAvailable() || ids == null || ids.isEmpty()) {
+            return;
+        }
+        if (!bigdataService.delete(category, ids)) {
+            throw new IllegalStateException("Failed to delete term index ids from category " + category);
+        }
     }
 
     public void chunkAdd(AddChunkEmbedding addChunkEmbedding) {
