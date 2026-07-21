@@ -2,6 +2,7 @@ package ai.vector;
 
 import ai.bigdata.BigdataService;
 import ai.bigdata.pojo.TextIndexData;
+import ai.bigdata.pojo.TermSearchHit;
 import ai.common.pojo.FileChunkResponse;
 import ai.common.pojo.FileInfo;
 import ai.common.pojo.IndexSearchData;
@@ -24,6 +25,7 @@ import ai.vector.loader.impl.*;
 import ai.vector.loader.pojo.SplitConfig;
 import ai.vector.loader.util.DocQaExtractor;
 import ai.vector.pojo.*;
+import ai.vector.retrieval.ReciprocalRankFusion;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import com.google.gson.Gson;
@@ -397,6 +399,91 @@ public class VectorStoreService {
 
     public List<IndexRecord> query(QueryCondition queryCondition) {
         return this.vectorStore.query(queryCondition);
+    }
+
+    public List<HybridSearchResult> hybridQuery(HybridQueryRequest request) {
+        if (request == null || StrUtil.isBlank(request.getText())) {
+            throw new IllegalArgumentException("Hybrid query text is required");
+        }
+        String category = resolveCategory(request.getCategory());
+        int denseTopK = normalizeLimit(request.getDenseTopK(), 20, 1000);
+        int sparseTopK = normalizeLimit(request.getSparseTopK(), 20, 1000);
+        int fusionTopK = normalizeLimit(request.getFusionTopK(), 50, 1000);
+        int finalTopK = normalizeLimit(request.getFinalTopK(), 10, fusionTopK);
+        int rrfK = normalizeLimit(request.getRrfK(), 60, 10000);
+        double denseWeight = normalizeWeight(request.getDenseWeight(), 1.0d);
+        double sparseWeight = normalizeWeight(request.getSparseWeight(), 1.0d);
+
+        QueryCondition denseQuery = QueryCondition.builder()
+                .category(category)
+                .text(request.getText())
+                .where(request.getWhere())
+                .whereDocument(request.getWhereDocument())
+                .n(denseTopK)
+                .build();
+        List<IndexRecord> denseRecords = this.vectorStore.query(denseQuery);
+        if (denseRecords == null) {
+            denseRecords = Collections.emptyList();
+        }
+
+        int sparseCandidateLimit = Math.min(1000, sparseTopK * 5);
+        List<TermSearchHit> sparseCandidates = bigdataService.search(
+                request.getText(), category, sparseCandidateLimit);
+        List<TermSearchHit> sparseHits = new ArrayList<>();
+        Map<String, IndexRecord> recordsById = new HashMap<>();
+        if (sparseCandidates != null && !sparseCandidates.isEmpty()) {
+            List<String> sparseIds = sparseCandidates.stream()
+                    .map(TermSearchHit::getId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+            GetEmbedding getEmbedding = GetEmbedding.builder()
+                    .category(category)
+                    .ids(sparseIds)
+                    .where(request.getWhere())
+                    .whereDocument(request.getWhereDocument())
+                    .build();
+            List<IndexRecord> sparseRecords = this.vectorStore.get(getEmbedding);
+            if (sparseRecords != null) {
+                for (IndexRecord record : sparseRecords) {
+                    if (record != null && record.getId() != null) {
+                        recordsById.put(record.getId(), record);
+                    }
+                }
+            }
+            for (TermSearchHit candidate : sparseCandidates) {
+                if (recordsById.containsKey(candidate.getId())) {
+                    candidate.setRank(sparseHits.size() + 1);
+                    sparseHits.add(candidate);
+                    if (sparseHits.size() >= sparseTopK) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        List<HybridSearchResult> fused = ReciprocalRankFusion.fuse(
+                denseRecords, sparseHits, recordsById, rrfK, denseWeight, sparseWeight, fusionTopK);
+        if (fused.size() > finalTopK) {
+            return new ArrayList<>(fused.subList(0, finalTopK));
+        }
+        return fused;
+    }
+
+    private int normalizeLimit(Integer value, int defaultValue, int maxValue) {
+        if (value == null) {
+            return Math.min(defaultValue, maxValue);
+        }
+        return Math.max(1, Math.min(value, maxValue));
+    }
+
+    private double normalizeWeight(Double value, double defaultValue) {
+        if (value == null) {
+            return defaultValue;
+        }
+        if (value < 0.0d || value.isNaN() || value.isInfinite()) {
+            throw new IllegalArgumentException("Hybrid retrieval weights must be finite and non-negative");
+        }
+        return value;
     }
 
     public List<List<IndexRecord>> query(MultiQueryCondition queryCondition) {
