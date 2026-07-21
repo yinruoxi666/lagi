@@ -26,6 +26,10 @@ public class BigdataService {
         }
     }
 
+    public boolean isAvailable() {
+        return adapter != null;
+    }
+
     public List<TermSearchHit> search(String keyword, String category, int topK) {
         if (adapter == null || topK <= 0) {
             return java.util.Collections.emptyList();
