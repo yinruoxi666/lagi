@@ -47,6 +47,8 @@ public class VectorApiServlet extends BaseServlet {
         String method = url.substring(url.lastIndexOf("/") + 1);
         if (method.equals("query") || method.equals("chunkQuery")) {
             this.query(req, resp);
+        } else if (method.equals("hybridQuery")) {
+            this.hybridQuery(req, resp);
         } else if (method.equals("get") || method.equals("chunkGet")) {
             this.get(req, resp);
         } else if (method.equals("add")) {
@@ -270,6 +272,16 @@ public class VectorApiServlet extends BaseServlet {
             result.put("status", "success");
             result.put("data", recordList);
         }
+        responsePrint(resp, toJson(result));
+    }
+
+    private void hybridQuery(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        resp.setContentType("application/json;charset=utf-8");
+        HybridQueryRequest request = reqBodyToObj(req, HybridQueryRequest.class);
+        List<HybridSearchResult> recordList = vectorStoreService.hybridQuery(request);
+        Map<String, Object> result = new HashMap<>();
+        result.put("status", "success");
+        result.put("data", recordList);
         responsePrint(resp, toJson(result));
     }
 
