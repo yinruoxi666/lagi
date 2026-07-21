@@ -32,4 +32,7 @@ public class HybridQueryRequest {
     private Double denseWeight;
     @JsonProperty("sparse_weight")
     private Double sparseWeight;
+    private Boolean rerank;
+    @JsonProperty("rerank_model")
+    private String rerankModel;
 }
