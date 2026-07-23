@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -27,6 +28,17 @@ public class SqliteSearchAdapter implements IBigdata {
 
     public SqliteSearchAdapter(BigdataConfig config) {
         this.connName = AiGlobal.DEFAULT_DB;
+        ensureFtsTable();
+    }
+
+    private void ensureFtsTable() {
+        String sql = "CREATE VIRTUAL TABLE IF NOT EXISTS " + FTS_TABLE_NAME
+                + " USING fts5(id UNINDEXED, category UNINDEXED, text)";
+        try (Conn conn = new Conn(connName); Statement statement = conn.createStatement()) {
+            statement.execute(sql);
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to initialize SQLite FTS5 term index", e);
+        }
     }
 
     @Override
@@ -53,10 +65,12 @@ public class SqliteSearchAdapter implements IBigdata {
             conn.commit();
             return true;
         } catch (SQLException e) {
-            try {
-                conn.rollback();
-            } catch (SQLException ex) {
-                logger.error("Error while rolling back transaction: {}", ex.getMessage());
+            if (conn != null) {
+                try {
+                    conn.rollback();
+                } catch (SQLException ex) {
+                    logger.error("Error while rolling back transaction: {}", ex.getMessage());
+                }
             }
             logger.error("Error while upserting text index data", e);
             return false;
