@@ -71,7 +71,7 @@ public class OpenAIStandardAdapter extends ModelService implements ILlmAdapter {
             return false;
         }
         String lowerModelName = model.toLowerCase();
-        return lowerModelName.contains("qwen3.5") || lowerModelName.contains("qwen3.6");
+        return lowerModelName.contains("qwen3.5") || lowerModelName.contains("qwen3.6") || lowerModelName.contains("deepseek-v4") || lowerModelName.contains("qwen3.7");
     }
 
     private Map<String, String> getHeaders() {
