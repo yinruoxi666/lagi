@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.Map;
+import java.util.List;
 
 @Data
 @Builder
@@ -27,4 +28,6 @@ public class HybridSearchResult {
     private Double fusionScore;
     @JsonProperty("rerank_score")
     private Double rerankScore;
+    @JsonProperty("matched_keywords")
+    private List<String> matchedKeywords;
 }

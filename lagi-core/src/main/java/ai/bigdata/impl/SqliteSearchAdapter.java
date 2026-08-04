@@ -17,21 +17,32 @@ import java.util.List;
 
 /**
  * SQLite FTS5-based implementation of IBigdata.
- * Uses a single FTS5 virtual table with id, category, and text columns.
+ * Uses a trigram-tokenized FTS5 table as a deterministic Chinese-capable fallback.
  */
 public class SqliteSearchAdapter implements IBigdata {
     private static final Logger logger = LoggerFactory.getLogger(SqliteSearchAdapter.class);
-    private static final String FTS_TABLE_NAME = "fts_text_index";
+    private static final String FTS_TABLE_NAME = "fts_text_index_v2";
 
     private final String connName;
 
     public SqliteSearchAdapter(BigdataConfig config) {
         this.connName = AiGlobal.DEFAULT_DB;
+        ensureFtsTable();
     }
 
     @Override
     public String getBackendName() {
         return "sqlite_fts";
+    }
+
+    private void ensureFtsTable() {
+        String sql = "CREATE VIRTUAL TABLE IF NOT EXISTS " + FTS_TABLE_NAME
+                + " USING fts5(id UNINDEXED, category UNINDEXED, text, tokenize='trigram')";
+        try (Conn conn = new Conn(connName); java.sql.Statement statement = conn.createStatement()) {
+            statement.execute(sql);
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to initialize SQLite FTS5 term index", e);
+        }
     }
 
     @Override

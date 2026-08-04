@@ -5,12 +5,16 @@ import ai.bigdata.pojo.TextIndexData;
 import ai.bigdata.pojo.TermSearchHit;
 import ai.bigdata.pojo.TermSearchResponse;
 import ai.manager.BigdataManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
 public class BigdataService {
+    private static final Logger logger = LoggerFactory.getLogger(BigdataService.class);
+
     private IBigdata primaryAdapter() {
         IBigdata elastic = BigdataManager.getInstance().getBigdata("elastic");
         return elastic != null ? elastic : BigdataManager.getInstance().getBigdata();
@@ -54,6 +58,9 @@ public class BigdataService {
         if (primaryResponse != null && primaryResponse.isSuccessful()) {
             return primaryResponse;
         }
+        logger.warn("Sparse backend {} failed for category {}: {}",
+                primary.getBackendName(), category,
+                primaryResponse == null ? "null_response" : primaryResponse.getFailureReason());
         for (IBigdata fallback : BigdataManager.getInstance().getFallbackBigdatas("elastic")) {
             if (fallback == primary) {
                 continue;
@@ -62,6 +69,8 @@ public class BigdataService {
                 TermSearchResponse fallbackResponse = fallback.searchDetailed(keyword, category, topK);
                 if (fallbackResponse != null && fallbackResponse.isSuccessful()) {
                     fallbackResponse.setFallbackUsed(true);
+                    logger.warn("Sparse retrieval for category {} fell back to {}",
+                            category, fallbackResponse.getBackend());
                     return fallbackResponse;
                 }
             } catch (RuntimeException ignored) {

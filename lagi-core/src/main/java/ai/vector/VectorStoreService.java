@@ -26,6 +26,7 @@ import ai.vector.loader.impl.*;
 import ai.vector.loader.pojo.SplitConfig;
 import ai.vector.loader.util.DocQaExtractor;
 import ai.vector.pojo.*;
+import ai.vector.retrieval.HybridMetadataSearchEngine;
 import ai.vector.retrieval.ReciprocalRankFusion;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
@@ -416,6 +417,44 @@ public class VectorStoreService {
 
     public List<IndexRecord> query(QueryCondition queryCondition) {
         return this.vectorStore.query(queryCondition);
+    }
+
+    public HybridMetadataSearchResponse hybridSearchByMetadata(HybridMetadataSearchRequest request) {
+        HybridMetadataSearchEngine engine = new HybridMetadataSearchEngine(
+                (query, category, where, whereDocument, topK) -> vectorStore.query(
+                        QueryCondition.builder()
+                                .category(category)
+                                .text(query)
+                                .where(where)
+                                .whereDocument(whereDocument)
+                                .n(topK)
+                                .build()),
+                bigdataService::searchDetailed,
+                (ids, category, where, whereDocument) -> vectorStore.get(
+                        GetEmbedding.builder()
+                                .category(category)
+                                .ids(ids)
+                                .where(where)
+                                .whereDocument(whereDocument)
+                                .build()),
+                (query, model, documents) -> {
+                    RerankResponse response = rerankService.rerank(RerankRequest.builder()
+                            .query(query)
+                            .model(model)
+                            .documents(documents)
+                            .build());
+                    List<HybridMetadataSearchEngine.RerankOutcome> outcomes = new ArrayList<>();
+                    if (response != null && response.getResults() != null) {
+                        for (RerankResponse.RerankResult result : response.getResults()) {
+                            if (result.getIndex() != null) {
+                                outcomes.add(new HybridMetadataSearchEngine.RerankOutcome(
+                                        result.getIndex(), result.getRelevanceScore()));
+                            }
+                        }
+                    }
+                    return outcomes;
+                });
+        return engine.search(request, vectorStore.getConfig().getDefaultCategory());
     }
 
     public List<HybridSearchResult> hybridQuery(HybridQueryRequest request) {

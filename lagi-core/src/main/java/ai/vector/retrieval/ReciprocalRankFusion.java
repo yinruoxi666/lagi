@@ -57,6 +57,7 @@ public final class ReciprocalRankFusion {
                 }
                 result.setSparseRank(rank);
                 result.setTermScore(hit.getScore());
+                result.setMatchedKeywords(hit.getMatchedKeywords());
                 result.setFusionScore(result.getFusionScore() + sparseWeight / (rrfK + rank));
             }
         }
