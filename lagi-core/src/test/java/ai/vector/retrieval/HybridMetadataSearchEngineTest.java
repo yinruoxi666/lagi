@@ -49,7 +49,10 @@ class HybridMetadataSearchEngineTest {
         assertEquals("failed", response.getRerankStatus());
         assertEquals(3, response.getResults().size());
         assertEquals("doc-b", response.getResults().get(0).getId());
-        assertTrue(response.getResults().stream().allMatch(result -> result.getRerank() == null));
+        assertTrue(response.getResults().stream().allMatch(result -> result.getRerank() != null));
+        assertEquals(Integer.valueOf(1), response.getResults().get(0).getRerank().getRank());
+        assertTrue(response.getResults().stream()
+                .allMatch(result -> result.getRerank().getScore() == null));
     }
 
     private static HybridMetadataSearchEngine engine(Map<String, IndexRecord> records,
@@ -71,7 +74,7 @@ class HybridMetadataSearchEngineTest {
                         records.get("doc-b"), records.get("doc-c")),
                 (query, model, documents) -> {
                     if (failRerank) {
-                        throw new IllegalStateException("mock timeout");
+                        throw new ExceptionInInitializerError("missing rerank model");
                     }
                     return Arrays.asList(
                             new HybridMetadataSearchEngine.RerankOutcome(1, 0.95d),

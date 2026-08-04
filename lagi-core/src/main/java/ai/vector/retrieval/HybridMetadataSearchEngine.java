@@ -96,7 +96,8 @@ public class HybridMetadataSearchEngine {
             try {
                 results = applyRerank(query, request.getRerankModel(), results);
                 rerankStatus = "completed";
-            } catch (RuntimeException e) {
+            } catch (RuntimeException | LinkageError e) {
+                results = applyRerankFallback(results);
                 rerankStatus = "failed";
             }
         }
@@ -170,6 +171,17 @@ public class HybridMetadataSearchEngine {
             }
         }
         return reranked;
+    }
+
+    private List<HybridMetadataSearchResult> applyRerankFallback(
+            List<HybridMetadataSearchResult> candidates) {
+        for (int i = 0; i < candidates.size(); i++) {
+            candidates.get(i).setRerank(HybridMetadataSearchResult.RerankEvidence.builder()
+                    .rank(i + 1)
+                    .score(null)
+                    .build());
+        }
+        return candidates;
     }
 
     private static int normalizeLimit(Integer value, int defaultValue, int maxValue) {
