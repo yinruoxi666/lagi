@@ -10,6 +10,8 @@ import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Constructor;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -60,6 +62,26 @@ public class BigdataManager {
         if(bigdataMap.isEmpty()) {
             return null;
         }
-        return bigdataMap.values().iterator().next();
+        IBigdata elastic = bigdataMap.get("elastic");
+        if (elastic != null) {
+            return elastic;
+        }
+        return bigdataMap.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(Map.Entry::getValue)
+                .findFirst()
+                .orElse(null);
+    }
+
+    public List<IBigdata> getFallbackBigdatas(String primaryName) {
+        List<Map.Entry<String, IBigdata>> entries = new ArrayList<>(bigdataMap.entrySet());
+        entries.sort(Comparator.comparing(Map.Entry::getKey));
+        List<IBigdata> result = new ArrayList<>();
+        for (Map.Entry<String, IBigdata> entry : entries) {
+            if (!entry.getKey().equals(primaryName)) {
+                result.add(entry.getValue());
+            }
+        }
+        return result;
     }
 }

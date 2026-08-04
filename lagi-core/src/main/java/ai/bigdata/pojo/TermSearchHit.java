@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 /**
  * A ranked hit returned by a term-search backend.
  *
@@ -20,4 +22,5 @@ public class TermSearchHit {
     private String text;
     private Double score;
     private Integer rank;
+    private List<String> matchedKeywords;
 }

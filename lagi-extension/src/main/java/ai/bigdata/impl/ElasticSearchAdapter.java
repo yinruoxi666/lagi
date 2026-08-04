@@ -1,8 +1,11 @@
 package ai.bigdata.impl;
 
 import ai.bigdata.IBigdata;
+import ai.bigdata.QueryKeywordAnalyzer;
+import ai.bigdata.pojo.QueryKeywordScore;
 import ai.bigdata.pojo.TextIndexData;
 import ai.bigdata.pojo.TermSearchHit;
+import ai.bigdata.pojo.TermSearchResponse;
 import ai.config.pojo.BigdataConfig;
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.ElasticsearchException;
@@ -24,16 +27,28 @@ import org.apache.http.client.CredentialsProvider;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestClientBuilder;
+import org.elasticsearch.client.Request;
+import org.elasticsearch.client.Response;
+import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 
 public class ElasticSearchAdapter implements IBigdata {
     private final ElasticsearchClient client;
+    private final RestClient restClient;
     private static final Logger logger = LoggerFactory.getLogger(ElasticSearchAdapter.class);
 
     public ElasticSearchAdapter(BigdataConfig config) {
@@ -46,6 +61,7 @@ public class ElasticSearchAdapter implements IBigdata {
             builder = RestClient.builder(new HttpHost(config.getHost(), config.getPort())).setHttpClientConfigCallback(httpClientBuilder -> httpClientBuilder.setDefaultCredentialsProvider(credentialsProvider));
         }
         RestClient restClient = builder.build();
+        this.restClient = restClient;
         ElasticsearchTransport transport = new RestClientTransport(restClient, new JacksonJsonpMapper());
         this.client = new ElasticsearchClient(transport);
     }
@@ -66,21 +82,28 @@ public class ElasticSearchAdapter implements IBigdata {
 
     @Override
     public List<TermSearchHit> search(String keyword, String category, int topK) {
+        TermSearchResponse response = searchDetailed(keyword, category, topK);
+        return response.isSuccessful() ? response.getHits() : new ArrayList<>();
+    }
+
+    @Override
+    public TermSearchResponse searchDetailed(String keyword, String category, int topK) {
         if (keyword == null || keyword.trim().isEmpty() || category == null || topK <= 0) {
-            return new ArrayList<>();
+            return TermSearchResponse.success(getBackendName(), Collections.emptyList(), Collections.emptyList());
         }
+        List<QueryKeywordScore> queryKeywords = analyzeQuery(keyword, category);
         // 检查索引是否存在
         BooleanResponse indexExistsResponse = null;
         try {
             indexExistsResponse = client.indices().exists(i -> i.index(category));
-        } catch (IOException e) {
+        } catch (IOException | ElasticsearchException e) {
             logger.error("Error while checking index existence", e);
-            return new ArrayList<>();
+            return TermSearchResponse.failure(getBackendName(), "index_check_failed");
         }
 
         if (!indexExistsResponse.value()) {
             logger.warn("Index {} does not exist", category);
-            return new ArrayList<>();
+            return TermSearchResponse.failure(getBackendName(), "index_not_found");
         }
         SearchResponse<TextIndexData> searchResponse = null;
         try {
@@ -92,9 +115,10 @@ public class ElasticSearchAdapter implements IBigdata {
                             .minimumShouldMatch("1"))), TextIndexData.class);
         } catch (IOException | ElasticsearchException e) {
             logger.error("Error while searching", e);
+            return TermSearchResponse.failure(getBackendName(), "search_failed");
         }
         if (searchResponse == null) {
-            return new ArrayList<>();
+            return TermSearchResponse.failure(getBackendName(), "empty_search_response");
         }
         List<Hit<TextIndexData>> hits = searchResponse.hits().hits();
         List<TermSearchHit> result = new ArrayList<>();
@@ -106,9 +130,84 @@ public class ElasticSearchAdapter implements IBigdata {
                     .text(source == null ? null : source.getText())
                     .score(hit.score())
                     .rank(rank++)
+                    .matchedKeywords(findMatchedKeywords(
+                            source == null ? null : source.getText(), queryKeywords))
                     .build());
         }
-        return result;
+        return TermSearchResponse.success(getBackendName(), queryKeywords, result);
+    }
+
+    @Override
+    public String getBackendName() {
+        return "elasticsearch";
+    }
+
+    private List<QueryKeywordScore> analyzeQuery(String query, String category) {
+        try {
+            Request request = new Request("POST", "/" + category + "/_termvectors");
+            JsonObject body = new JsonObject();
+            JsonObject document = new JsonObject();
+            document.addProperty("text", query);
+            body.add("doc", document);
+            com.google.gson.JsonArray fields = new com.google.gson.JsonArray();
+            fields.add("text");
+            body.add("fields", fields);
+            body.addProperty("term_statistics", true);
+            body.addProperty("field_statistics", true);
+            body.addProperty("positions", false);
+            body.addProperty("offsets", false);
+            body.addProperty("payloads", false);
+            request.setJsonEntity(body.toString());
+
+            Response response = restClient.performRequest(request);
+            String json = EntityUtils.toString(response.getEntity());
+            JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+            JsonObject textField = root.getAsJsonObject("term_vectors").getAsJsonObject("text");
+            JsonObject fieldStatistics = textField.getAsJsonObject("field_statistics");
+            long documentCount = fieldStatistics == null || !fieldStatistics.has("doc_count")
+                    ? 0L : fieldStatistics.get("doc_count").getAsLong();
+            JsonObject terms = textField.getAsJsonObject("terms");
+            List<QueryKeywordScore> result = new ArrayList<>();
+            if (terms != null) {
+                for (Map.Entry<String, JsonElement> entry : terms.entrySet()) {
+                    JsonObject statistics = entry.getValue().getAsJsonObject();
+                    int queryFrequency = statistics.has("term_freq")
+                            ? statistics.get("term_freq").getAsInt() : 1;
+                    long documentFrequency = statistics.has("doc_freq")
+                            ? statistics.get("doc_freq").getAsLong() : 0L;
+                    double idf = Math.log(1.0d + (Math.max(0L, documentCount - documentFrequency) + 0.5d)
+                            / (documentFrequency + 0.5d));
+                    result.add(QueryKeywordScore.builder()
+                            .keyword(entry.getKey())
+                            .queryFrequency(queryFrequency)
+                            .documentFrequency(documentFrequency)
+                            .score(queryFrequency * idf)
+                            .build());
+                }
+            }
+            result.sort(Comparator.comparing(QueryKeywordScore::getScore).reversed()
+                    .thenComparing(QueryKeywordScore::getKeyword));
+            return result;
+        } catch (Exception e) {
+            logger.warn("Failed to obtain Elasticsearch query term statistics for category {}: {}",
+                    category, e.getMessage());
+            return QueryKeywordAnalyzer.analyze(query);
+        }
+    }
+
+    private List<String> findMatchedKeywords(String text, List<QueryKeywordScore> queryKeywords) {
+        if (text == null || queryKeywords == null || queryKeywords.isEmpty()) {
+            return Collections.emptyList();
+        }
+        String normalized = text.toLowerCase(Locale.ROOT);
+        List<String> matched = new ArrayList<>();
+        for (QueryKeywordScore keyword : queryKeywords) {
+            if (keyword.getKeyword() != null
+                    && normalized.contains(keyword.getKeyword().toLowerCase(Locale.ROOT))) {
+                matched.add(keyword.getKeyword());
+            }
+        }
+        return matched;
     }
 
     @Override

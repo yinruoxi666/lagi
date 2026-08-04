@@ -30,6 +30,11 @@ public class SqliteSearchAdapter implements IBigdata {
     }
 
     @Override
+    public String getBackendName() {
+        return "sqlite_fts";
+    }
+
+    @Override
     public boolean upsert(TextIndexData data) {
         if (data == null || data.getCategory() == null) {
             return false;
