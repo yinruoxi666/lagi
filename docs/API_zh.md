@@ -1647,4 +1647,38 @@ POST /uploadFile/deleteFile
 | `ChargeDetail` | `seq`、`userId`、`amount`、`time`、`status` |
 
 # 数据模型
+# Hybrid Search by Metadata
+
+```text
+POST /v1/vector/hybridSearchByMetadata
+```
+
+该接口在 metadata 条件下并行执行 Embedding 与 Elasticsearch BM25 召回，
+使用 Weighted RRF 融合候选后执行可选 Rerank。现有
+`/v1/vector/searchByMetadata` 保持不变。
+
+请求示例：
+
+```json
+{
+  "category": "knowledge_base",
+  "text": "企业数据安全管理制度",
+  "where": {"file_id": "demo-file"},
+  "dense_top_k": 30,
+  "bm25_top_k": 30,
+  "fusion_top_k": 20,
+  "final_top_k": 10,
+  "dense_weight": 1.0,
+  "bm25_weight": 1.0,
+  "rrf_k": 60,
+  "rerank": true,
+  "rerank_model": "default"
+}
+```
+
+响应中的 `query_keywords` 是 Query 关键词的 TF/DF 权重；每个结果中的
+`bm25.score` 是文档级 Elasticsearch BM25 原始分数。`hybrid_score` 是
+Weighted RRF 综合召回分数，`embedding.distance` 是向量库原始距离，
+`rerank` 包含最终重排排名及 provider 实际返回的分数。Rerank provider
+不返回分数时，`score` 为 `null`。
 

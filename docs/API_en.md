@@ -1647,4 +1647,18 @@ These billing routes are intentionally isolated from model routing and chat exec
 | `ChargeDetail` | `seq`, `userId`, `amount`, `time`, `status` |
 
 # Data Schema
+# Hybrid Search by Metadata
+
+```text
+POST /v1/vector/hybridSearchByMetadata
+```
+
+This endpoint runs embedding and Elasticsearch BM25 recall under the same
+metadata constraints, fuses candidates with weighted RRF, and optionally
+reranks them. The existing `/v1/vector/searchByMetadata` contract is unchanged.
+
+`query_keywords` contains query-side TF/DF weights. Each result keeps its raw
+document-level BM25 score, embedding distance, weighted-RRF `hybrid_score`, and
+rerank rank/score. When the rerank provider does not expose a relevance score,
+the score is `null` rather than synthesized.
 
