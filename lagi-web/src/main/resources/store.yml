@@ -48,6 +48,11 @@ stores:
       port: 9200
       enable: true
 
+    # Local FTS5 fallback used when Elasticsearch is unavailable.
+    - name: sqlite
+      driver: ai.bigdata.impl.SqliteSearchAdapter
+      enable: true
+
   database:
     - name: mysql
       jdbcUrl: you-jdbc-url

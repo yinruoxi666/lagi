@@ -16,6 +16,7 @@ public class HikariDS {
     private static final HikariDataSource saasDS;
     private static final String SAAS_CONFIG_PATH = "/hikari-saas.properties";
     private static final String SAAS_DB_FILE = "saas.db";
+    private static final String SQLITE_DRIVER_CLASS = "org.sqlite.JDBC";
     private static final String SQLITE_PARAMS = "enable_load_extension=true&busy_timeout=5000&journal_mode=WAL&synchronous=NORMAL";
 
     static {
@@ -24,6 +25,7 @@ public class HikariDS {
         if (dataDir != null && !dataDir.isEmpty()) {
             Path dbPath = Paths.get(dataDir).resolve(SAAS_DB_FILE).toAbsolutePath().normalize();
             String jdbcUrl = "jdbc:sqlite:" + dbPath.toString().replace('\\', '/') + "?" + SQLITE_PARAMS;
+            saasConfig.setDriverClassName(SQLITE_DRIVER_CLASS);
             saasConfig.setJdbcUrl(jdbcUrl);
         }
         saasDS = new HikariDataSource(saasConfig);

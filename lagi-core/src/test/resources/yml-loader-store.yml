@@ -1,0 +1,5 @@
+stores:
+  term:
+    - name: sqlite
+      driver: ai.bigdata.impl.SqliteSearchAdapter
+      enable: true

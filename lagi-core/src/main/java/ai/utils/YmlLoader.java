@@ -33,8 +33,8 @@ public class YmlLoader {
             TypeReference<Map<String, Object>> mapType = new TypeReference<Map<String, Object>>() {
             };
             Map<String, Object> map = mapper.readValue(inputStream, mapType);
-            return  Convert.convert(clazz, map.get(fieldName));
-        } catch (IOException e) {
+            return mapper.convertValue(map.get(fieldName), clazz);
+        } catch (IOException | IllegalArgumentException e) {
             log.error("加载配置文件失败：{}", e.getMessage(), e);
         }
         return null;
