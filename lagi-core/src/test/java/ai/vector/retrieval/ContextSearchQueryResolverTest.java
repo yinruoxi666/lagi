@@ -43,6 +43,28 @@ class ContextSearchQueryResolverTest {
     }
 
     @Test
+    void combinesObviousReferenceWhenIntentDetectionIsUnavailable() {
+        ChatCompletionRequest request = request(
+                message("user", "企业数据安全制度"),
+                message("assistant", "制度包括访问控制和审计"),
+                message("user", "它有哪些审计要求？"));
+
+        assertEquals("企业数据安全制度它有哪些审计要求？",
+                ContextSearchQueryResolver.resolve(request, null));
+    }
+
+    @Test
+    void keepsIndependentLastQuestionWhenIntentDetectionIsUnavailable() {
+        ChatCompletionRequest request = request(
+                message("user", "上一轮问题"),
+                message("assistant", "上一轮回答"),
+                message("user", "企业数据安全制度"));
+
+        assertEquals("企业数据安全制度",
+                ContextSearchQueryResolver.resolve(request, null));
+    }
+
+    @Test
     void rejectsMissingContextWhenTextIsEmpty() {
         ChatCompletionRequest request = new ChatCompletionRequest();
 

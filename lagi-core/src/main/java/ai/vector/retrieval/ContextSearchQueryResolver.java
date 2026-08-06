@@ -26,6 +26,9 @@ public final class ContextSearchQueryResolver {
         if (StrUtil.isBlank(lastMessage)) {
             throw new IllegalArgumentException("The last search message must not be empty");
         }
+        if (intentResult == null) {
+            intentResult = inferContinuedIntent(request, lastMessage);
+        }
         if (intentResult == null
                 || !IntentStatusEnum.CONTINUE.getName().equals(intentResult.getStatus())) {
             return lastMessage;
@@ -56,5 +59,38 @@ public final class ContextSearchQueryResolver {
             return userMessages.get(userMessages.size() - 2).getContent().trim();
         }
         return lastMessage;
+    }
+
+    private static IntentResult inferContinuedIntent(ChatCompletionRequest request, String lastMessage) {
+        IntentResult result = new IntentResult();
+        String normalized = lastMessage.trim();
+        if (!startsWithContextReference(normalized)) {
+            return result;
+        }
+        List<ChatMessage> messages = request.getMessages();
+        for (int index = messages.size() - 2; index >= 0; index--) {
+            ChatMessage message = messages.get(index);
+            if (message != null && LagiGlobal.LLM_ROLE_USER.equals(message.getRole())
+                    && StrUtil.isNotBlank(message.getContent())) {
+                result.setStatus(IntentStatusEnum.CONTINUE.getName());
+                result.setContinuedIndex(index);
+                break;
+            }
+        }
+        return result;
+    }
+
+    private static boolean startsWithContextReference(String message) {
+        return message.startsWith("它")
+                || message.startsWith("他们")
+                || message.startsWith("她")
+                || message.startsWith("这个")
+                || message.startsWith("这些")
+                || message.startsWith("那些")
+                || message.startsWith("该")
+                || message.startsWith("其")
+                || message.startsWith("上述")
+                || message.startsWith("前面")
+                || message.startsWith("其中");
     }
 }

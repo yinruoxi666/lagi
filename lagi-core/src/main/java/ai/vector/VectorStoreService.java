@@ -423,7 +423,13 @@ public class VectorStoreService {
             contextRequest.setMessages(request.getMessages());
             contextRequest.setCategory(request.getCategory());
             ContextSearchQueryResolver.resolve(contextRequest, null);
-            IntentResult intentResult = intentService.detectIntent(contextRequest, request.getWhere());
+            IntentResult intentResult = null;
+            try {
+                intentResult = intentService.detectIntent(contextRequest, request.getWhere());
+            } catch (RuntimeException e) {
+                log.warn("Hybrid context intent detection failed; using deterministic fallback ({})",
+                        e.getClass().getSimpleName());
+            }
             request.setText(ContextSearchQueryResolver.resolve(contextRequest, intentResult));
         }
         HybridMetadataSearchEngine engine = new HybridMetadataSearchEngine(
