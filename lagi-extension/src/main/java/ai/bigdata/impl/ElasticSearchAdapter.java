@@ -38,6 +38,9 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Collections;
@@ -70,7 +73,9 @@ public class ElasticSearchAdapter implements IBigdata {
     public boolean upsert(TextIndexData data) {
         boolean result = false;
         try {
-            IndexResponse response = client.index(i -> i.index(data.getCategory()).id(data.getId()).document(data));
+            String indexName = toIndexName(data.getCategory());
+            ensureIndex(indexName);
+            IndexResponse response = client.index(i -> i.index(indexName).id(data.getId()).document(data));
             if (response.result().equals(Result.Created) || response.result().equals(Result.Updated)) {
                 result = true;
             }
@@ -78,6 +83,25 @@ public class ElasticSearchAdapter implements IBigdata {
             throw new RuntimeException(e);
         }
         return result;
+    }
+
+    private void ensureIndex(String indexName) throws IOException {
+        if (client.indices().exists(i -> i.index(indexName)).value()) {
+            return;
+        }
+        try {
+            client.indices().create(c -> c.index(indexName).mappings(m -> m
+                    .properties("id", p -> p.keyword(k -> k))
+                    .properties("category", p -> p.keyword(k -> k))
+                    .properties("text", p -> p.text(t -> t
+                            .analyzer("cjk")
+                            .searchAnalyzer("cjk")))));
+        } catch (ElasticsearchException e) {
+            // Another writer may create the same category index concurrently.
+            if (!client.indices().exists(i -> i.index(indexName)).value()) {
+                throw e;
+            }
+        }
     }
 
     @Override
@@ -91,11 +115,12 @@ public class ElasticSearchAdapter implements IBigdata {
         if (keyword == null || keyword.trim().isEmpty() || category == null || topK <= 0) {
             return TermSearchResponse.success(getBackendName(), Collections.emptyList(), Collections.emptyList());
         }
-        List<QueryKeywordScore> queryKeywords = analyzeQuery(keyword, category);
+        String indexName = toIndexName(category);
+        List<QueryKeywordScore> queryKeywords = analyzeQuery(keyword, category, indexName);
         // 检查索引是否存在
         BooleanResponse indexExistsResponse = null;
         try {
-            indexExistsResponse = client.indices().exists(i -> i.index(category));
+            indexExistsResponse = client.indices().exists(i -> i.index(indexName));
         } catch (IOException | ElasticsearchException e) {
             logger.error("Error while checking index existence", e);
             return TermSearchResponse.failure(getBackendName(), "index_check_failed");
@@ -107,7 +132,7 @@ public class ElasticSearchAdapter implements IBigdata {
         }
         SearchResponse<TextIndexData> searchResponse = null;
         try {
-            searchResponse = client.search(s -> s.index(category)
+            searchResponse = client.search(s -> s.index(indexName)
                     .size(topK)
                     .query(q -> q.bool(b -> b
                             .should(sq -> sq.match(m -> m.field("text").query(keyword)))
@@ -142,9 +167,9 @@ public class ElasticSearchAdapter implements IBigdata {
         return "elasticsearch";
     }
 
-    private List<QueryKeywordScore> analyzeQuery(String query, String category) {
+    private List<QueryKeywordScore> analyzeQuery(String query, String category, String indexName) {
         try {
-            Request request = new Request("POST", "/" + category + "/_termvectors");
+            Request request = new Request("POST", "/" + indexName + "/_termvectors");
             JsonObject body = new JsonObject();
             JsonObject document = new JsonObject();
             document.addProperty("text", query);
@@ -215,10 +240,11 @@ public class ElasticSearchAdapter implements IBigdata {
         if (category == null || ids == null || ids.isEmpty()) {
             return false;
         }
+        String indexName = toIndexName(category);
         try {
             BulkResponse response = client.bulk(b -> {
                 for (String id : ids) {
-                    b.operations(op -> op.delete(d -> d.index(category).id(id)));
+                    b.operations(op -> op.delete(d -> d.index(indexName).id(id)));
                 }
                 return b;
             });
@@ -240,11 +266,47 @@ public class ElasticSearchAdapter implements IBigdata {
     public boolean delete(String category) {
         boolean result = false;
         try {
-            DeleteIndexResponse response = client.indices().delete(i -> i.index(category));
+            DeleteIndexResponse response = client.indices().delete(i -> i.index(toIndexName(category)));
             result = response.acknowledged();
         } catch (IOException | ElasticsearchException e) {
             logger.error("Error while deleting", e);
         }
         return result;
+    }
+
+    /**
+     * Elasticsearch index names must be lowercase, while vector-store categories are
+     * case-sensitive and may contain uppercase characters. Keep a readable lowercase
+     * prefix and append a digest of the original category so case-only variants cannot
+     * collide.
+     */
+    static String toIndexName(String category) {
+        if (category == null || category.trim().isEmpty()) {
+            throw new IllegalArgumentException("category must not be blank");
+        }
+        String original = category.trim();
+        String readable = original.toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9_-]+", "-");
+        if (readable.isEmpty()) {
+            readable = "category";
+        }
+        if (readable.length() > 200) {
+            readable = readable.substring(0, 200);
+        }
+        return "lagi-" + readable + "-" + sha256Prefix(original);
+    }
+
+    private static String sha256Prefix(String value) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(16);
+            for (int i = 0; i < 8; i++) {
+                hex.append(String.format(Locale.ROOT, "%02x", digest[i] & 0xff));
+            }
+            return hex.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is unavailable", e);
+        }
     }
 }
