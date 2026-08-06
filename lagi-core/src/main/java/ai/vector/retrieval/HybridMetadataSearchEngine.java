@@ -18,21 +18,33 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static ai.vector.VectorStoreConstant.FileChunkSource.FILE_CHUNK_SOURCE_QA;
+
 /** Orchestrates dense recall, explainable BM25, weighted RRF and optional reranking. */
 public class HybridMetadataSearchEngine {
     private final DenseRetriever denseRetriever;
     private final SparseRetriever sparseRetriever;
     private final RecordResolver recordResolver;
     private final RerankProvider rerankProvider;
+    private final ResultTextResolver resultTextResolver;
 
     public HybridMetadataSearchEngine(DenseRetriever denseRetriever,
                                       SparseRetriever sparseRetriever,
                                       RecordResolver recordResolver,
                                       RerankProvider rerankProvider) {
+        this(denseRetriever, sparseRetriever, recordResolver, rerankProvider, null);
+    }
+
+    public HybridMetadataSearchEngine(DenseRetriever denseRetriever,
+                                      SparseRetriever sparseRetriever,
+                                      RecordResolver recordResolver,
+                                      RerankProvider rerankProvider,
+                                      ResultTextResolver resultTextResolver) {
         this.denseRetriever = Objects.requireNonNull(denseRetriever, "denseRetriever");
         this.sparseRetriever = Objects.requireNonNull(sparseRetriever, "sparseRetriever");
         this.recordResolver = Objects.requireNonNull(recordResolver, "recordResolver");
         this.rerankProvider = rerankProvider;
+        this.resultTextResolver = resultTextResolver;
     }
 
     public HybridMetadataSearchResponse search(HybridMetadataSearchRequest request, String defaultCategory) {
@@ -87,8 +99,9 @@ public class HybridMetadataSearchEngine {
                 denseRecords, filteredSparseHits, sparseRecordsById,
                 rrfK, denseWeight, bm25Weight, fusionTopK);
         List<HybridMetadataSearchResult> results = fused.stream()
-                .map(this::toExplainableResult)
+                .map(result -> toExplainableResult(result, category))
                 .collect(Collectors.toList());
+        results = deduplicateQaResults(results);
 
         String rerankStatus = "skipped";
         if ((request.getRerank() == null || request.getRerank())
@@ -116,7 +129,23 @@ public class HybridMetadataSearchEngine {
                 .build();
     }
 
-    private HybridMetadataSearchResult toExplainableResult(HybridSearchResult result) {
+    private List<HybridMetadataSearchResult> deduplicateQaResults(
+            List<HybridMetadataSearchResult> results) {
+        Set<String> seenQaTexts = new HashSet<>();
+        return results.stream()
+                .filter(result -> !isQaResult(result)
+                        || result.getText() == null
+                        || seenQaTexts.add(result.getText()))
+                .collect(Collectors.toList());
+    }
+
+    private boolean isQaResult(HybridMetadataSearchResult result) {
+        return result != null && result.getMetadata() != null
+                && FILE_CHUNK_SOURCE_QA.equals(
+                        String.valueOf(result.getMetadata().get("source")));
+    }
+
+    private HybridMetadataSearchResult toExplainableResult(HybridSearchResult result, String category) {
         HybridMetadataSearchResult.Bm25Evidence bm25 = result.getSparseRank() == null ? null
                 : HybridMetadataSearchResult.Bm25Evidence.builder()
                 .score(result.getTermScore())
@@ -128,9 +157,14 @@ public class HybridMetadataSearchEngine {
                 .distance(result.getDistance())
                 .rank(result.getDenseRank())
                 .build();
+        String text = result.getDocument();
+        if (resultTextResolver != null) {
+            text = resultTextResolver.resolve(
+                    result.getId(), text, result.getMetadata(), category);
+        }
         return HybridMetadataSearchResult.builder()
                 .id(result.getId())
-                .text(result.getDocument())
+                .text(text)
                 .metadata(result.getMetadata())
                 .hybridScore(result.getFusionScore())
                 .bm25(bm25)
@@ -219,6 +253,10 @@ public class HybridMetadataSearchEngine {
 
     public interface RerankProvider {
         List<RerankOutcome> rerank(String query, String model, List<String> documents);
+    }
+
+    public interface ResultTextResolver {
+        String resolve(String id, String text, Map<String, Object> metadata, String category);
     }
 
     public static class RerankOutcome {
