@@ -8,17 +8,13 @@ import ai.common.utils.FileUtils;
 import ai.common.utils.ThreadPoolManager;
 import ai.embedding.impl.QwenEmbeddings;
 import ai.intent.IntentService;
-import ai.intent.enums.IntentStatusEnum;
 import ai.intent.impl.SampleIntentServiceImpl;
 import ai.intent.pojo.IntentResult;
 import ai.manager.VectorStoreManager;
 import ai.openai.pojo.ChatCompletionRequest;
-import ai.openai.pojo.ChatMessage;
 import ai.rerank.pojo.RerankRequest;
 import ai.rerank.pojo.RerankResponse;
 import ai.rerank.service.RerankService;
-import ai.utils.LagiGlobal;
-import ai.utils.StoppingWordUtil;
 import ai.utils.qa.ChatCompletionUtil;
 import ai.vector.impl.BaseVectorStore;
 import ai.vector.loader.DocumentLoader;
@@ -26,6 +22,7 @@ import ai.vector.loader.impl.*;
 import ai.vector.loader.pojo.SplitConfig;
 import ai.vector.loader.util.DocQaExtractor;
 import ai.vector.pojo.*;
+import ai.vector.retrieval.ContextSearchQueryResolver;
 import ai.vector.retrieval.HybridMetadataSearchEngine;
 import ai.vector.retrieval.ReciprocalRankFusion;
 import cn.hutool.core.bean.BeanUtil;
@@ -420,6 +417,15 @@ public class VectorStoreService {
     }
 
     public HybridMetadataSearchResponse hybridSearchByMetadata(HybridMetadataSearchRequest request) {
+        if (request != null && StrUtil.isBlank(request.getText())) {
+            ChatCompletionRequest contextRequest = new ChatCompletionRequest();
+            contextRequest.setMax_tokens(4096);
+            contextRequest.setMessages(request.getMessages());
+            contextRequest.setCategory(request.getCategory());
+            ContextSearchQueryResolver.resolve(contextRequest, null);
+            IntentResult intentResult = intentService.detectIntent(contextRequest, request.getWhere());
+            request.setText(ContextSearchQueryResolver.resolve(contextRequest, intentResult));
+        }
         HybridMetadataSearchEngine engine = new HybridMetadataSearchEngine(
                 (query, category, where, whereDocument, topK) -> vectorStore.query(
                         QueryCondition.builder()
@@ -678,36 +684,12 @@ public class VectorStoreService {
     }
 
     public List<IndexSearchData> searchByContext(ChatCompletionRequest request, Map<String, Object> where) {
-        List<ChatMessage> messages = request.getMessages();
         log.info("intent detect start");
         IntentResult intentResult = intentService.detectIntent(request, where);
         if (intentResult.getIndexSearchDataList() != null) {
             return intentResult.getIndexSearchDataList();
         }
-        String question = null;
-        if (intentResult.getStatus() != null && intentResult.getStatus().equals(IntentStatusEnum.CONTINUE.getName())) {
-            if (intentResult.getContinuedIndex() != null) {
-                ChatMessage chatMessage = messages.get(intentResult.getContinuedIndex());
-                String content = chatMessage.getContent();
-                String[] split = content.split("[， ,.。！!?？]");
-                String source = Arrays.stream(split).filter(StoppingWordUtil::containsStoppingWorlds).findAny().orElse("");
-                if (StrUtil.isBlank(source)) {
-                    source = content;
-                }
-                if (chatMessage.getRole().equals(LagiGlobal.LLM_ROLE_SYSTEM)) {
-                    source = "";
-                }
-                question = source + ChatCompletionUtil.getLastMessage(request);
-            } else {
-                List<ChatMessage> userMessages = messages.stream().filter(m -> m.getRole().equals("user")).collect(Collectors.toList());
-                if (userMessages.size() > 1) {
-                    question = userMessages.get(userMessages.size() - 2).getContent().trim();
-                }
-            }
-        }
-        if (question == null) {
-            question = ChatCompletionUtil.getLastMessage(request);
-        }
+        String question = ContextSearchQueryResolver.resolve(request, intentResult);
         // fix invalid conditional query
         return search(question, where, request.getCategory());
     }

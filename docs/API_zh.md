@@ -1676,9 +1676,13 @@ POST /v1/vector/hybridSearchByMetadata
 }
 ```
 
+`text` 用于直接提交一条独立检索问题。`text` 为空时可提交 OpenAI 风格的
+`messages` 上下文（兼容字段名 `message`）；接口沿用 `searchByMetadata` 的
+上下文意图机制归纳实际检索 Query，并在响应的 `data.query` 中返回。`text`
+非空时优先使用 `text`，不会改写已有调用方的单句检索行为。
+
 响应中的 `query_keywords` 是 Query 关键词的 TF/DF 权重；每个结果中的
 `bm25.score` 是文档级 Elasticsearch BM25 原始分数。`hybrid_score` 是
 Weighted RRF 综合召回分数，`embedding.distance` 是向量库原始距离，
 `rerank` 包含最终重排排名及 provider 实际返回的分数。Rerank provider
 不返回分数时，`score` 为 `null`。
-

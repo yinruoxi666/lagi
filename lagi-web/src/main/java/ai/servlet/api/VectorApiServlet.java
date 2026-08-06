@@ -267,16 +267,6 @@ public class VectorApiServlet extends BaseServlet {
         resp.setContentType("application/json;charset=utf-8");
         HybridMetadataSearchRequest request = objectMapper.readValue(
                 requestToJson(req), HybridMetadataSearchRequest.class);
-        if (request != null && StrUtil.isBlank(request.getText()) && request.getMessages() != null) {
-            for (int i = request.getMessages().size() - 1; i >= 0; i--) {
-                if (request.getMessages().get(i) != null
-                        && "user".equals(request.getMessages().get(i).getRole())
-                        && StrUtil.isNotBlank(request.getMessages().get(i).getContent())) {
-                    request.setText(request.getMessages().get(i).getContent());
-                    break;
-                }
-            }
-        }
         HybridMetadataSearchResponse response = vectorStoreService.hybridSearchByMetadata(request);
         Map<String, Object> result = new HashMap<>();
         result.put("status", "success");

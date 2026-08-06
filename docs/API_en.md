@@ -1657,8 +1657,13 @@ This endpoint runs embedding and Elasticsearch BM25 recall under the same
 metadata constraints, fuses candidates with weighted RRF, and optionally
 reranks them. The existing `/v1/vector/searchByMetadata` contract is unchanged.
 
+Use `text` for one standalone retrieval question. When `text` is empty, callers
+may provide OpenAI-style `messages` context (the singular `message` field name is
+also accepted). The endpoint reuses the context-intent behavior of
+`searchByMetadata` to derive the effective retrieval query and returns it as
+`data.query`. A non-empty `text` always takes precedence.
+
 `query_keywords` contains query-side TF/DF weights. Each result keeps its raw
 document-level BM25 score, embedding distance, weighted-RRF `hybrid_score`, and
 rerank rank/score. When the rerank provider does not expose a relevance score,
 the score is `null` rather than synthesized.
-

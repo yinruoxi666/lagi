@@ -1,6 +1,7 @@
 package ai.vector.pojo;
 
 import ai.openai.pojo.ChatMessage;
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -17,6 +18,7 @@ import java.util.Map;
 public class HybridMetadataSearchRequest {
     private String category;
     private String text;
+    @JsonAlias("message")
     private List<ChatMessage> messages;
     private Map<String, Object> where;
     @JsonProperty("where_document")
