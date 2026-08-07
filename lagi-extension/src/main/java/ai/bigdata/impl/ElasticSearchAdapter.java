@@ -50,6 +50,7 @@ import java.util.Map;
 
 
 public class ElasticSearchAdapter implements IBigdata {
+    private static final String QUERY_ANALYZER = "smartcn";
     private final ElasticsearchClient client;
     private final RestClient restClient;
     private static final Logger logger = LoggerFactory.getLogger(ElasticSearchAdapter.class);
@@ -135,8 +136,10 @@ public class ElasticSearchAdapter implements IBigdata {
             searchResponse = client.search(s -> s.index(indexName)
                     .size(topK)
                     .query(q -> q.bool(b -> b
-                            .should(sq -> sq.match(m -> m.field("text").query(keyword)))
-                            .should(sq -> sq.matchPhrase(m -> m.field("text").query(keyword).boost(2.0f)))
+                            .should(sq -> sq.match(m -> m.field("text").query(keyword)
+                                    .analyzer(QUERY_ANALYZER)))
+                            .should(sq -> sq.matchPhrase(m -> m.field("text").query(keyword)
+                                    .analyzer(QUERY_ANALYZER).boost(2.0f)))
                             .minimumShouldMatch("1"))), TextIndexData.class);
         } catch (IOException | ElasticsearchException e) {
             logger.error("Error while searching", e);
@@ -177,6 +180,9 @@ public class ElasticSearchAdapter implements IBigdata {
             com.google.gson.JsonArray fields = new com.google.gson.JsonArray();
             fields.add("text");
             body.add("fields", fields);
+            JsonObject perFieldAnalyzer = new JsonObject();
+            perFieldAnalyzer.addProperty("text", QUERY_ANALYZER);
+            body.add("per_field_analyzer", perFieldAnalyzer);
             body.addProperty("term_statistics", true);
             body.addProperty("field_statistics", true);
             body.addProperty("positions", false);
