@@ -50,7 +50,9 @@ import java.util.Map;
 
 
 public class ElasticSearchAdapter implements IBigdata {
-    private static final String QUERY_ANALYZER = "smartcn";
+
+    private static final String INDEX_ANALYZER = "ik_max_word";
+    private static final String QUERY_ANALYZER = "ik_smart";
     private final ElasticsearchClient client;
     private final RestClient restClient;
     private static final Logger logger = LoggerFactory.getLogger(ElasticSearchAdapter.class);
@@ -95,7 +97,7 @@ public class ElasticSearchAdapter implements IBigdata {
                     .properties("id", p -> p.keyword(k -> k))
                     .properties("category", p -> p.keyword(k -> k))
                     .properties("text", p -> p.text(t -> t
-                            .analyzer(QUERY_ANALYZER)
+                            .analyzer(INDEX_ANALYZER)
                             .searchAnalyzer(QUERY_ANALYZER)))));
         } catch (ElasticsearchException e) {
             // Another writer may create the same category index concurrently.
@@ -206,6 +208,9 @@ public class ElasticSearchAdapter implements IBigdata {
                             ? statistics.get("term_freq").getAsInt() : 1;
                     long documentFrequency = statistics.has("doc_freq")
                             ? statistics.get("doc_freq").getAsLong() : 0L;
+                    if (documentFrequency <= 0L) {
+                        continue;
+                    }
                     double idf = Math.log(1.0d + (Math.max(0L, documentCount - documentFrequency) + 0.5d)
                             / (documentFrequency + 0.5d));
                     result.add(QueryKeywordScore.builder()
