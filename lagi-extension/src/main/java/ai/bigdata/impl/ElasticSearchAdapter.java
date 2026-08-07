@@ -95,8 +95,8 @@ public class ElasticSearchAdapter implements IBigdata {
                     .properties("id", p -> p.keyword(k -> k))
                     .properties("category", p -> p.keyword(k -> k))
                     .properties("text", p -> p.text(t -> t
-                            .analyzer("cjk")
-                            .searchAnalyzer("cjk")))));
+                            .analyzer(QUERY_ANALYZER)
+                            .searchAnalyzer(QUERY_ANALYZER)))));
         } catch (ElasticsearchException e) {
             // Another writer may create the same category index concurrently.
             if (!client.indices().exists(i -> i.index(indexName)).value()) {
