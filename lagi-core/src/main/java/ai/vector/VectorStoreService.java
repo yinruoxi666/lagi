@@ -24,6 +24,7 @@ import ai.vector.loader.util.DocQaExtractor;
 import ai.vector.pojo.*;
 import ai.vector.retrieval.ContextSearchQueryResolver;
 import ai.vector.retrieval.HybridMetadataSearchEngine;
+import ai.vector.retrieval.QaPairTextAssembler;
 import ai.vector.retrieval.ReciprocalRankFusion;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
@@ -465,8 +466,38 @@ public class VectorStoreService {
                         }
                     }
                     return outcomes;
-                });
+                },
+                this::assembleHybridQaText);
         return engine.search(request, vectorStore.getConfig().getDefaultCategory());
+    }
+
+    private String assembleHybridQaText(String id, String text, Map<String, Object> metadata,
+                                        String category) {
+        try {
+            return QaPairTextAssembler.assemble(id, text, metadata, category,
+                    new QaPairTextAssembler.PairLookup() {
+                        @Override
+                        public IndexRecord findById(String recordId, String recordCategory) {
+                            return fetch(recordId, recordCategory);
+                        }
+
+                        @Override
+                        public List<IndexRecord> findByParentId(String parentId,
+                                                                String recordCategory) {
+                            Map<String, Object> where = new HashMap<>();
+                            where.put("parent_id", parentId);
+                            where.put("source", FILE_CHUNK_SOURCE_QA);
+                            return vectorStore.get(GetEmbedding.builder()
+                                    .category(recordCategory)
+                                    .where(buildAndQueryCondition(where))
+                                    .build());
+                        }
+                    });
+        } catch (RuntimeException e) {
+            log.warn("Failed to assemble hybrid QA text for id {} ({})",
+                    id, e.getClass().getSimpleName());
+            return text;
+        }
     }
 
     public List<HybridSearchResult> hybridQuery(HybridQueryRequest request) {

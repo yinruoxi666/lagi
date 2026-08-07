@@ -13,6 +13,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -53,6 +54,69 @@ class HybridMetadataSearchEngineTest {
         assertEquals(Integer.valueOf(1), response.getResults().get(0).getRerank().getRank());
         assertTrue(response.getResults().stream()
                 .allMatch(result -> result.getRerank().getScore() == null));
+    }
+
+    @Test
+    void resolvesQaTextBeforeReranking() {
+        Map<String, Object> qaMetadata = new HashMap<>();
+        qaMetadata.put("source", "qa");
+        qaMetadata.put("parent_id", "");
+        IndexRecord question = IndexRecord.builder().id("q-1").document("机场行李限额")
+                .metadata(qaMetadata).distance(0.10f).build();
+        IndexRecord ordinary = IndexRecord.builder().id("doc-1").document("普通文档")
+                .metadata(Collections.emptyMap()).distance(0.20f).build();
+        AtomicReference<List<String>> rerankDocuments = new AtomicReference<>();
+        HybridMetadataSearchEngine engine = new HybridMetadataSearchEngine(
+                (query, category, where, whereDocument, topK) -> Arrays.asList(question, ordinary),
+                (query, category, topK) -> TermSearchResponse.success(
+                        "elasticsearch", Collections.emptyList(), Collections.emptyList()),
+                (ids, category, where, whereDocument) -> Collections.emptyList(),
+                (query, model, documents) -> {
+                    rerankDocuments.set(documents);
+                    return Arrays.asList(
+                            new HybridMetadataSearchEngine.RerankOutcome(0, 0.9d),
+                            new HybridMetadataSearchEngine.RerankOutcome(1, 0.8d));
+                },
+                (id, text, metadata, category) -> "qa".equals(metadata.get("source"))
+                        ? text + "$$$行李箱限额需要咨询柜台" : text);
+
+        HybridMetadataSearchResponse response = engine.search(request(), "default");
+
+        assertEquals("机场行李限额$$$行李箱限额需要咨询柜台",
+                response.getResults().get(0).getText());
+        assertEquals("机场行李限额$$$行李箱限额需要咨询柜台",
+                rerankDocuments.get().get(0));
+    }
+
+    @Test
+    void deduplicatesQuestionAndAnswerAfterQaAssembly() {
+        Map<String, Object> questionMetadata = new HashMap<>();
+        questionMetadata.put("source", "qa");
+        questionMetadata.put("parent_id", "");
+        Map<String, Object> answerMetadata = new HashMap<>();
+        answerMetadata.put("source", "qa");
+        answerMetadata.put("parent_id", "q-1");
+        IndexRecord question = IndexRecord.builder().id("q-1").document("机场行李限额")
+                .metadata(questionMetadata).distance(0.10f).build();
+        IndexRecord answer = IndexRecord.builder().id("a-1").document("行李箱限额需要咨询柜台")
+                .metadata(answerMetadata).distance(0.20f).build();
+        HybridMetadataSearchEngine engine = new HybridMetadataSearchEngine(
+                (query, category, where, whereDocument, topK) -> Arrays.asList(question, answer),
+                (query, category, topK) -> TermSearchResponse.success(
+                        "elasticsearch", Collections.emptyList(), Collections.emptyList()),
+                (ids, category, where, whereDocument) -> Collections.emptyList(),
+                null,
+                (id, text, metadata, category) ->
+                        "机场行李限额$$$行李箱限额需要咨询柜台");
+        HybridMetadataSearchRequest request = request();
+        request.setRerank(false);
+
+        HybridMetadataSearchResponse response = engine.search(request, "default");
+
+        assertEquals(1, response.getResults().size());
+        assertEquals("q-1", response.getResults().get(0).getId());
+        assertEquals("机场行李限额$$$行李箱限额需要咨询柜台",
+                response.getResults().get(0).getText());
     }
 
     private static HybridMetadataSearchEngine engine(Map<String, IndexRecord> records,
