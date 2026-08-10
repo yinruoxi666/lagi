@@ -13,6 +13,8 @@ import java.util.List;
 @Data
 public class ModelFunctions {
     private List<EmbeddingConfig> embedding;
+    @JsonProperty("rerank")
+    private RerankConfig rerank;
     @JsonProperty("chat")
     private ModelFunction chat;
     @JsonProperty("speech2text")
@@ -57,6 +59,7 @@ public class ModelFunctions {
     @JsonCreator
     public ModelFunctions(
             @JsonProperty("embedding") List<EmbeddingConfig> embedding,
+            @JsonProperty("rerank") RerankConfig rerank,
             @JsonProperty("chat") ModelFunction chat,
             @JsonProperty("speech2text") List<Backend> speech2text,
             @JsonProperty("text2speech") List<Backend> text2speech,
@@ -79,6 +82,7 @@ public class ModelFunctions {
             @JsonProperty("text2qa") Backend text2qa
     ) {
         this.embedding = embedding;
+        this.rerank = rerank;
         this.chat = chat;
         this.speech2text = speech2text;
         this.text2speech = text2speech;

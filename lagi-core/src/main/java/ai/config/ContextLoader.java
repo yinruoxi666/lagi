@@ -73,6 +73,12 @@ public class ContextLoader {
         throw new ClassNotFoundException("Class " + className + " not found.");
     }
 
+    public static void registerExtensionLoadableClass(String className) {
+        if (className != null && !className.trim().isEmpty()) {
+            EXTENSION_LOADABLE_CLASS_NAMES.add(className.trim());
+        }
+    }
+
 
     private static void loadContextByInputStream(InputStream inputStream, String extensionJarFolder) {
         ObjectMapper mapper = new YAMLMapper();
