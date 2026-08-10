@@ -60,6 +60,7 @@ public class GlobalConfigurations extends AbstractConfiguration {
         initCascadeApiAddress();
         validateChatBackends();
         EmbeddingManager.getInstance().register(functions.getEmbedding());
+        RerankManager.getInstance().initialize(functions.getRerank());
         BigdataManager.getInstance().register(stores.getBigdata());
         OSSManager.getInstance().register(stores.getOss());
         VectorStoreManager.getInstance().register(stores.getVectors(), stores.getRag(), functions.getEmbedding());

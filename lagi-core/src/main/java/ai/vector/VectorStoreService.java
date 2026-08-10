@@ -2,19 +2,19 @@ package ai.vector;
 
 import ai.bigdata.BigdataService;
 import ai.bigdata.pojo.TextIndexData;
+import ai.bigdata.pojo.TermSearchHit;
 import ai.common.pojo.*;
 import ai.common.utils.FileUtils;
 import ai.common.utils.ThreadPoolManager;
 import ai.embedding.impl.QwenEmbeddings;
 import ai.intent.IntentService;
-import ai.intent.enums.IntentStatusEnum;
 import ai.intent.impl.SampleIntentServiceImpl;
 import ai.intent.pojo.IntentResult;
 import ai.manager.VectorStoreManager;
 import ai.openai.pojo.ChatCompletionRequest;
-import ai.openai.pojo.ChatMessage;
-import ai.utils.LagiGlobal;
-import ai.utils.StoppingWordUtil;
+import ai.rerank.pojo.RerankRequest;
+import ai.rerank.pojo.RerankResponse;
+import ai.rerank.service.RerankService;
 import ai.utils.qa.ChatCompletionUtil;
 import ai.vector.impl.BaseVectorStore;
 import ai.vector.loader.DocumentLoader;
@@ -22,6 +22,10 @@ import ai.vector.loader.impl.*;
 import ai.vector.loader.pojo.SplitConfig;
 import ai.vector.loader.util.DocQaExtractor;
 import ai.vector.pojo.*;
+import ai.vector.retrieval.ContextSearchQueryResolver;
+import ai.vector.retrieval.HybridMetadataSearchEngine;
+import ai.vector.retrieval.QaPairTextAssembler;
+import ai.vector.retrieval.ReciprocalRankFusion;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -68,6 +72,7 @@ public class VectorStoreService {
 
     private final IntentService intentService = new SampleIntentServiceImpl();
     private final BigdataService bigdataService = new BigdataService();
+    private final RerankService rerankService = new RerankService();
     private static final VectorCache vectorCache = VectorCache.getInstance();
 
     public VectorStoreService() {
@@ -398,18 +403,215 @@ public class VectorStoreService {
     }
 
     public void upsert(List<UpsertRecord> upsertRecords, String category) {
-        for (UpsertRecord upsertRecord : upsertRecords) {
-            TextIndexData data = new TextIndexData();
-            data.setId(upsertRecord.getId());
-            data.setText(upsertRecord.getDocument());
-            data.setCategory(category);
-            bigdataService.upsert(data);
+        if (upsertRecords == null || upsertRecords.isEmpty()) {
+            return;
         }
+        category = resolveCategory(category);
         this.vectorStore.upsert(upsertRecords, category);
+        for (UpsertRecord upsertRecord : upsertRecords) {
+            syncTermUpsert(upsertRecord.getId(), upsertRecord.getDocument(), category);
+        }
     }
 
     public List<IndexRecord> query(QueryCondition queryCondition) {
         return this.vectorStore.query(queryCondition);
+    }
+
+    public HybridMetadataSearchResponse hybridSearchByMetadata(HybridMetadataSearchRequest request) {
+        if (request != null && StrUtil.isBlank(request.getText())) {
+            ChatCompletionRequest contextRequest = new ChatCompletionRequest();
+            contextRequest.setMax_tokens(4096);
+            contextRequest.setMessages(request.getMessages());
+            contextRequest.setCategory(request.getCategory());
+            ContextSearchQueryResolver.resolve(contextRequest, null);
+            IntentResult intentResult = null;
+            try {
+                intentResult = intentService.detectIntent(contextRequest, request.getWhere());
+            } catch (RuntimeException e) {
+                log.warn("Hybrid context intent detection failed; using deterministic fallback ({})",
+                        e.getClass().getSimpleName());
+            }
+            request.setText(ContextSearchQueryResolver.resolve(contextRequest, intentResult));
+        }
+        HybridMetadataSearchEngine engine = new HybridMetadataSearchEngine(
+                (query, category, where, whereDocument, topK) -> vectorStore.query(
+                        QueryCondition.builder()
+                                .category(category)
+                                .text(query)
+                                .where(where)
+                                .whereDocument(whereDocument)
+                                .n(topK)
+                                .build()),
+                bigdataService::searchDetailed,
+                (ids, category, where, whereDocument) -> vectorStore.get(
+                        GetEmbedding.builder()
+                                .category(category)
+                                .ids(ids)
+                                .where(where)
+                                .whereDocument(whereDocument)
+                                .build()),
+                (query, model, documents) -> {
+                    RerankResponse response = rerankService.rerank(RerankRequest.builder()
+                            .query(query)
+                            .model(model)
+                            .documents(documents)
+                            .build());
+                    List<HybridMetadataSearchEngine.RerankOutcome> outcomes = new ArrayList<>();
+                    if (response != null && response.getResults() != null) {
+                        for (RerankResponse.RerankResult result : response.getResults()) {
+                            if (result.getIndex() != null) {
+                                outcomes.add(new HybridMetadataSearchEngine.RerankOutcome(
+                                        result.getIndex(), result.getRelevanceScore()));
+                            }
+                        }
+                    }
+                    return outcomes;
+                },
+                this::assembleHybridQaText);
+        return engine.search(request, vectorStore.getConfig().getDefaultCategory());
+    }
+
+    private String assembleHybridQaText(String id, String text, Map<String, Object> metadata,
+                                        String category) {
+        try {
+            return QaPairTextAssembler.assemble(id, text, metadata, category,
+                    new QaPairTextAssembler.PairLookup() {
+                        @Override
+                        public IndexRecord findById(String recordId, String recordCategory) {
+                            return fetch(recordId, recordCategory);
+                        }
+
+                        @Override
+                        public List<IndexRecord> findByParentId(String parentId,
+                                                                String recordCategory) {
+                            Map<String, Object> where = new HashMap<>();
+                            where.put("parent_id", parentId);
+                            where.put("source", FILE_CHUNK_SOURCE_QA);
+                            return vectorStore.get(GetEmbedding.builder()
+                                    .category(recordCategory)
+                                    .where(buildAndQueryCondition(where))
+                                    .build());
+                        }
+                    });
+        } catch (RuntimeException e) {
+            log.warn("Failed to assemble hybrid QA text for id {} ({})",
+                    id, e.getClass().getSimpleName());
+            return text;
+        }
+    }
+
+    public List<HybridSearchResult> hybridQuery(HybridQueryRequest request) {
+        if (request == null || StrUtil.isBlank(request.getText())) {
+            throw new IllegalArgumentException("Hybrid query text is required");
+        }
+        String category = resolveCategory(request.getCategory());
+        int denseTopK = normalizeLimit(request.getDenseTopK(), 20, 1000);
+        int sparseTopK = normalizeLimit(request.getSparseTopK(), 20, 1000);
+        int fusionTopK = normalizeLimit(request.getFusionTopK(), 50, 1000);
+        int finalTopK = normalizeLimit(request.getFinalTopK(), 10, fusionTopK);
+        int rrfK = normalizeLimit(request.getRrfK(), 60, 10000);
+        double denseWeight = normalizeWeight(request.getDenseWeight(), 1.0d);
+        double sparseWeight = normalizeWeight(request.getSparseWeight(), 1.0d);
+
+        QueryCondition denseQuery = QueryCondition.builder()
+                .category(category)
+                .text(request.getText())
+                .where(request.getWhere())
+                .whereDocument(request.getWhereDocument())
+                .n(denseTopK)
+                .build();
+        List<IndexRecord> denseRecords = this.vectorStore.query(denseQuery);
+        if (denseRecords == null) {
+            denseRecords = Collections.emptyList();
+        }
+
+        int sparseCandidateLimit = Math.min(1000, sparseTopK * 5);
+        List<TermSearchHit> sparseCandidates = bigdataService.search(
+                request.getText(), category, sparseCandidateLimit);
+        List<TermSearchHit> sparseHits = new ArrayList<>();
+        Map<String, IndexRecord> recordsById = new HashMap<>();
+        if (sparseCandidates != null && !sparseCandidates.isEmpty()) {
+            List<String> sparseIds = sparseCandidates.stream()
+                    .map(TermSearchHit::getId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+            GetEmbedding getEmbedding = GetEmbedding.builder()
+                    .category(category)
+                    .ids(sparseIds)
+                    .where(request.getWhere())
+                    .whereDocument(request.getWhereDocument())
+                    .build();
+            List<IndexRecord> sparseRecords = this.vectorStore.get(getEmbedding);
+            if (sparseRecords != null) {
+                for (IndexRecord record : sparseRecords) {
+                    if (record != null && record.getId() != null) {
+                        recordsById.put(record.getId(), record);
+                    }
+                }
+            }
+            for (TermSearchHit candidate : sparseCandidates) {
+                if (recordsById.containsKey(candidate.getId())) {
+                    candidate.setRank(sparseHits.size() + 1);
+                    sparseHits.add(candidate);
+                    if (sparseHits.size() >= sparseTopK) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        List<HybridSearchResult> fused = ReciprocalRankFusion.fuse(
+                denseRecords, sparseHits, recordsById, rrfK, denseWeight, sparseWeight, fusionTopK);
+        if (request.getRerank() == null || request.getRerank()) {
+            fused = rerankHybridResults(request.getText(), request.getRerankModel(), fused);
+        }
+        return fused.size() > finalTopK
+                ? new ArrayList<>(fused.subList(0, finalTopK)) : fused;
+    }
+
+    private List<HybridSearchResult> rerankHybridResults(String query, String model,
+                                                          List<HybridSearchResult> candidates) {
+        if (candidates == null || candidates.size() < 2) {
+            return candidates;
+        }
+        List<String> documents = candidates.stream()
+                .map(result -> result.getDocument() == null ? "" : result.getDocument())
+                .collect(Collectors.toList());
+        RerankRequest rerankRequest = RerankRequest.builder()
+                .model(model)
+                .query(query)
+                .documents(documents)
+                .build();
+        RerankResponse response = rerankService.rerank(rerankRequest);
+        List<HybridSearchResult> reranked = new ArrayList<>();
+        if (response != null && response.getResults() != null) {
+            for (RerankResponse.RerankResult result : response.getResults()) {
+                Integer index = result.getIndex();
+                if (index != null && index >= 0 && index < candidates.size()) {
+                    HybridSearchResult candidate = candidates.get(index);
+                    candidate.setRerankScore(result.getRelevanceScore());
+                    reranked.add(candidate);
+                }
+            }
+        }
+        return reranked.isEmpty() ? candidates : reranked;
+    }
+
+    private int normalizeLimit(Integer value, int defaultValue, int maxValue) {
+        if (value == null) {
+            return Math.min(defaultValue, maxValue);
+        }
+        return Math.max(1, Math.min(value, maxValue));
+    }
+
+    private double normalizeWeight(Double value, double defaultValue) {
+        if (value == null) {
+            return defaultValue;
+        }
+        if (value < 0.0d || value.isNaN() || value.isInfinite()) {
+            throw new IllegalArgumentException("Hybrid retrieval weights must be finite and non-negative");
+        }
+        return value;
     }
 
     public List<List<IndexRecord>> query(MultiQueryCondition queryCondition) {
@@ -456,23 +658,44 @@ public class VectorStoreService {
     }
 
     public void delete(List<String> ids) {
-        this.vectorStore.delete(ids);
+        this.delete(ids, vectorStore.getConfig().getDefaultCategory());
     }
 
     public void delete(List<String> ids, String category) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        category = resolveCategory(category);
         this.vectorStore.delete(ids, category);
+        syncTermDelete(category, ids);
     }
 
     public void deleteWhere(List<Map<String, String>> whereList) {
-        this.vectorStore.deleteWhere(whereList);
+        this.deleteWhere(whereList, vectorStore.getConfig().getDefaultCategory());
     }
 
     public void deleteWhere(List<Map<String, String>> whereList, String category) {
+        if (whereList == null || whereList.isEmpty()) {
+            return;
+        }
+        category = resolveCategory(category);
+        Set<String> ids = new LinkedHashSet<>();
+        for (Map<String, String> where : whereList) {
+            List<IndexRecord> records = this.vectorStore.fetch(where, category);
+            if (records != null) {
+                records.stream().map(IndexRecord::getId).filter(Objects::nonNull).forEach(ids::add);
+            }
+        }
         this.vectorStore.deleteWhere(whereList, category);
+        syncTermDelete(category, new ArrayList<>(ids));
     }
 
     public void deleteCollection(String category) {
+        category = resolveCategory(category);
         this.vectorStore.deleteCollection(category);
+        if (bigdataService.isAvailable() && !bigdataService.delete(category)) {
+            throw new IllegalStateException("Failed to delete term index category " + category);
+        }
     }
 
     public List<IndexSearchData> searchByIds(List<String> ids, String category) {
@@ -498,36 +721,12 @@ public class VectorStoreService {
     }
 
     public List<IndexSearchData> searchByContext(ChatCompletionRequest request, Map<String, Object> where) {
-        List<ChatMessage> messages = request.getMessages();
         log.info("intent detect start");
         IntentResult intentResult = intentService.detectIntent(request, where);
         if (intentResult.getIndexSearchDataList() != null) {
             return intentResult.getIndexSearchDataList();
         }
-        String question = null;
-        if (intentResult.getStatus() != null && intentResult.getStatus().equals(IntentStatusEnum.CONTINUE.getName())) {
-            if (intentResult.getContinuedIndex() != null) {
-                ChatMessage chatMessage = messages.get(intentResult.getContinuedIndex());
-                String content = chatMessage.getContent();
-                String[] split = content.split("[， ,.。！!?？]");
-                String source = Arrays.stream(split).filter(StoppingWordUtil::containsStoppingWorlds).findAny().orElse("");
-                if (StrUtil.isBlank(source)) {
-                    source = content;
-                }
-                if (chatMessage.getRole().equals(LagiGlobal.LLM_ROLE_SYSTEM)) {
-                    source = "";
-                }
-                question = source + ChatCompletionUtil.getLastMessage(request);
-            } else {
-                List<ChatMessage> userMessages = messages.stream().filter(m -> m.getRole().equals("user")).collect(Collectors.toList());
-                if (userMessages.size() > 1) {
-                    question = userMessages.get(userMessages.size() - 2).getContent().trim();
-                }
-            }
-        }
-        if (question == null) {
-            question = ChatCompletionUtil.getLastMessage(request);
-        }
+        String question = ContextSearchQueryResolver.resolve(request, intentResult);
         // fix invalid conditional query
         return search(question, where, request.getCategory());
     }
@@ -865,15 +1064,84 @@ public class VectorStoreService {
     }
 
     public void add(AddEmbedding addEmbedding) {
+        if (addEmbedding == null || addEmbedding.getData() == null || addEmbedding.getData().isEmpty()) {
+            return;
+        }
+        String category = resolveCategory(addEmbedding.getCategory());
+        addEmbedding.setCategory(category);
+        for (AddEmbedding.AddEmbeddingData data : addEmbedding.getData()) {
+            if (data.getId() == null || data.getId().isEmpty()) {
+                data.setId(UUID.randomUUID().toString().replace("-", ""));
+            }
+            syncTermUpsert(data.getId(), data.getDocument(), category);
+        }
         this.vectorStore.add(addEmbedding);
     }
 
     public void update(UpdateEmbedding updateEmbedding) {
+        if (updateEmbedding == null || updateEmbedding.getData() == null || updateEmbedding.getData().isEmpty()) {
+            return;
+        }
+        String category = resolveCategory(updateEmbedding.getCategory());
+        updateEmbedding.setCategory(category);
         this.vectorStore.update(updateEmbedding);
+        for (UpdateEmbedding.UpdateEmbeddingData data : updateEmbedding.getData()) {
+            if (data.getDocument() != null) {
+                syncTermUpsert(data.getId(), data.getDocument(), category);
+            }
+        }
     }
 
     public void delete(DeleteEmbedding deleteEmbedding) {
+        if (deleteEmbedding == null) {
+            return;
+        }
+        String category = resolveCategory(deleteEmbedding.getCategory());
+        deleteEmbedding.setCategory(category);
+        Set<String> ids = new LinkedHashSet<>();
+        if (deleteEmbedding.getIds() != null) {
+            ids.addAll(deleteEmbedding.getIds());
+        }
+        if ((deleteEmbedding.getWhere() != null && !deleteEmbedding.getWhere().isEmpty())
+                || (deleteEmbedding.getWhereDocument() != null && !deleteEmbedding.getWhereDocument().isEmpty())) {
+            GetEmbedding getEmbedding = GetEmbedding.builder()
+                    .category(category)
+                    .where(deleteEmbedding.getWhere())
+                    .whereDocument(deleteEmbedding.getWhereDocument())
+                    .build();
+            List<IndexRecord> records = this.vectorStore.get(getEmbedding);
+            if (records != null) {
+                records.stream().map(IndexRecord::getId).filter(Objects::nonNull).forEach(ids::add);
+            }
+        }
         this.vectorStore.delete(deleteEmbedding);
+        syncTermDelete(category, new ArrayList<>(ids));
+    }
+
+    private String resolveCategory(String category) {
+        return category == null ? vectorStore.getConfig().getDefaultCategory() : category;
+    }
+
+    private void syncTermUpsert(String id, String document, String category) {
+        if (!bigdataService.isAvailable()) {
+            return;
+        }
+        TextIndexData data = new TextIndexData();
+        data.setId(id);
+        data.setText(document == null ? "" : document);
+        data.setCategory(category);
+        if (!bigdataService.upsert(data)) {
+            throw new IllegalStateException("Failed to upsert term index id " + id);
+        }
+    }
+
+    private void syncTermDelete(String category, List<String> ids) {
+        if (!bigdataService.isAvailable() || ids == null || ids.isEmpty()) {
+            return;
+        }
+        if (!bigdataService.delete(category, ids)) {
+            throw new IllegalStateException("Failed to delete term index ids from category " + category);
+        }
     }
 
     public AddEmbedding chunkAdd(AddChunkEmbedding addChunkEmbedding) {

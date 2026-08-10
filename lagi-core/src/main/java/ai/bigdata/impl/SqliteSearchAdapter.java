@@ -2,6 +2,7 @@ package ai.bigdata.impl;
 
 import ai.bigdata.IBigdata;
 import ai.bigdata.pojo.TextIndexData;
+import ai.bigdata.pojo.TermSearchHit;
 import ai.common.db.Conn;
 import ai.config.pojo.BigdataConfig;
 import ai.utils.AiGlobal;
@@ -16,17 +17,32 @@ import java.util.List;
 
 /**
  * SQLite FTS5-based implementation of IBigdata.
- * Uses a single FTS5 virtual table with id, category, and text columns.
+ * Uses a trigram-tokenized FTS5 table as a deterministic Chinese-capable fallback.
  */
 public class SqliteSearchAdapter implements IBigdata {
     private static final Logger logger = LoggerFactory.getLogger(SqliteSearchAdapter.class);
-    private static final int SEARCH_LIMIT = 1000;
-    private static final String FTS_TABLE_NAME = "fts_text_index";
+    private static final String FTS_TABLE_NAME = "fts_text_index_v2";
 
     private final String connName;
 
     public SqliteSearchAdapter(BigdataConfig config) {
         this.connName = AiGlobal.DEFAULT_DB;
+        ensureFtsTable();
+    }
+
+    @Override
+    public String getBackendName() {
+        return "sqlite_fts";
+    }
+
+    private void ensureFtsTable() {
+        String sql = "CREATE VIRTUAL TABLE IF NOT EXISTS " + FTS_TABLE_NAME
+                + " USING fts5(id UNINDEXED, category UNINDEXED, text, tokenize='trigram')";
+        try (Conn conn = new Conn(connName); java.sql.Statement statement = conn.createStatement()) {
+            statement.execute(sql);
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to initialize SQLite FTS5 term index", e);
+        }
     }
 
     @Override
@@ -71,26 +87,30 @@ public class SqliteSearchAdapter implements IBigdata {
     }
 
     @Override
-    public List<TextIndexData> search(String keyword, String category) {
-        if (keyword == null || keyword.isEmpty() || category == null) {
+    public List<TermSearchHit> search(String keyword, String category, int topK) {
+        if (keyword == null || keyword.isEmpty() || category == null || topK <= 0) {
             return new ArrayList<>();
         }
         Conn conn = new Conn(connName);
         try {
-            String sql = "SELECT id, category, text FROM " + FTS_TABLE_NAME
-                    + " WHERE category = ? AND " + FTS_TABLE_NAME + " MATCH ? LIMIT ?";
-            List<TextIndexData> result = new ArrayList<>();
+            String sql = "SELECT id, text, bm25(" + FTS_TABLE_NAME + ") AS term_score FROM "
+                    + FTS_TABLE_NAME + " WHERE category = ? AND " + FTS_TABLE_NAME
+                    + " MATCH ? ORDER BY term_score ASC LIMIT ?";
+            List<TermSearchHit> result = new ArrayList<>();
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setString(1, category);
                 ps.setString(2, escapeFts5Phrase(keyword));
-                ps.setInt(3, SEARCH_LIMIT);
+                ps.setInt(3, topK);
                 try (ResultSet rs = ps.executeQuery()) {
+                    int rank = 1;
                     while (rs.next()) {
-                        TextIndexData item = new TextIndexData();
-                        item.setId(rs.getString("id"));
-                        item.setCategory(rs.getString("category"));
-                        item.setText(rs.getString("text"));
-                        result.add(item);
+                        result.add(TermSearchHit.builder()
+                                .id(rs.getString("id"))
+                                .text(rs.getString("text"))
+                                // FTS5 bm25 is lower-is-better (commonly negative).
+                                .score(-rs.getDouble("term_score"))
+                                .rank(rank++)
+                                .build());
                     }
                 }
             }
@@ -100,6 +120,43 @@ public class SqliteSearchAdapter implements IBigdata {
             return new ArrayList<>();
         } finally {
             conn.close();
+        }
+    }
+
+    @Override
+    public boolean delete(String category, List<String> ids) {
+        if (category == null || ids == null || ids.isEmpty()) {
+            return false;
+        }
+        Conn conn = null;
+        try {
+            conn = new Conn(connName);
+            conn.setAutoCommit(false);
+            String sql = "DELETE FROM " + FTS_TABLE_NAME + " WHERE category = ? AND id = ?";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                for (String id : ids) {
+                    ps.setString(1, category);
+                    ps.setString(2, id);
+                    ps.addBatch();
+                }
+                ps.executeBatch();
+            }
+            conn.commit();
+            return true;
+        } catch (SQLException e) {
+            if (conn != null) {
+                try {
+                    conn.rollback();
+                } catch (SQLException rollbackError) {
+                    logger.error("Error while rolling back term-index deletion", rollbackError);
+                }
+            }
+            logger.error("Error while deleting term index ids from category {}", category, e);
+            return false;
+        } finally {
+            if (conn != null) {
+                conn.close();
+            }
         }
     }
 
