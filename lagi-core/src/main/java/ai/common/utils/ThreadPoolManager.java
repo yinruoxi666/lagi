@@ -23,8 +23,13 @@ public class ThreadPoolManager {
     }
 
     public static void registerExecutor(String name) {
+        registerExecutor(name, Executors.defaultThreadFactory());
+    }
+
+    public static void registerExecutor(String name, ThreadFactory threadFactory) {
         ExecutorService e = new ThreadPoolExecutor(10, 100, 10, TimeUnit.SECONDS,
                 new ArrayBlockingQueue<>(5),
+                threadFactory,
                 (r, executor)->{
                     logger.error(StrUtil.format("线程池队({})任务过多请求被拒绝", name));
                 }

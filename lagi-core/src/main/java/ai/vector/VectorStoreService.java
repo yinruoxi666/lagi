@@ -17,6 +17,7 @@ import ai.utils.LagiGlobal;
 import ai.utils.StoppingWordUtil;
 import ai.utils.qa.ChatCompletionUtil;
 import ai.vector.impl.BaseVectorStore;
+import ai.vector.diagnostics.VectorSearchPerformanceContext;
 import ai.vector.loader.DocumentLoader;
 import ai.vector.loader.impl.*;
 import ai.vector.loader.pojo.SplitConfig;
@@ -46,7 +47,7 @@ import static ai.vector.VectorStoreConstant.FileChunkSource.*;
 public class VectorStoreService {
     private final Gson gson = new Gson();
     private final BaseVectorStore vectorStore;
-    private static final ExecutorService executor;
+    private static final ThreadPoolExecutor executor;
     private final Map<String, DocumentLoader> loaderMap = new HashMap<>();
     private static final List<String> DEFAULT_SOURCES = new ArrayList<>();
 
@@ -56,12 +57,10 @@ public class VectorStoreService {
                 new ThreadPoolExecutor(
                         30, 100, 10, TimeUnit.SECONDS,
                         new ArrayBlockingQueue<>(100),
-                        r -> { /* 可加命名线程工厂 */
-                            return new Thread(r, "vector-service-" + UUID.randomUUID());
-                        },
+                        VectorSearchPerformanceContext.diagnosticThreadFactory("vector-service"),
                         new ThreadPoolExecutor.CallerRunsPolicy() // ★ 队列满时在提交线程执行
                 ));
-        executor = ThreadPoolManager.getExecutor("vector-service");
+        executor = (ThreadPoolExecutor) ThreadPoolManager.getExecutor("vector-service");
         DEFAULT_SOURCES.add(FILE_CHUNK_SOURCE_FILE);
         DEFAULT_SOURCES.add(FILE_CHUNK_SOURCE_QA);
     }
@@ -483,7 +482,20 @@ public class VectorStoreService {
     public List<IndexSearchData> searchByContext(ChatCompletionRequest request, Map<String, Object> where) {
         List<ChatMessage> messages = request.getMessages();
         log.info("intent detect start");
-        IntentResult intentResult = intentService.detectIntent(request, where);
+        VectorSearchPerformanceContext.info("上下文检索开始：消息数={}，category={}",
+                messages == null ? 0 : messages.size(), request.getCategory());
+        long intentStartedNanos = VectorSearchPerformanceContext.startTimer();
+        IntentResult intentResult;
+        try {
+            intentResult = intentService.detectIntent(request, where);
+        } finally {
+            VectorSearchPerformanceContext.recordStage("intent.detect", "意图识别",
+                    VectorSearchPerformanceContext.elapsedMillis(intentStartedNanos),
+                    VectorSearchPerformanceContext.TASK_EXECUTION_WARN_MS);
+        }
+        VectorSearchPerformanceContext.info("意图识别结果：type={}，status={}，continuedIndex={}，已返回检索结果={}",
+                intentResult.getType(), intentResult.getStatus(), intentResult.getContinuedIndex(),
+                intentResult.getIndexSearchDataList() != null);
         if (intentResult.getIndexSearchDataList() != null) {
             return intentResult.getIndexSearchDataList();
         }
@@ -520,39 +532,101 @@ public class VectorStoreService {
     }
 
     public List<IndexSearchData> search(String question, Map<String, Object> where, String category) {
-        int similarity_top_k = vectorStore.getConfig().getSimilarityTopK();
-        double similarity_cutoff = vectorStore.getConfig().getSimilarityCutoff();
-        category = ObjectUtils.defaultIfNull(category, vectorStore.getConfig().getDefaultCategory());
-        log.info("VectorStoreService search | question: {}, category: {}, where: {}, similarity_top_k: {}, similarity_cutoff: {}",
-                question, category, where, similarity_top_k, similarity_cutoff);
-        List<IndexSearchData> indexSearchDataList = search(question, similarity_top_k, similarity_cutoff, where, category);
-        log.info("VectorStoreService search | question: {}, category: {}, where: {}, result size: {}",
-                question, category, where, indexSearchDataList.size());
-        Set<String> esIds = bigdataService.getIds(question, category);
-        if (esIds != null && !esIds.isEmpty()) {
-            Set<String> indexIds = indexSearchDataList.stream().map(IndexSearchData::getId).collect(Collectors.toSet());
-            indexIds.retainAll(esIds);
-            indexSearchDataList = indexSearchDataList.stream()
-                    .filter(indexSearchData -> indexIds.contains(indexSearchData.getId()))
-                    .collect(Collectors.toList());
+        long searchStartedNanos = VectorSearchPerformanceContext.startTimer();
+        try {
+            int similarity_top_k = vectorStore.getConfig().getSimilarityTopK();
+            double similarity_cutoff = vectorStore.getConfig().getSimilarityCutoff();
+            String targetCategory = ObjectUtils.defaultIfNull(category, vectorStore.getConfig().getDefaultCategory());
+            VectorSearchPerformanceContext.info(
+                    "向量检索业务开始：category={}，问题字符数={}，where条件数={}，topK={}，cutoff={}",
+                    targetCategory, question == null ? 0 : question.length(), where == null ? 0 : where.size(),
+                    similarity_top_k, similarity_cutoff);
+            log.info("VectorStoreService search | question: {}, category: {}, where: {}, similarity_top_k: {}, similarity_cutoff: {}",
+                    question, targetCategory, where, similarity_top_k, similarity_cutoff);
+
+            long vectorSearchStartedNanos = VectorSearchPerformanceContext.startTimer();
+            List<IndexSearchData> indexSearchDataList;
+            try {
+                indexSearchDataList = search(question, similarity_top_k, similarity_cutoff, where, targetCategory);
+            } finally {
+                VectorSearchPerformanceContext.recordStage("search.vector", "向量召回与cutoff过滤",
+                        VectorSearchPerformanceContext.elapsedMillis(vectorSearchStartedNanos),
+                        VectorSearchPerformanceContext.HTTP_WARN_MS);
+            }
+            log.info("VectorStoreService search | question: {}, category: {}, where: {}, result size: {}",
+                    question, targetCategory, where, indexSearchDataList.size());
+
+            long esStartedNanos = VectorSearchPerformanceContext.startTimer();
+            Set<String> esIds;
+            try {
+                esIds = bigdataService.getIds(question, targetCategory);
+            } finally {
+                VectorSearchPerformanceContext.recordStage("search.es", "ES候选ID查询",
+                        VectorSearchPerformanceContext.elapsedMillis(esStartedNanos),
+                        VectorSearchPerformanceContext.HTTP_WARN_MS);
+            }
+
+            long esFilterStartedNanos = VectorSearchPerformanceContext.startTimer();
+            if (esIds != null && !esIds.isEmpty()) {
+                Set<String> indexIds = indexSearchDataList.stream().map(IndexSearchData::getId).collect(Collectors.toSet());
+                indexIds.retainAll(esIds);
+                indexSearchDataList = indexSearchDataList.stream()
+                        .filter(indexSearchData -> indexIds.contains(indexSearchData.getId()))
+                        .collect(Collectors.toList());
+            }
+            VectorSearchPerformanceContext.recordStage("search.esFilter", "ES结果本地过滤",
+                    VectorSearchPerformanceContext.elapsedMillis(esFilterStartedNanos),
+                    VectorSearchPerformanceContext.HTTP_WARN_MS);
+            log.info("VectorStoreService search | question: {}, category: {}, where: {}, after es filter result size: {}",
+                    question, targetCategory, where, indexSearchDataList.size());
+
+            long resultLogStartedNanos = VectorSearchPerformanceContext.startTimer();
+            indexSearchDataList.forEach(indexSearchData -> {
+                log.info("VectorStoreService search result | id: {}, distance: {}, text: {}",
+                        indexSearchData.getId(), indexSearchData.getDistance(), indexSearchData.getText());
+            });
+            VectorSearchPerformanceContext.recordStage("search.resultLog", "召回结果日志输出",
+                    VectorSearchPerformanceContext.elapsedMillis(resultLogStartedNanos),
+                    VectorSearchPerformanceContext.HTTP_WARN_MS);
+
+            long extensionStartedNanos = VectorSearchPerformanceContext.startTimer();
+            try {
+                return processFutureResults(indexSearchDataList, targetCategory);
+            } finally {
+                VectorSearchPerformanceContext.recordStage("search.extension", "结果扩展总阶段",
+                        VectorSearchPerformanceContext.elapsedMillis(extensionStartedNanos),
+                        VectorSearchPerformanceContext.TASK_EXECUTION_WARN_MS);
+            }
+        } finally {
+            VectorSearchPerformanceContext.recordStage("search.total", "单次VectorStoreService.search",
+                    VectorSearchPerformanceContext.elapsedMillis(searchStartedNanos),
+                    VectorSearchPerformanceContext.ENDPOINT_WARN_MS);
         }
-        log.info("VectorStoreService search | question: {}, category: {}, where: {}, after es filter result size: {}",
-                question, category, where, indexSearchDataList.size());
-        // 打印检索结果中的text和distance
-        indexSearchDataList.forEach(indexSearchData -> {
-            log.info("VectorStoreService search result | id: {}, distance: {}, text: {}",
-                    indexSearchData.getId(), indexSearchData.getDistance(), indexSearchData.getText());
-        });
-        return processFutureResults(indexSearchDataList, category);
     }
 
     private List<IndexSearchData> processFutureResults(List<IndexSearchData> indexSearchDataList, String category) {
-        List<Future<List<IndexSearchData>>> futureResultList = indexSearchDataList.stream()
-                .map(indexSearchData -> executor.submit(() -> extendIndexSearchData(indexSearchData, category)))
-                .collect(Collectors.toList());
+        VectorSearchPerformanceContext.info("扩展任务批量提交开始：任务数={}，线程池状态={}",
+                indexSearchDataList.size(), VectorSearchPerformanceContext.poolStats(executor));
+        long submitStartedNanos = VectorSearchPerformanceContext.startTimer();
+        List<VectorSearchPerformanceContext.TimedFuture<List<IndexSearchData>>> futureResultList = new ArrayList<>();
+        for (int i = 0; i < indexSearchDataList.size(); i++) {
+            IndexSearchData indexSearchData = indexSearchDataList.get(i);
+            String taskId = i + "-" + indexSearchData.getId();
+            futureResultList.add(VectorSearchPerformanceContext.submit(
+                    executor,
+                    "vector-service",
+                    "extend",
+                    taskId,
+                    () -> extendIndexSearchData(indexSearchData, category)
+            ));
+        }
+        VectorSearchPerformanceContext.recordStage("extension.submitBatch", "扩展任务批量提交",
+                VectorSearchPerformanceContext.elapsedMillis(submitStartedNanos),
+                VectorSearchPerformanceContext.TASK_QUEUE_WARN_MS);
 
         Set<String> seenTexts = ConcurrentHashMap.newKeySet();
-        return futureResultList.stream()
+        long aggregateStartedNanos = VectorSearchPerformanceContext.startTimer();
+        List<IndexSearchData> result = futureResultList.stream()
                 .map(future -> {
                     try {
                         return future.get();
@@ -569,6 +643,12 @@ public class VectorStoreService {
                 .filter(filteredList -> !filteredList.isEmpty())
                 .map(this::mergeIndexSearchData)
                 .collect(Collectors.toList());
+        VectorSearchPerformanceContext.recordStage("extension.aggregate", "扩展Future等待、去重与合并",
+                VectorSearchPerformanceContext.elapsedMillis(aggregateStartedNanos),
+                VectorSearchPerformanceContext.TASK_EXECUTION_WARN_MS);
+        VectorSearchPerformanceContext.info("扩展任务处理完成：输入数={}，输出数={}，线程池状态={}",
+                indexSearchDataList.size(), result.size(), VectorSearchPerformanceContext.poolStats(executor));
+        return result;
     }
 
     private IndexSearchData mergeIndexSearchData(List<IndexSearchData> indexSearchDataList) {
@@ -633,15 +713,33 @@ public class VectorStoreService {
     }
 
     private List<IndexSearchData> extendIndexSearchData(IndexSearchData indexSearchData, String category) {
+        long totalStartedNanos = VectorSearchPerformanceContext.startTimer();
+        long cacheStartedNanos = VectorSearchPerformanceContext.startTimer();
         List<IndexSearchData> extendedList = vectorCache.getFromVectorLinkCache(indexSearchData.getId());
+        VectorSearchPerformanceContext.recordCache("vector-link", extendedList != null,
+                VectorSearchPerformanceContext.elapsedMillis(cacheStartedNanos));
         log.info("extendIndexSearchData | id: {}, cache hit: {}", indexSearchData.getId(), extendedList != null);
         if (extendedList == null) {
-            extendedList = extendText(indexSearchData, category);
+            long extendStartedNanos = VectorSearchPerformanceContext.startTimer();
+            try {
+                extendedList = extendText(indexSearchData, category);
+            } finally {
+                VectorSearchPerformanceContext.recordStage("extension.extendText", "单条结果父子扩展",
+                        VectorSearchPerformanceContext.elapsedMillis(extendStartedNanos),
+                        VectorSearchPerformanceContext.TASK_EXECUTION_WARN_MS);
+            }
+            long cachePutStartedNanos = VectorSearchPerformanceContext.startTimer();
             vectorCache.putToVectorLinkCache(indexSearchData.getId(), extendedList);
+            VectorSearchPerformanceContext.recordStage("cache.vectorLink.put", "vector-link缓存写入",
+                    VectorSearchPerformanceContext.elapsedMillis(cachePutStartedNanos),
+                    VectorSearchPerformanceContext.HTTP_WARN_MS);
         }
         // 将距离赋值给所有扩展的数据
         extendedList.get(0).setDistance(indexSearchData.getDistance());
         log.info("extendIndexSearchData | id: {}, extended size: {}", indexSearchData.getId(), extendedList.size());
+        VectorSearchPerformanceContext.recordStage("extension.item.total", "单条结果扩展处理",
+                VectorSearchPerformanceContext.elapsedMillis(totalStartedNanos),
+                VectorSearchPerformanceContext.TASK_EXECUTION_WARN_MS);
         return extendedList;
     }
 
@@ -653,7 +751,17 @@ public class VectorStoreService {
         queryCondition.setN(similarity_top_k);
         queryCondition.setWhere(where);
         queryCondition.setCategory(category);
-        List<IndexRecord> indexRecords = this.query(queryCondition);
+        long queryStartedNanos = VectorSearchPerformanceContext.startTimer();
+        List<IndexRecord> indexRecords;
+        try {
+            indexRecords = this.query(queryCondition);
+        } finally {
+            VectorSearchPerformanceContext.recordStage("vectorStore.query", "VectorStore.query外部调用",
+                    VectorSearchPerformanceContext.elapsedMillis(queryStartedNanos),
+                    VectorSearchPerformanceContext.HTTP_WARN_MS);
+        }
+        VectorSearchPerformanceContext.info("VectorStore.query返回：记录数={}", indexRecords.size());
+        long transformStartedNanos = VectorSearchPerformanceContext.startTimer();
         for (IndexRecord indexRecord : indexRecords) {
             if (indexRecord.getDistance() > similarity_cutoff) {
                 continue;
@@ -665,6 +773,10 @@ public class VectorStoreService {
                 result.add(indexSearchData);
             }
         }
+        VectorSearchPerformanceContext.recordStage("vectorStore.transform", "向量结果cutoff与对象转换",
+                VectorSearchPerformanceContext.elapsedMillis(transformStartedNanos),
+                VectorSearchPerformanceContext.HTTP_WARN_MS);
+        VectorSearchPerformanceContext.info("向量结果转换完成：原始数={}，保留数={}", indexRecords.size(), result.size());
         return result;
     }
 
@@ -703,9 +815,19 @@ public class VectorStoreService {
         if (parentId == null) {
             return null;
         }
+        long cacheStartedNanos = VectorSearchPerformanceContext.startTimer();
         IndexSearchData indexSearchData = vectorCache.getFromParentElementCache(parentId);
+        VectorSearchPerformanceContext.recordCache("parent", indexSearchData != null,
+                VectorSearchPerformanceContext.elapsedMillis(cacheStartedNanos));
         if (indexSearchData == null) {
-            indexSearchData = toIndexSearchData(this.fetch(parentId, category));
+            long fetchStartedNanos = VectorSearchPerformanceContext.startTimer();
+            try {
+                indexSearchData = toIndexSearchData(this.fetch(parentId, category));
+            } finally {
+                VectorSearchPerformanceContext.recordStage("parent.fetch", "父节点Chroma查询",
+                        VectorSearchPerformanceContext.elapsedMillis(fetchStartedNanos),
+                        VectorSearchPerformanceContext.HTTP_WARN_MS);
+            }
             log.info("update parent cache | id: {}, data: {}",
                     parentId, indexSearchData != null ? indexSearchData.getId() : "miss");
             vectorCache.putToParentElementCache(parentId, indexSearchData);
@@ -722,7 +844,10 @@ public class VectorStoreService {
         if (parentId == null) {
             return result;
         }
+        long cacheStartedNanos = VectorSearchPerformanceContext.startTimer();
         result = vectorCache.getFromChildElementCache(parentId);
+        VectorSearchPerformanceContext.recordCache("child", result != null,
+                VectorSearchPerformanceContext.elapsedMillis(cacheStartedNanos));
         if (result != null) {
             return result;
         }
@@ -736,7 +861,15 @@ public class VectorStoreService {
                 .category(category)
                 .where(where)
                 .build();
-        List<IndexRecord> indexRecords = this.get(getEmbedding);
+        long getStartedNanos = VectorSearchPerformanceContext.startTimer();
+        List<IndexRecord> indexRecords;
+        try {
+            indexRecords = this.get(getEmbedding);
+        } finally {
+            VectorSearchPerformanceContext.recordStage("child.get", "子节点Chroma查询",
+                    VectorSearchPerformanceContext.elapsedMillis(getStartedNanos),
+                    VectorSearchPerformanceContext.HTTP_WARN_MS);
+        }
         if (indexRecords != null && !indexRecords.isEmpty()) {
             result = indexRecords.stream()
                     .map(this::toIndexSearchData)
@@ -754,6 +887,10 @@ public class VectorStoreService {
     }
 
     public List<IndexSearchData> extendText(int parentDepth, int childDepth, IndexSearchData data, String category) {
+        long extendStartedNanos = VectorSearchPerformanceContext.startTimer();
+        VectorSearchPerformanceContext.info(
+                "父子扩展开始：结果ID={}，source={}，parentId={}，parentDepth={}，childDepth={}",
+                data.getId(), data.getSource(), data.getParentId(), parentDepth, childDepth);
         List<IndexSearchData> resultList = new ArrayList<>();
         String parentId = data.getParentId();
         IndexSearchData originalDocData = data;
@@ -816,6 +953,10 @@ public class VectorStoreService {
             log.info("打印复制后text内容{},distance距离：{}",indexSearchDataCopy.getText(),indexSearchDataCopy.getDistance());
             copyList.add(indexSearchDataCopy);
         }
+        VectorSearchPerformanceContext.info(
+                "父子扩展结束：结果ID={}，实际父节点数={}，实际子循环数={}，输出节点数={}，耗时={}ms",
+                data.getId(), parentCount, j, copyList.size(),
+                VectorSearchPerformanceContext.elapsedMillis(extendStartedNanos));
         return copyList;
     }
 

@@ -14,6 +14,7 @@ import ai.utils.StoppingWordUtil;
 import ai.utils.StrFilterUtil;
 import ai.utils.qa.ChatCompletionUtil;
 import ai.vector.VectorStoreService;
+import ai.vector.diagnostics.VectorSearchPerformanceContext;
 import cn.hutool.core.util.StrUtil;
 import lombok.extern.slf4j.Slf4j;
 
@@ -21,19 +22,19 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.stream.Collectors;
 
 
 @Slf4j
 public class SampleIntentServiceImpl implements IntentService {
     private static final String punctuations = "[\\.,;!\\?，。；！？]";
-    private static final ExecutorService executor;
+    private static final ThreadPoolExecutor executor;
 
     static {
-        ThreadPoolManager.registerExecutor("vector_intent");
-        executor = ThreadPoolManager.getExecutor("vector_intent");
+        ThreadPoolManager.registerExecutor("vector_intent",
+                VectorSearchPerformanceContext.diagnosticThreadFactory("vector-intent"));
+        executor = (ThreadPoolExecutor) ThreadPoolManager.getExecutor("vector_intent");
     }
 
     private List<String> splitByPunctuation(String content) {
@@ -56,6 +57,9 @@ public class SampleIntentServiceImpl implements IntentService {
     @Override
     public IntentResult detectIntent(ChatCompletionRequest chatCompletionRequest, Map<String, Object> where) {
         IntentTypeEnum intentTypeEnum = detectType(chatCompletionRequest);
+        VectorSearchPerformanceContext.info("意图类型识别完成：type={}，消息数={}",
+                intentTypeEnum.getName(), chatCompletionRequest.getMessages() == null
+                        ? 0 : chatCompletionRequest.getMessages().size());
         IntentResult intentResult = new IntentResult();
         intentResult.setType(intentTypeEnum.getName());
         if (intentTypeEnum != IntentTypeEnum.TEXT
@@ -89,15 +93,20 @@ public class SampleIntentServiceImpl implements IntentService {
     }
 
     private static void setIntentByVector(ChatCompletionRequest chatCompletionRequest, Integer lIndex, String lastQ, IntentResult intentResult, Map<String, Object> where) {
+        long comparisonStartedNanos = VectorSearchPerformanceContext.startTimer();
         VectorStoreService vectorStoreService = new VectorStoreService();
         String lQ = chatCompletionRequest.getMessages().get(lIndex).getContent();
         String complexQ = lQ + lastQ;
         lastQ = StrFilterUtil.filterPunctuations(lastQ);
         complexQ = StrFilterUtil.filterPunctuations(complexQ);
         String finalLastQ = lastQ;
-        Future<List<IndexSearchData>> lastFuture = executor.submit(() -> vectorStoreService.search(finalLastQ, where, chatCompletionRequest.getCategory()));
+        VectorSearchPerformanceContext.TimedFuture<List<IndexSearchData>> lastFuture =
+                VectorSearchPerformanceContext.submit(executor, "vector-intent", "intent-vector", "last-question",
+                        () -> vectorStoreService.search(finalLastQ, where, chatCompletionRequest.getCategory()));
         String finalComplexQ = complexQ;
-        Future<List<IndexSearchData>> complexFuture = executor.submit(() -> vectorStoreService.search(finalComplexQ, where, chatCompletionRequest.getCategory()));
+        VectorSearchPerformanceContext.TimedFuture<List<IndexSearchData>> complexFuture =
+                VectorSearchPerformanceContext.submit(executor, "vector-intent", "intent-vector", "complex-question",
+                        () -> vectorStoreService.search(finalComplexQ, where, chatCompletionRequest.getCategory()));
         try {
             List<IndexSearchData> l = lastFuture.get();
             List<IndexSearchData> c = complexFuture.get();
@@ -116,8 +125,16 @@ public class SampleIntentServiceImpl implements IntentService {
             } else {
                 intentResult.setIndexSearchDataList(l);
             }
+            VectorSearchPerformanceContext.info(
+                    "意图向量比较完成：last结果数={}，complex结果数={}，选择继续上下文={}",
+                    l.size(), c.size(), vectorContinue);
         } catch (Exception e) {
             log.error("detectIntent error", e);
+            VectorSearchPerformanceContext.error("意图向量比较异常", e);
+        } finally {
+            VectorSearchPerformanceContext.recordStage("intent.vectorComparison", "意图并行向量比较",
+                    VectorSearchPerformanceContext.elapsedMillis(comparisonStartedNanos),
+                    VectorSearchPerformanceContext.TASK_EXECUTION_WARN_MS);
         }
     }
 }

@@ -3,6 +3,7 @@ package ai.embedding.impl;
 import ai.embedding.EmbeddingConstant;
 import ai.embedding.Embeddings;
 import ai.common.pojo.EmbeddingConfig;
+import ai.vector.diagnostics.VectorSearchPerformanceContext;
 import com.alibaba.dashscope.embeddings.*;
 import com.alibaba.dashscope.exception.NoApiKeyException;
 import com.google.common.cache.Cache;
@@ -32,19 +33,51 @@ public class QwenEmbeddings implements Embeddings {
     }
 
     public List<List<Float>> createEmbeddingBatch(List<String> docs) {
-        List<List<Float>> result = cache.getIfPresent(docs);
-        if (result != null) {
-            return result;
+        long totalStartedNanos = VectorSearchPerformanceContext.startTimer();
+        int characterCount = 0;
+        for (String doc : docs) {
+            characterCount += doc == null ? 0 : doc.length();
         }
-        TextEmbeddingParam param = TextEmbeddingParam
-                .builder()
-                .apiKey(this.apiKey)
-                .model(TextEmbedding.Models.TEXT_EMBEDDING_V2)
-                .texts(docs).build();
-        TextEmbedding textEmbedding = new TextEmbedding();
-        result = new ArrayList<>();
         try {
-            TextEmbeddingResult textEmbeddingResult = textEmbedding.call(param);
+            long cacheStartedNanos = VectorSearchPerformanceContext.startTimer();
+            List<List<Float>> result = cache.getIfPresent(docs);
+            VectorSearchPerformanceContext.recordCache("embedding", result != null,
+                    VectorSearchPerformanceContext.elapsedMillis(cacheStartedNanos));
+            if (result != null) {
+                int dimension = result.isEmpty() || result.get(0) == null ? 0 : result.get(0).size();
+                VectorSearchPerformanceContext.info(
+                        "Qwen embedding缓存返回：文档数={}，字符数={}，向量数={}，维度={}",
+                        docs.size(), characterCount, result.size(), dimension);
+                return result;
+            }
+
+            TextEmbeddingParam param = TextEmbeddingParam
+                    .builder()
+                    .apiKey(this.apiKey)
+                    .model(TextEmbedding.Models.TEXT_EMBEDDING_V2)
+                    .texts(docs).build();
+            TextEmbedding textEmbedding = new TextEmbedding();
+            TextEmbeddingResult textEmbeddingResult;
+            long remoteStartedNanos = VectorSearchPerformanceContext.startTimer();
+            VectorSearchPerformanceContext.info(
+                    "Qwen embedding外部调用开始：model={}，文档数={}，字符数={}",
+                    TextEmbedding.Models.TEXT_EMBEDDING_V2, docs.size(), characterCount);
+            try {
+                textEmbeddingResult = textEmbedding.call(param);
+            } catch (NoApiKeyException e) {
+                VectorSearchPerformanceContext.error("Qwen embedding外部调用异常：缺少API密钥", e);
+                throw new RuntimeException(e);
+            } catch (RuntimeException e) {
+                VectorSearchPerformanceContext.error("Qwen embedding外部调用异常", e);
+                throw e;
+            } finally {
+                VectorSearchPerformanceContext.recordStage("embedding.remote", "Qwen embedding外部调用",
+                        VectorSearchPerformanceContext.elapsedMillis(remoteStartedNanos),
+                        VectorSearchPerformanceContext.EMBEDDING_WARN_MS);
+            }
+
+            long conversionStartedNanos = VectorSearchPerformanceContext.startTimer();
+            result = new ArrayList<>();
             for (TextEmbeddingResultItem item : textEmbeddingResult.getOutput().getEmbeddings()) {
                 List<Float> embedding = new ArrayList<>();
                 for (Double value : item.getEmbedding()) {
@@ -52,13 +85,26 @@ public class QwenEmbeddings implements Embeddings {
                 }
                 result.add(embedding);
             }
-        } catch (NoApiKeyException e) {
-            throw new RuntimeException(e);
+            VectorSearchPerformanceContext.recordStage("embedding.convert", "Qwen embedding结果转换",
+                    VectorSearchPerformanceContext.elapsedMillis(conversionStartedNanos),
+                    VectorSearchPerformanceContext.HTTP_WARN_MS);
+            if (!result.isEmpty()) {
+                long cachePutStartedNanos = VectorSearchPerformanceContext.startTimer();
+                cache.put(docs, result);
+                VectorSearchPerformanceContext.recordStage("embedding.cachePut", "Qwen embedding缓存写入",
+                        VectorSearchPerformanceContext.elapsedMillis(cachePutStartedNanos),
+                        VectorSearchPerformanceContext.HTTP_WARN_MS);
+            }
+            int dimension = result.isEmpty() || result.get(0) == null ? 0 : result.get(0).size();
+            VectorSearchPerformanceContext.info(
+                    "Qwen embedding处理完成：文档数={}，字符数={}，向量数={}，维度={}",
+                    docs.size(), characterCount, result.size(), dimension);
+            return result;
+        } finally {
+            VectorSearchPerformanceContext.recordStage("embedding.total", "Qwen embedding总阶段",
+                    VectorSearchPerformanceContext.elapsedMillis(totalStartedNanos),
+                    VectorSearchPerformanceContext.EMBEDDING_WARN_MS);
         }
-        if (!result.isEmpty()) {
-            cache.put(docs, result);
-        }
-        return result;
     }
 
     @Override

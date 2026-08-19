@@ -2,6 +2,8 @@ package ai.vector.impl;
 
 import ai.common.pojo.VectorStoreConfig;
 import ai.embedding.Embeddings;
+import ai.vector.diagnostics.ChromaHttpPerformanceEventListener;
+import ai.vector.diagnostics.VectorSearchPerformanceContext;
 import ai.vector.pojo.*;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -23,6 +25,12 @@ public class ChromaV2VectorStore extends BaseVectorStore {
             .connectTimeout(TIMEOUT, TimeUnit.SECONDS)
             .readTimeout(TIMEOUT, TimeUnit.SECONDS)
             .writeTimeout(TIMEOUT, TimeUnit.SECONDS)
+            .eventListenerFactory(call -> {
+                VectorSearchPerformanceContext.Snapshot snapshot = VectorSearchPerformanceContext.capture();
+                return snapshot == null
+                        ? okhttp3.EventListener.NONE
+                        : new ChromaHttpPerformanceEventListener(snapshot);
+            })
             .build();
     private final Embeddings embeddingFunction;
     private final Map<String, Object> colMetadata;
@@ -83,29 +91,50 @@ public class ChromaV2VectorStore extends BaseVectorStore {
     }
 
     private List<IndexRecord> queryInternal(QueryCondition queryCondition, String category) {
-        Map<String, Object> where = normalizeFilterMap(queryCondition.getWhere());
-        Map<String, Object> whereDocument = normalizeFilterMap(queryCondition.getWhereDocument());
-        if (queryCondition.getText() == null || queryCondition.getText().trim().isEmpty()) {
-            GetEmbedding getEmbedding = GetEmbedding.builder()
-                    .category(category)
+        long totalStartedNanos = VectorSearchPerformanceContext.startTimer();
+        try {
+            Map<String, Object> where = normalizeFilterMap(queryCondition.getWhere());
+            Map<String, Object> whereDocument = normalizeFilterMap(queryCondition.getWhereDocument());
+            VectorSearchPerformanceContext.info(
+                    "Chroma query开始：category={}，nResults={}，where条件数={}，whereDocument条件数={}，文本字符数={}",
+                    category, queryCondition.getN(), mapSize(where), mapSize(whereDocument),
+                    queryCondition.getText() == null ? 0 : queryCondition.getText().length());
+            if (queryCondition.getText() == null || queryCondition.getText().trim().isEmpty()) {
+                GetEmbedding getEmbedding = GetEmbedding.builder()
+                        .category(category)
+                        .where(where)
+                        .limit(queryCondition.getN())
+                        .offset(0)
+                        .whereDocument(whereDocument)
+                        .build();
+                return get(getEmbedding);
+            }
+            List<List<Float>> queryEmbeddings = this.embeddingFunction.createEmbedding(Collections.singletonList(queryCondition.getText()));
+            int dimension = queryEmbeddings == null || queryEmbeddings.isEmpty() || queryEmbeddings.get(0) == null
+                    ? 0 : queryEmbeddings.get(0).size();
+            VectorSearchPerformanceContext.info("Chroma query向量准备完成：向量数={}，维度={}",
+                    queryEmbeddings == null ? 0 : queryEmbeddings.size(), dimension);
+            ChromaQueryRequest request = ChromaQueryRequest.builder()
                     .where(where)
-                    .limit(queryCondition.getN())
-                    .offset(0)
                     .whereDocument(whereDocument)
+                    .queryEmbeddings(queryEmbeddings)
+                    .nResults(queryCondition.getN())
                     .build();
-            return get(getEmbedding);
+            String json = withCollectionIdRetry(category, collectionId ->
+                    postJson(collectionRecordsPath(collectionId, "query"), toJson(request))
+            );
+            long parseStartedNanos = VectorSearchPerformanceContext.startTimer();
+            List<IndexRecord> records = parseQueryRecords(readTree(json));
+            VectorSearchPerformanceContext.recordStage("chroma.query.parse", "Chroma query响应解析",
+                    VectorSearchPerformanceContext.elapsedMillis(parseStartedNanos),
+                    VectorSearchPerformanceContext.HTTP_WARN_MS);
+            VectorSearchPerformanceContext.info("Chroma query完成：category={}，结果数={}", category, records.size());
+            return records;
+        } finally {
+            VectorSearchPerformanceContext.recordStage("chroma.query.total", "Chroma query总阶段",
+                    VectorSearchPerformanceContext.elapsedMillis(totalStartedNanos),
+                    VectorSearchPerformanceContext.HTTP_WARN_MS);
         }
-        List<List<Float>> queryEmbeddings = this.embeddingFunction.createEmbedding(Collections.singletonList(queryCondition.getText()));
-        ChromaQueryRequest request = ChromaQueryRequest.builder()
-                .where(where)
-                .whereDocument(whereDocument)
-                .queryEmbeddings(queryEmbeddings)
-                .nResults(queryCondition.getN())
-                .build();
-        String json = withCollectionIdRetry(category, collectionId ->
-                postJson(collectionRecordsPath(collectionId, "query"), toJson(request))
-        );
-        return parseQueryRecords(readTree(json));
     }
 
     @Override
@@ -241,21 +270,38 @@ public class ChromaV2VectorStore extends BaseVectorStore {
 
     @Override
     public List<IndexRecord> get(GetEmbedding getEmbedding) {
-        String category = resolveCategory(getEmbedding.getCategory());
-        Map<String, Object> where = normalizeFilterMap(getEmbedding.getWhere());
-        Map<String, Object> whereDocument = normalizeFilterMap(getEmbedding.getWhereDocument());
-        GetEmbedding request = GetEmbedding.builder()
-                .ids(getEmbedding.getIds())
-                .where(where)
-                .whereDocument(whereDocument)
-                .limit(getEmbedding.getLimit())
-                .offset(getEmbedding.getOffset())
-                .include(getEmbedding.getInclude())
-                .build();
-        String json = withCollectionIdRetry(category, collectionId ->
-                postJson(collectionRecordsPath(collectionId, "get"), toJson(request))
-        );
-        return parseGetRecords(json);
+        long totalStartedNanos = VectorSearchPerformanceContext.startTimer();
+        try {
+            String category = resolveCategory(getEmbedding.getCategory());
+            Map<String, Object> where = normalizeFilterMap(getEmbedding.getWhere());
+            Map<String, Object> whereDocument = normalizeFilterMap(getEmbedding.getWhereDocument());
+            VectorSearchPerformanceContext.info(
+                    "Chroma get开始：category={}，ID数={}，where条件数={}，whereDocument条件数={}，limit={}，offset={}",
+                    category, getEmbedding.getIds() == null ? 0 : getEmbedding.getIds().size(),
+                    mapSize(where), mapSize(whereDocument), getEmbedding.getLimit(), getEmbedding.getOffset());
+            GetEmbedding request = GetEmbedding.builder()
+                    .ids(getEmbedding.getIds())
+                    .where(where)
+                    .whereDocument(whereDocument)
+                    .limit(getEmbedding.getLimit())
+                    .offset(getEmbedding.getOffset())
+                    .include(getEmbedding.getInclude())
+                    .build();
+            String json = withCollectionIdRetry(category, collectionId ->
+                    postJson(collectionRecordsPath(collectionId, "get"), toJson(request))
+            );
+            long parseStartedNanos = VectorSearchPerformanceContext.startTimer();
+            List<IndexRecord> records = parseGetRecords(json);
+            VectorSearchPerformanceContext.recordStage("chroma.get.parse", "Chroma get响应解析",
+                    VectorSearchPerformanceContext.elapsedMillis(parseStartedNanos),
+                    VectorSearchPerformanceContext.HTTP_WARN_MS);
+            VectorSearchPerformanceContext.info("Chroma get完成：category={}，结果数={}", category, records.size());
+            return records;
+        } finally {
+            VectorSearchPerformanceContext.recordStage("chroma.get.total", "Chroma get总阶段",
+                    VectorSearchPerformanceContext.elapsedMillis(totalStartedNanos),
+                    VectorSearchPerformanceContext.HTTP_WARN_MS);
+        }
     }
 
     @Override
@@ -341,6 +387,9 @@ public class ChromaV2VectorStore extends BaseVectorStore {
             return operation.call(collectionId);
         } catch (ChromaHttpException e) {
             if (e.getStatusCode() == 404) {
+                VectorSearchPerformanceContext.increment("chroma.retry.404");
+                VectorSearchPerformanceContext.warn(
+                        "Chroma操作收到404，清理tenant/database/collection状态后重试：category={}", category);
                 resetTenantAndCollectionState();
                 String retryCollectionId = getCollectionId(resolveCategory(category), true);
                 return operation.call(retryCollectionId);
@@ -350,13 +399,25 @@ public class ChromaV2VectorStore extends BaseVectorStore {
     }
 
     private String getCollectionId(String category, boolean createIfMissing) {
+        long cacheStartedNanos = VectorSearchPerformanceContext.startTimer();
         String cacheId = collectionIdCache.get(category);
+        VectorSearchPerformanceContext.recordCache("chroma-collection", hasText(cacheId),
+                VectorSearchPerformanceContext.elapsedMillis(cacheStartedNanos));
         if (hasText(cacheId)) {
             return cacheId;
         }
-        String collectionId = createIfMissing ? createOrGetCollection(category) : findCollectionIdByName(category);
+        long resolveStartedNanos = VectorSearchPerformanceContext.startTimer();
+        String collectionId;
+        try {
+            collectionId = createIfMissing ? createOrGetCollection(category) : findCollectionIdByName(category);
+        } finally {
+            VectorSearchPerformanceContext.recordStage("chroma.collection.resolve", "Chroma collection解析",
+                    VectorSearchPerformanceContext.elapsedMillis(resolveStartedNanos),
+                    VectorSearchPerformanceContext.HTTP_WARN_MS);
+        }
         if (hasText(collectionId)) {
             collectionIdCache.put(category, collectionId);
+            VectorSearchPerformanceContext.info("Chroma collection缓存写入：category={}", category);
         }
         if (!hasText(collectionId)) {
             throw new RuntimeException("Collection not found for category: " + category);
@@ -365,6 +426,7 @@ public class ChromaV2VectorStore extends BaseVectorStore {
     }
 
     private String createOrGetCollection(String category) {
+        long startedNanos = VectorSearchPerformanceContext.startTimer();
         ensureTenantAndDatabase();
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("name", category);
@@ -374,32 +436,55 @@ public class ChromaV2VectorStore extends BaseVectorStore {
         JsonNode root = unwrapDataNode(readTree(json));
         String collectionId = readText(root, "id", "collection_id", "uuid");
         if (hasText(collectionId)) {
+            VectorSearchPerformanceContext.recordStage("chroma.collection.getOrCreate",
+                    "Chroma collection get-or-create", VectorSearchPerformanceContext.elapsedMillis(startedNanos),
+                    VectorSearchPerformanceContext.HTTP_WARN_MS);
             return collectionId;
         }
-        return findCollectionIdByName(category);
+        String fallbackCollectionId = findCollectionIdByName(category);
+        VectorSearchPerformanceContext.recordStage("chroma.collection.getOrCreate",
+                "Chroma collection get-or-create及回退查找",
+                VectorSearchPerformanceContext.elapsedMillis(startedNanos),
+                VectorSearchPerformanceContext.HTTP_WARN_MS);
+        return fallbackCollectionId;
     }
 
     private void ensureTenantAndDatabase() {
+        long fastPathStartedNanos = VectorSearchPerformanceContext.startTimer();
         if (tenantAndDatabaseReady && hasText(tenantUuid)) {
+            VectorSearchPerformanceContext.recordCache("chroma-tenant-database", true,
+                    VectorSearchPerformanceContext.elapsedMillis(fastPathStartedNanos));
             return;
         }
+        VectorSearchPerformanceContext.recordCache("chroma-tenant-database", false,
+                VectorSearchPerformanceContext.elapsedMillis(fastPathStartedNanos));
+        long startedNanos = VectorSearchPerformanceContext.startTimer();
         synchronized (this) {
             if (tenantAndDatabaseReady && hasText(tenantUuid)) {
+                VectorSearchPerformanceContext.info("Chroma tenant/database在等待锁期间已初始化");
                 return;
             }
             ensureTenant();
             ensureDatabase();
             tenantAndDatabaseReady = true;
         }
+        VectorSearchPerformanceContext.recordStage("chroma.tenantDatabase.initialize",
+                "Chroma tenant/database初始化", VectorSearchPerformanceContext.elapsedMillis(startedNanos),
+                VectorSearchPerformanceContext.HTTP_WARN_MS);
     }
 
     private void ensureTenant() {
+        long startedNanos = VectorSearchPerformanceContext.startTimer();
+        String action = "get";
         try {
             tenantUuid = requireTenantUuid(getJson(configuredTenantPath()));
         } catch (ChromaHttpException e) {
             if (e.getStatusCode() != 404) {
                 throw e;
             }
+            action = "create";
+            VectorSearchPerformanceContext.increment("chroma.tenant.createAfter404");
+            VectorSearchPerformanceContext.info("Chroma tenant不存在，开始创建：tenant={}", tenantName());
             Map<String, Object> request = new LinkedHashMap<>();
             request.put("name", tenantName());
             String createdTenantUuid = parseTenantUuid(postJson(tenantsPath(), toJson(request)));
@@ -407,19 +492,33 @@ public class ChromaV2VectorStore extends BaseVectorStore {
                 createdTenantUuid = requireTenantUuid(getJson(configuredTenantPath()));
             }
             tenantUuid = createdTenantUuid;
+        } finally {
+            VectorSearchPerformanceContext.recordStage("chroma.tenant." + action,
+                    "Chroma tenant初始化(" + action + ")", VectorSearchPerformanceContext.elapsedMillis(startedNanos),
+                    VectorSearchPerformanceContext.HTTP_WARN_MS);
         }
     }
 
     private void ensureDatabase() {
+        long startedNanos = VectorSearchPerformanceContext.startTimer();
+        String action = "get";
         try {
             getJson(databasePath());
         } catch (ChromaHttpException e) {
             if (e.getStatusCode() != 404) {
                 throw e;
             }
+            action = "create";
+            VectorSearchPerformanceContext.increment("chroma.database.createAfter404");
+            VectorSearchPerformanceContext.info("Chroma database不存在，开始创建：database={}", databaseName());
             Map<String, Object> request = new LinkedHashMap<>();
             request.put("name", databaseName());
             postJson(databasesPath(), toJson(request));
+        } finally {
+            VectorSearchPerformanceContext.recordStage("chroma.database." + action,
+                    "Chroma database初始化(" + action + ")",
+                    VectorSearchPerformanceContext.elapsedMillis(startedNanos),
+                    VectorSearchPerformanceContext.HTTP_WARN_MS);
         }
     }
 
@@ -472,6 +571,7 @@ public class ChromaV2VectorStore extends BaseVectorStore {
         tenantUuid = null;
         tenantAndDatabaseReady = false;
         collectionIdCache.clear();
+        VectorSearchPerformanceContext.info("Chroma tenant/database/collection本地状态已清理");
     }
 
     private JsonNode unwrapDataNode(JsonNode root) {
@@ -642,8 +742,22 @@ public class ChromaV2VectorStore extends BaseVectorStore {
     }
 
     private String execute(String url, Request request) {
+        long startedNanos = VectorSearchPerformanceContext.startTimer();
+        long requestBytes = requestContentLength(request);
+        VectorSearchPerformanceContext.info(
+                "Chroma HTTP同步调用开始：operation={}，method={}，url={}，请求字节={}，连接池连接数={}，空闲连接数={}，运行调用数={}，排队调用数={}",
+                httpOperation(request), request.method(), safeTarget(request), requestBytes,
+                HTTP_CLIENT.connectionPool().connectionCount(), HTTP_CLIENT.connectionPool().idleConnectionCount(),
+                HTTP_CLIENT.dispatcher().runningCallsCount(), HTTP_CLIENT.dispatcher().queuedCallsCount());
         try (Response response = HTTP_CLIENT.newCall(request).execute()) {
             String body = response.body() == null ? "" : response.body().string();
+            long elapsedMs = VectorSearchPerformanceContext.elapsedMillis(startedNanos);
+            VectorSearchPerformanceContext.info(
+                    "Chroma HTTP同步调用结束：operation={}，method={}，url={}，statusCode={}，总耗时={}ms，响应字节={}，连接池连接数={}，空闲连接数={}，运行调用数={}，排队调用数={}",
+                    httpOperation(request), request.method(), safeTarget(request), response.code(), elapsedMs,
+                    utf8Length(body), HTTP_CLIENT.connectionPool().connectionCount(),
+                    HTTP_CLIENT.connectionPool().idleConnectionCount(), HTTP_CLIENT.dispatcher().runningCallsCount(),
+                    HTTP_CLIENT.dispatcher().queuedCallsCount());
             if (!response.isSuccessful()) {
                 throw new ChromaHttpException(
                         response.code(),
@@ -653,8 +767,63 @@ public class ChromaV2VectorStore extends BaseVectorStore {
             }
             return body;
         } catch (IOException e) {
+            VectorSearchPerformanceContext.error(
+                    "Chroma HTTP同步调用异常：operation=" + httpOperation(request)
+                            + "，method=" + request.method() + "，url=" + safeTarget(request)
+                            + "，耗时=" + VectorSearchPerformanceContext.elapsedMillis(startedNanos) + "ms", e);
             throw new RuntimeException("Request failed: " + url, e);
         }
+    }
+
+    private long requestContentLength(Request request) {
+        if (request.body() == null) {
+            return 0L;
+        }
+        try {
+            return request.body().contentLength();
+        } catch (IOException ignored) {
+            return -1L;
+        }
+    }
+
+    private int utf8Length(String value) {
+        try {
+            return value == null ? 0 : value.getBytes("UTF-8").length;
+        } catch (Exception ignored) {
+            return -1;
+        }
+    }
+
+    private String safeTarget(Request request) {
+        HttpUrl httpUrl = request.url();
+        return httpUrl.scheme() + "://" + httpUrl.host() + ":" + httpUrl.port() + httpUrl.encodedPath();
+    }
+
+    private String httpOperation(Request request) {
+        String path = request.url().encodedPath();
+        if (path.endsWith("/query")) {
+            return "query";
+        }
+        if (path.endsWith("/get")) {
+            return "get";
+        }
+        if (path.endsWith("/count")) {
+            return "count";
+        }
+        if (path.contains("/collections")) {
+            return "collection";
+        }
+        if (path.contains("/databases")) {
+            return "database";
+        }
+        if (path.contains("/tenants")) {
+            return "tenant";
+        }
+        return "other";
+    }
+
+    private int mapSize(Map<?, ?> values) {
+        return values == null ? 0 : values.size();
     }
 
     private void addHeaders(Request.Builder builder, Map<String, String> headers) {

@@ -6,13 +6,13 @@ import ai.common.pojo.UserRagSetting;
 import ai.migrate.service.UploadFileService;
 import ai.openai.pojo.ChatCompletionRequest;
 import ai.servlet.BaseServlet;
-import ai.servlet.dto.VectorSearchRequest;
 import ai.servlet.dto.VectorDeleteRequest;
 import ai.servlet.dto.VectorSearchRequest;
 import ai.servlet.dto.VectorUpsertRequest;
 import ai.vector.VectorCacheLoader;
 import ai.vector.VectorDbService;
 import ai.vector.VectorStoreService;
+import ai.vector.diagnostics.VectorSearchPerformanceContext;
 import ai.vector.pojo.*;
 import cn.hutool.core.util.StrUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -31,14 +31,49 @@ import java.util.Map;
 import static com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL;
 
 public class VectorApiServlet extends BaseServlet {
-    private final VectorStoreService vectorStoreService = new VectorStoreService();
-    private final VectorDbService vectorDbService = new VectorDbService(null);
-    private final BigdataService bigdataService = new BigdataService();
-    private final UploadFileService uploadFileService = new UploadFileService();
+    private final VectorStoreService vectorStoreService;
+    private final VectorDbService vectorDbService;
+    private final BigdataService bigdataService;
+    private final UploadFileService uploadFileService;
+    private final MetadataSearchExecutor metadataSearchExecutor;
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     static {
         objectMapper.setSerializationInclusion(NON_NULL);
+    }
+
+    public VectorApiServlet() {
+        this(new VectorStoreService(), new VectorDbService(null),
+                new BigdataService(), new UploadFileService());
+    }
+
+    VectorApiServlet(VectorStoreService vectorStoreService,
+                     VectorDbService vectorDbService,
+                     BigdataService bigdataService,
+                     UploadFileService uploadFileService) {
+        this.vectorStoreService = vectorStoreService;
+        this.vectorDbService = vectorDbService;
+        this.bigdataService = bigdataService;
+        this.uploadFileService = uploadFileService;
+        this.metadataSearchExecutor = new MetadataSearchExecutor() {
+            @Override
+            public List<IndexSearchData> searchText(String text, Map<String, Object> where, String category) {
+                return vectorStoreService.search(text, where, category);
+            }
+
+            @Override
+            public List<IndexSearchData> searchMessages(ChatCompletionRequest request, Map<String, Object> where) {
+                return vectorStoreService.searchByContext(request, where);
+            }
+        };
+    }
+
+    VectorApiServlet(MetadataSearchExecutor metadataSearchExecutor) {
+        this.vectorStoreService = null;
+        this.vectorDbService = null;
+        this.bigdataService = null;
+        this.uploadFileService = null;
+        this.metadataSearchExecutor = metadataSearchExecutor;
     }
 
     @Override
@@ -233,32 +268,113 @@ public class VectorApiServlet extends BaseServlet {
 
     private void searchByMetadata(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         resp.setContentType("application/json;charset=utf-8");
-        VectorSearchRequest request = reqBodyToObj(req, VectorSearchRequest.class);
-        String text = request.getText();
-        String category = request.getCategory();
-        Map<String, Object> where = request.getWhere();
-        List<IndexSearchData> indexSearchData = null;
-        if (StrUtil.isNotBlank(text)) {
-            System.out.println("Search text: " + text);
-            indexSearchData = vectorStoreService.search(text, where, category);
+        long endpointStartedNanos = VectorSearchPerformanceContext.startTimer();
+        try (VectorSearchPerformanceContext.Scope scope = VectorSearchPerformanceContext.open(
+                req.getHeader(VectorSearchPerformanceContext.REQUEST_ID_HEADER))) {
+            String finalStatus = "error";
+            int finalResultCount = -1;
+            try {
+                resp.setHeader(VectorSearchPerformanceContext.REQUEST_ID_HEADER, scope.getRequestId());
+                VectorSearchPerformanceContext.info(
+                        "请求开始：method={}，uri={}，声明的请求体字节数={}",
+                        req.getMethod(), req.getRequestURI(), req.getContentLength());
 
-        } else {
-            ChatCompletionRequest chatCompletionRequest = new ChatCompletionRequest();
-            chatCompletionRequest.setMax_tokens(4096);
-            chatCompletionRequest.setMessages(request.getMessages());
-            chatCompletionRequest.setCategory(category);
-            System.out.println("Search messages: " + toJson(request.getMessages()));
-            indexSearchData = vectorStoreService.searchByContext(chatCompletionRequest, where);
-            System.out.println("Search results: " + toJson(indexSearchData));
+                long bodyReadStartedNanos = VectorSearchPerformanceContext.startTimer();
+                String requestBody;
+                try {
+                    requestBody = requestToJson(req);
+                } finally {
+                    VectorSearchPerformanceContext.recordStage("endpoint.body.read", "请求体读取",
+                            VectorSearchPerformanceContext.elapsedMillis(bodyReadStartedNanos),
+                            VectorSearchPerformanceContext.HTTP_WARN_MS);
+                }
+                VectorSearchPerformanceContext.info("完整请求体={}",
+                        VectorSearchPerformanceContext.escapeForSingleLine(requestBody));
+
+                long deserializeStartedNanos = VectorSearchPerformanceContext.startTimer();
+                VectorSearchRequest request;
+                try {
+                    request = gson.fromJson(requestBody, VectorSearchRequest.class);
+                } finally {
+                    VectorSearchPerformanceContext.recordStage("endpoint.body.deserialize", "请求体反序列化",
+                            VectorSearchPerformanceContext.elapsedMillis(deserializeStartedNanos),
+                            VectorSearchPerformanceContext.HTTP_WARN_MS);
+                }
+
+                String text = request.getText();
+                String category = request.getCategory();
+                Map<String, Object> where = request.getWhere();
+                List<IndexSearchData> indexSearchData;
+                long businessStartedNanos = VectorSearchPerformanceContext.startTimer();
+                try {
+                    if (StrUtil.isNotBlank(text)) {
+                        VectorSearchPerformanceContext.info(
+                                "进入text检索分支：category={}，文本字符数={}，where条件数={}",
+                                category, text.length(), where == null ? 0 : where.size());
+                        indexSearchData = metadataSearchExecutor.searchText(text, where, category);
+                    } else {
+                        VectorSearchPerformanceContext.info(
+                                "进入messages检索分支：category={}，消息数={}，where条件数={}",
+                                category, request.getMessages() == null ? 0 : request.getMessages().size(),
+                                where == null ? 0 : where.size());
+                        ChatCompletionRequest chatCompletionRequest = new ChatCompletionRequest();
+                        chatCompletionRequest.setMax_tokens(4096);
+                        chatCompletionRequest.setMessages(request.getMessages());
+                        chatCompletionRequest.setCategory(category);
+                        indexSearchData = metadataSearchExecutor.searchMessages(chatCompletionRequest, where);
+                    }
+                } finally {
+                    VectorSearchPerformanceContext.recordStage("endpoint.business", "检索业务调用",
+                            VectorSearchPerformanceContext.elapsedMillis(businessStartedNanos),
+                            VectorSearchPerformanceContext.TASK_EXECUTION_WARN_MS);
+                }
+
+                finalResultCount = indexSearchData == null ? 0 : indexSearchData.size();
+                Map<String, Object> result = new HashMap<>();
+                if (indexSearchData == null || indexSearchData.isEmpty()) {
+                    finalStatus = "failed";
+                    result.put("status", "failed");
+                } else {
+                    finalStatus = "success";
+                    result.put("status", "success");
+                    result.put("data", indexSearchData);
+                }
+
+                long serializeStartedNanos = VectorSearchPerformanceContext.startTimer();
+                String responseBody;
+                try {
+                    responseBody = toJson(result);
+                } finally {
+                    VectorSearchPerformanceContext.recordStage("endpoint.response.serialize", "响应序列化",
+                            VectorSearchPerformanceContext.elapsedMillis(serializeStartedNanos),
+                            VectorSearchPerformanceContext.HTTP_WARN_MS);
+                }
+
+                long responseWriteStartedNanos = VectorSearchPerformanceContext.startTimer();
+                try {
+                    responsePrint(resp, responseBody);
+                } finally {
+                    VectorSearchPerformanceContext.recordStage("endpoint.response.write", "响应写出",
+                            VectorSearchPerformanceContext.elapsedMillis(responseWriteStartedNanos),
+                            VectorSearchPerformanceContext.HTTP_WARN_MS);
+                }
+                VectorSearchPerformanceContext.info("响应写出完成：响应字节数={}",
+                        responseBody.getBytes("UTF-8").length);
+            } catch (IOException | RuntimeException e) {
+                finalStatus = "error";
+                VectorSearchPerformanceContext.error("searchByMetadata请求处理异常", e);
+                throw e;
+            } finally {
+                scope.finish(finalStatus, finalResultCount,
+                        VectorSearchPerformanceContext.elapsedMillis(endpointStartedNanos));
+            }
         }
-        Map<String, Object> result = new HashMap<>();
-        if (indexSearchData == null || indexSearchData.isEmpty()) {
-            result.put("status", "failed");
-        } else {
-            result.put("status", "success");
-            result.put("data", indexSearchData);
-        }
-        responsePrint(resp, toJson(result));
+    }
+
+    interface MetadataSearchExecutor {
+        List<IndexSearchData> searchText(String text, Map<String, Object> where, String category);
+
+        List<IndexSearchData> searchMessages(ChatCompletionRequest request, Map<String, Object> where);
     }
 
     private void query(HttpServletRequest req, HttpServletResponse resp) throws IOException {
