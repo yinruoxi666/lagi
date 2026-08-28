@@ -596,7 +596,7 @@ public class VectorStoreService {
             List<IndexSearchData> cached = vectorCache.getFromVectorLinkCache(data.getId());
             if (cached != null) {
                 summary.vectorLinkCacheHits++;
-                results.set(index, cached);
+                results.set(index, VectorLinkCacheData.copyWithDistance(cached, data.getDistance()));
                 continue;
             }
             summary.vectorLinkCacheMisses++;

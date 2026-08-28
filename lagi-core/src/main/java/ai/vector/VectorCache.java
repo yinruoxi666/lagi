@@ -54,7 +54,7 @@ public class VectorCache {
     }
 
     public void putToVectorLinkCache(String id, List<IndexSearchData> extendedIndexSearchData) {
-        vectorLinkCache.put(id, extendedIndexSearchData);
+        vectorLinkCache.put(id, VectorLinkCacheData.copyWithDistance(extendedIndexSearchData, null));
         logger.debug("Vector cache put: cacheType=vectorLink, id={}, size={}", id, vectorLinkCache.size());
     }
 
