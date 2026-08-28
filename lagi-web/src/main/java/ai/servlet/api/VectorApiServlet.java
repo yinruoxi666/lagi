@@ -1,6 +1,5 @@
 package ai.servlet.api;
 
-import ai.bigdata.BigdataService;
 import ai.common.pojo.IndexSearchData;
 import ai.common.pojo.UserRagSetting;
 import ai.migrate.service.UploadFileService;
@@ -32,7 +31,6 @@ import static com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL;
 public class VectorApiServlet extends BaseServlet {
     private final VectorStoreService vectorStoreService = new VectorStoreService();
     private final VectorDbService vectorDbService = new VectorDbService(null);
-    private final BigdataService bigdataService = new BigdataService();
     private final UploadFileService uploadFileService = new UploadFileService();
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -48,6 +46,8 @@ public class VectorApiServlet extends BaseServlet {
         String method = url.substring(url.lastIndexOf("/") + 1);
         if (method.equals("query") || method.equals("chunkQuery")) {
             this.query(req, resp);
+        } else if (method.equals("hybridQuery")) {
+            this.hybridQuery(req, resp);
         } else if (method.equals("get") || method.equals("chunkGet")) {
             this.get(req, resp);
         } else if (method.equals("add")) {
@@ -269,6 +269,16 @@ public class VectorApiServlet extends BaseServlet {
         responsePrint(resp, toJson(result));
     }
 
+    private void hybridQuery(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        resp.setContentType("application/json;charset=utf-8");
+        HybridQueryRequest request = reqBodyToObj(req, HybridQueryRequest.class);
+        List<HybridSearchResult> recordList = vectorStoreService.hybridQuery(request);
+        Map<String, Object> result = new HashMap<>();
+        result.put("status", "success");
+        result.put("data", recordList);
+        responsePrint(resp, toJson(result));
+    }
+
     private void upsert(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         resp.setContentType("application/json;charset=utf-8");
         VectorUpsertRequest vectorUpsertRequest = reqBodyToObj(req, VectorUpsertRequest.class);
@@ -324,7 +334,6 @@ public class VectorApiServlet extends BaseServlet {
         String category = vectorDeleteRequest.getCategory();
         vectorStoreService.deleteCollection(category);
         uploadFileService.deleteUploadFile(category);
-        bigdataService.delete(category);
         Map<String, Object> result = new HashMap<>();
         result.put("status", "success");
         responsePrint(resp, toJson(result));

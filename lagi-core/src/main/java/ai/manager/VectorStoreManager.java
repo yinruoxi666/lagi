@@ -39,7 +39,15 @@ public class VectorStoreManager {
         if (vectorStoreConfigs == null || vectorStoreConfigs.isEmpty() || ragFunction == null || embeddings == null || embeddings.isEmpty()) {
             return;
         }
-        Map<String, VectorStoreConfig> vectorMap = vectorStoreConfigs.stream().collect(Collectors.toMap(VectorStoreConfig::getName, vectorStoreConfig -> vectorStoreConfig));
+        Map<String, VectorStoreConfig> vectorMap = vectorStoreConfigs.stream().collect(Collectors.toMap(
+                VectorStoreConfig::getName,
+                vectorStoreConfig -> vectorStoreConfig,
+                (v1, v2) -> {
+                    log.warn("Duplicate vector store name detected: {}. Keep first one, ignore later config.", v1.getName());
+                    return v1;
+                },
+                LinkedHashMap::new
+        ));
         if(Boolean.TRUE.equals(ragFunction.getEnable())) {
             VectorStoreConfig vectorStoreConfig = vectorMap.get(ragFunction.getVector());
             Optional.ofNullable(vectorStoreConfig).ifPresent(v -> {
@@ -52,7 +60,7 @@ public class VectorStoreManager {
                     register(name, vs);
                     LagiGlobal.RAG_ENABLE = true;
                 } catch (Exception e) {
-                    log.error("registerVectorStore ({})error", v.getName());
+                    log.error("registerVectorStore ({}) error", v.getName(), e);
                 }}
             );
         }
@@ -105,5 +113,3 @@ public class VectorStoreManager {
     }
 
 }
-
-
