@@ -197,6 +197,9 @@
                         </goals>
                         <configuration>
                             <warName>ROOT</warName>
+                            <!-- Keep Maven's exploded WAR directory aligned with the
+                                 IntelliJ Tomcat artifact path (target/ROOT). -->
+                            <webappDirectory>${project.build.directory}/ROOT</webappDirectory>
                             <attachClasses>false</attachClasses>
                             <archive>
                                 <manifest>
