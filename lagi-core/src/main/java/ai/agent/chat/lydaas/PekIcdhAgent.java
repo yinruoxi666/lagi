@@ -580,7 +580,8 @@ public class PekIcdhAgent extends BaseChatAgent {
         }
         log.info("[pek_icdh][cache] hit, sessionId={}, conversationId={}, historySize={}",
                 sessionId, conversationId, dataList.size());
-        return new ArrayList<>(dataList);
+        // The platform accepts only the immediately preceding round, not the full history.
+        return Collections.singletonList(dataList.get(dataList.size() - 1));
     }
 
     private void saveConversationContext(String sessionId, LydaasChatResponse response) {
